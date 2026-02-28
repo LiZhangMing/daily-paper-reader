@@ -2149,21 +2149,62 @@ window.$docsify = {
       const hydrateStructuredSidebarItems = () => {
         const nav = document.querySelector('.sidebar-nav');
         if (!nav) return;
-        const links = nav.querySelectorAll('a.dpr-sidebar-item-structured[data-sidebar-item]');
+        const links = nav.querySelectorAll('a.dpr-sidebar-item-link[href*="#/"]');
         links.forEach((a) => {
           if (a.dataset.sidebarStructuredHydrated === '1') return;
-          const raw = a.getAttribute('data-sidebar-item') || '';
-          if (!raw) return;
+          const href = String(a.getAttribute('href') || '').trim();
+          const routeMatch = href.match(/#\/(.+)$/);
+          const routeId = routeMatch ? decodeURIComponent(routeMatch[1]).replace(/\/$/, '') : '';
+          const arxivId = routeId ? routeId.split('/').slice(-1)[0] : '';
+          const fallbackLink = arxivId ? `https://arxiv.org/abs/${arxivId}` : '';
+
           let payload = null;
-          try {
-            payload = JSON.parse(raw);
-          } catch {
-            return;
+          const raw = a.getAttribute('data-sidebar-item') || '';
+          if (raw) {
+            try {
+              payload = JSON.parse(raw);
+            } catch {
+              payload = null;
+            }
           }
+
+          // 兼容历史 sidebar：从旧 DOM（title/tags/score）回填结构化数据
+          if (!payload || typeof payload !== 'object') {
+            const legacyTitle = String(
+              (a.querySelector('.dpr-sidebar-title') && a.querySelector('.dpr-sidebar-title').textContent) ||
+                a.textContent ||
+                '',
+            ).trim();
+            const legacyScoreNode = a.querySelector('.dpr-sidebar-tag-score .dpr-stars');
+            const legacyScoreTitle = String(
+              (legacyScoreNode && legacyScoreNode.getAttribute('title')) || '',
+            );
+            const scoreMatch = legacyScoreTitle.match(/评分：\s*([0-9]+(?:\.[0-9]+)?)\s*\/10/);
+            const legacyScore = scoreMatch ? scoreMatch[1] : '-';
+            const legacyTags = [];
+            const tagNodes = a.querySelectorAll('.dpr-sidebar-tag');
+            tagNodes.forEach((node) => {
+              if (node.classList.contains('dpr-sidebar-tag-score')) return;
+              const label = String(node.textContent || '').trim();
+              if (!label) return;
+              let kind = 'other';
+              if (node.classList.contains('dpr-sidebar-tag-keyword')) kind = 'keyword';
+              if (node.classList.contains('dpr-sidebar-tag-query')) kind = 'query';
+              if (node.classList.contains('dpr-sidebar-tag-paper')) kind = 'paper';
+              legacyTags.push({ kind, label });
+            });
+            payload = {
+              title: legacyTitle || routeId,
+              link: fallbackLink || href,
+              score: legacyScore,
+              tags: legacyTags,
+            };
+          }
+
           if (!payload || typeof payload !== 'object') return;
 
           const title = String(payload.title || a.textContent || '').trim();
-          const link = String(payload.link || '').trim();
+          const link = String(payload.link || fallbackLink || href || '').trim();
           const score = String(payload.score || '').trim();
           const tags = Array.isArray(payload.tags) ? payload.tags : [];
 
