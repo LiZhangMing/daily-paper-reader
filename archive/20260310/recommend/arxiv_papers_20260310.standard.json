@@ -1,0 +1,792 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-03-10T19:32:58.101632+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 14,
+    "deep_cap": 6,
+    "deep_selected": 9,
+    "quick_candidates": 31,
+    "quick_skim_target": 11,
+    "quick_selected": 11
+  },
+  "deep_dive": [
+    {
+      "id": "2603.02785v1",
+      "title": "HiLoRA: Hierarchical Low-Rank Adaptation for Personalized Federated Learning",
+      "abstract": "Vision Transformers (ViTs) have been widely adopted in vision tasks due to their strong transferability. In Federated Learning (FL), where full fine-tuning is communication heavy, Low-Rank Adaptation (LoRA) provides an efficient and communication-friendly way to adapt ViTs. However, existing LoRA-based federated tuning methods overlook latent client structures in real-world settings, limiting shared representation learning and hindering effective adaptation to unseen clients. To address this, we propose HiLoRA, a hierarchical LoRA framework that places adapters at three levels: root, cluster, and leaf, each designed to capture global, subgroup, and client-specific knowledge, respectively. Through cross-tier orthogonality and cascaded optimization, HiLoRA separates update subspaces and aligns each tier with its residual personalized objective. In particular, we develop a LoRA-Subspace Adaptive Clustering mechanism that infers latent client groups via subspace similarity analysis, thereby facilitating knowledge sharing across structurally aligned clients. Theoretically, we establish a tier-wise generalization analysis that supports HiLoRA's design. Experiments on ViT backbones with CIFAR-100 and DomainNet demonstrate consistent improvements in both personalization and generalization.",
+      "authors": [
+        "Zihao Peng",
+        "Nan Zou",
+        "Jiandian Zeng",
+        "Guo Li",
+        "Ke Chen",
+        "Boyuan Li",
+        "Tian Wang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-03T09:25:16+00:00",
+      "link": "https://arxiv.org/pdf/2603.02785v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "hierarchical Low-Rank Adaptation (HiLoRA) for efficient tuning",
+      "llm_evidence_cn": "用于高效微调的分层低秩自适应 (HiLoRA)",
+      "llm_evidence": "用于高效微调的分层低秩自适应 (HiLoRA)",
+      "canonical_evidence": "用于高效微调的分层低秩自适应 (HiLoRA)",
+      "llm_tldr_en": "Proposes HiLoRA, a hierarchical low-rank adaptation framework for efficient personalized federated learning.",
+      "llm_tldr_cn": "提出了HiLoRA，一种用于高效个性化联邦学习的分层低秩自适应框架。",
+      "llm_tldr": "提出了HiLoRA，一种用于高效个性化联邦学习的分层低秩自适应框架。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.03535v1",
+      "title": "Trade-offs in Ensembling, Merging and Routing Among Parameter-Efficient Experts",
+      "abstract": "While large language models (LLMs) fine-tuned with lightweight adapters achieve strong performance across diverse tasks, their performance on individual tasks depends on the fine-tuning strategy. Fusing independently trained models with different strengths has shown promise for multi-task learning through three main strategies: ensembling, which combines outputs from independent models; merging, which fuses model weights via parameter averaging; and routing, which integrates models in an input-dependent fashion. However, many design decisions in these approaches remain understudied, and the relative benefits of more sophisticated ensembling, merging and routing techniques are not fully understood. We empirically evaluate their trade-offs, addressing two key questions: What are the advantages of going beyond uniform ensembling or merging? And does the flexibility of routing justify its complexity? Our findings indicate that non-uniform ensembling and merging improve performance, but routing offers even greater gains. To mitigate the computational cost of routing, we analyze expert selection techniques, showing that clustering and greedy subset selection can maintain reasonable performance with minimal overhead. These insights advance our understanding of model fusion for multi-task learning.",
+      "authors": [
+        "Sanae Lotfi",
+        "Lucas Caccia",
+        "Alessandro Sordoni",
+        "Jordan T. Ash",
+        "Miroslav Dudik"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-03-03T21:44:11+00:00",
+      "link": "https://arxiv.org/pdf/2603.03535v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "Evaluates trade-offs in ensembling, merging, and routing among parameter-efficient experts/adapters.",
+      "llm_evidence_cn": "评估参数高效专家/适配器在集成、合并和路由中的权衡。",
+      "llm_evidence": "评估参数高效专家/适配器在集成、合并和路由中的权衡。",
+      "canonical_evidence": "评估参数高效专家/适配器在集成、合并和路由中的权衡。",
+      "llm_tldr_en": "Empirically studies strategies for combining independently trained parameter-efficient adapters for multi-task learning.",
+      "llm_tldr_cn": "实证研究了为多任务学习组合独立训练的参数高效适配器的策略。",
+      "llm_tldr": "实证研究了为多任务学习组合独立训练的参数高效适配器的策略。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.03959v1",
+      "title": "LoRA-MME: Multi-Model Ensemble of LoRA-Tuned Encoders for Code Comment Classification",
+      "abstract": "Code comment classification is a critical task for automated software documentation and analysis. In the context of the NLBSE'26 Tool Competition, we present \\textbf{LoRA-MME}, a Multi-Model Ensemble architecture utilizing Parameter-Efficient Fine-Tuning (PEFT). Our approach addresses the multi-label classification challenge across Java, Python, and Pharo by combining the strengths of four distinct transformer encoders: UniXcoder, CodeBERT, GraphCodeBERT, and CodeBERTa. By independently fine-tuning these models using Low-Rank Adaptation(LoRA) and aggregating their predictions via a learned weighted ensemble strategy, we maximize classification performance without the memory overhead of full model fine-tuning. Our tool achieved an \\textbf{F1 Weighted score of 0.7906} and a \\textbf{Macro F1 of 0.6867} on the test set. However, the computational cost of the ensemble resulted in a final submission score of 41.20\\%, highlighting the trade-off between semantic accuracy and inference efficiency.",
+      "authors": [
+        "Md Akib Haider",
+        "Ahsan Bulbul",
+        "Nafis Fuad Shahid",
+        "Aimaan Ahmed",
+        "Mohammad Ishrak Abedin"
+      ],
+      "primary_category": "cs.SE",
+      "categories": [
+        "cs.SE",
+        "cs.LG"
+      ],
+      "published": "2026-03-04T11:36:32+00:00",
+      "link": "https://arxiv.org/pdf/2603.03959v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "Utilizes Low-Rank Adaptation (LoRA) for parameter-efficient fine-tuning of transformer encoders.",
+      "llm_evidence_cn": "利用低秩自适应 (LoRA) 对 Transformer 编码器进行参数高效微调。",
+      "llm_evidence": "利用低秩自适应 (LoRA) 对 Transformer 编码器进行参数高效微调。",
+      "canonical_evidence": "利用低秩自适应 (LoRA) 对 Transformer 编码器进行参数高效微调。",
+      "llm_tldr_en": "Proposes LoRA-MME, an ensemble architecture using LoRA-tuned encoders for efficient code comment classification.",
+      "llm_tldr_cn": "提出 LoRA-MME，一种使用 LoRA 微调编码器的集成架构，用于高效的代码注释分类。",
+      "llm_tldr": "提出 LoRA-MME，一种使用 LoRA 微调编码器的集成架构，用于高效的代码注释分类。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.03959v2",
+      "title": "LoRA-MME: Multi-Model Ensemble of LoRA-Tuned Encoders for Code Comment Classification",
+      "abstract": "Code comment classification is a critical task for automated software documentation and analysis. In the context of the NLBSE'26 Tool Competition, we present LoRA-MME, a Multi-Model Ensemble architecture utilizing Parameter-Efficient Fine-Tuning (PEFT). Our approach addresses the multi-label classification challenge across Java, Python, and Pharo by combining the strengths of four distinct transformer encoders: UniXcoder, CodeBERT, GraphCodeBERT, and CodeBERTa. By independently fine-tuning these models using Low-Rank Adaptation(LoRA) and aggregating their predictions via a learned weighted ensemble strategy, we maximize classification performance without the memory overhead of full model fine-tuning. Our tool achieved an F1 Weighted score of 0.7906 and a Macro F1 of 0.6867 on the test set. However, the computational cost of the ensemble resulted in a final submission score of 41.20%, highlighting the trade-off between semantic accuracy and inference efficiency.",
+      "authors": [
+        "Md Akib Haider",
+        "Ahsan Bulbul",
+        "Nafis Fuad Shahid",
+        "Aimaan Ahmed",
+        "Mohammad Ishrak Abedin"
+      ],
+      "primary_category": "cs.SE",
+      "categories": [
+        "cs.SE",
+        "cs.LG"
+      ],
+      "published": "2026-03-04T11:36:32+00:00",
+      "link": "https://arxiv.org/pdf/2603.03959v2",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "Multi-Model Ensemble architecture utilizing Parameter-Efficient Fine-Tuning (PEFT) and LoRA",
+      "llm_evidence_cn": "利用参数高效微调(PEFT)和LoRA的多模型集成架构",
+      "llm_evidence": "利用参数高效微调(PEFT)和LoRA的多模型集成架构",
+      "canonical_evidence": "利用参数高效微调(PEFT)和LoRA的多模型集成架构",
+      "llm_tldr_en": "Proposes an ensemble of LoRA-tuned encoders for efficient code comment classification.",
+      "llm_tldr_cn": "提出了一种基于LoRA微调编码器的集成方法，用于高效的代码注释分类。",
+      "llm_tldr": "提出了一种基于LoRA微调编码器的集成方法，用于高效的代码注释分类。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.02281v1",
+      "title": "Quantum-Inspired Fine-Tuning for Few-Shot AIGC Detection via Phase-Structured Reparameterization",
+      "abstract": "Recent studies show that quantum neural networks (QNNs) generalize well in few-shot regimes. To extend this advantage to large-scale tasks, we propose Q-LoRA, a quantum-enhanced fine-tuning scheme that integrates lightweight QNNs into the low-rank adaptation (LoRA) adapter. Applied to AI-generated content (AIGC) detection, Q-LoRA consistently outperforms standard LoRA under few-shot settings. We analyze the source of this improvement and identify two possible structural inductive biases from QNNs: (i) phase-aware representations, which encode richer information across orthogonal amplitude-phase components, and (ii) norm-constrained transformations, which stabilize optimization via inherent orthogonality. However, Q-LoRA incurs non-trivial overhead due to quantum simulation. Motivated by our analysis, we further introduce H-LoRA, a fully classical variant that applies the Hilbert transform within the LoRA adapter to retain similar phase structure and constraints. Experiments on few-shot AIGC detection show that both Q-LoRA and H-LoRA outperform standard LoRA by over 5% accuracy, with H-LoRA achieving comparable accuracy at significantly lower cost in this task.",
+      "authors": [
+        "Kaiyang Xing",
+        "Han Fang",
+        "Zhaoyun Chen",
+        "Zhonghui Li",
+        "Yang Yang",
+        "Weiming Zhang",
+        "Guoping Guo"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI",
+        "quant-ph"
+      ],
+      "published": "2026-03-02T02:16:09+00:00",
+      "link": "https://arxiv.org/pdf/2603.02281v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Integrates QNNs into LoRA adapters for few-shot fine-tuning",
+      "llm_evidence_cn": "将量子神经网络集成到LoRA适配器中进行少样本微调",
+      "llm_evidence": "将量子神经网络集成到LoRA适配器中进行少样本微调",
+      "canonical_evidence": "将量子神经网络集成到LoRA适配器中进行少样本微调",
+      "llm_tldr_en": "Proposes Q-LoRA, a quantum-enhanced low-rank adaptation scheme for improved few-shot AIGC detection.",
+      "llm_tldr_cn": "提出Q-LoRA，一种量子增强的低秩自适应方案，提升了少样本AIGC检测性能。",
+      "llm_tldr": "提出Q-LoRA，一种量子增强的低秩自适应方案，提升了少样本AIGC检测性能。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.02464v1",
+      "title": "GLoRIA: Gated Low-Rank Interpretable Adaptation for Dialectal ASR",
+      "abstract": "Automatic Speech Recognition (ASR) in dialect-heavy settings remains challenging due to strong regional variation and limited labeled data. We propose GLoRIA, a parameter-efficient adaptation framework that leverages metadata (e.g., coordinates) to modulate low-rank updates in a pre-trained encoder. GLoRIA injects low-rank matrices into each feed-forward layer, with a gating MLP determining the non-negative contribution of each LoRA rank-1 component based on location metadata. On the GCND corpus, GLoRIA outperforms geo-conditioned full fine-tuning, LoRA, and both dialect-specific and unified full fine-tuning, achieving state-of-the-art word error rates while updating under 10% of parameters. GLoRIA also generalizes well to unseen dialects, including in extrapolation scenarios, and enables interpretable adaptation patterns that can be visualized geospatially. These results show metadata-gated low-rank adaptation is an effective, interpretable, and efficient solution for dialectal ASR.",
+      "authors": [
+        "Pouya Mehralian",
+        "Melissa Farasyn",
+        "Anne Breitbarth",
+        "Anne-Sophie Ghyselen",
+        "Hugo Van hamme"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.AI"
+      ],
+      "published": "2026-03-02T23:10:09+00:00",
+      "link": "https://arxiv.org/pdf/2603.02464v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "modulate low-rank updates in a pre-trained encoder",
+      "llm_evidence_cn": "在预训练编码器中调节低秩更新",
+      "llm_evidence": "在预训练编码器中调节低秩更新",
+      "canonical_evidence": "在预训练编码器中调节低秩更新",
+      "llm_tldr_en": "GLoRIA is a parameter-efficient framework that uses gated low-rank updates for dialectal speech adaptation.",
+      "llm_tldr_cn": "GLoRIA是一个参数高效框架，利用门控低秩更新实现方言语音识别的适配。",
+      "llm_tldr": "GLoRIA是一个参数高效框架，利用门控低秩更新实现方言语音识别的适配。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.04733v1",
+      "title": "FOZO: Forward-Only Zeroth-Order Prompt Optimization for Test-Time Adaptation",
+      "abstract": "Test-Time Adaptation (TTA) is essential for enabling deep learning models to handle real-world data distribution shifts. However, current approaches face significant limitations: backpropagation-based methods are not suitable for low-end deployment devices, due to their high computation and memory requirements, as well as their tendency to modify model weights during adaptation; while traditional backpropagation-free techniques exhibit constrained adaptation capabilities. In this work, we propose Forward-Only Zeroth-Order Optimization (FOZO), a novel and practical backpropagation-free paradigm for TTA. FOZO leverages a memory-efficient zeroth-order prompt optimization, which is led by objectives optimizing both intermediate feature statistics and prediction entropy. To ensure efficient and stable adaptation over the out-of-distribution data stream, we introduce a dynamically decaying perturbation scale during zeroth-order gradient estimation and theoretically prove its convergence under the TTA data stream assumption. Extensive continual adaptation experiments on ImageNet-C, ImageNet-R, and ImageNet-Sketch demonstrate FOZO's superior performance, achieving 59.52% Top-1 accuracy on ImageNet-C (5K, level 5) and outperforming main gradient-based methods and SOTA forward-only FOA (58.13%). Furthermore, FOZO exhibits strong generalization on quantized (INT8) models. These findings demonstrate that FOZO is a highly competitive solution for TTA deployment in resource-limited scenarios.",
+      "authors": [
+        "Xingyu Wang",
+        "Tao Wang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-05T02:12:48+00:00",
+      "link": "https://arxiv.org/pdf/2603.04733v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "memory-efficient zeroth-order prompt optimization",
+      "llm_evidence_cn": "内存高效的零阶提示优化",
+      "llm_evidence": "内存高效的零阶提示优化",
+      "canonical_evidence": "内存高效的零阶提示优化",
+      "llm_tldr_en": "Introduces a backpropagation-free zeroth-order prompt optimization method for efficient test-time adaptation.",
+      "llm_tldr_cn": "引入了一种无反向传播的零阶提示优化方法，用于高效的测试时自适应。",
+      "llm_tldr": "引入了一种无反向传播的零阶提示优化方法，用于高效的测试时自适应。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Soft prompt tuning and prefix tuning techniques",
+      "matched_requirement_id": "req-3",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.04772v1",
+      "title": "TSEmbed: Unlocking Task Scaling in Universal Multimodal Embeddings",
+      "abstract": "Despite the exceptional reasoning capabilities of Multimodal Large Language Models (MLLMs), their adaptation into universal embedding models is significantly impeded by task conflict. To address this, we propose TSEmbed, a universal multimodal embedding framework that synergizes Mixture-of-Experts (MoE) with Low-Rank Adaptation (LoRA) to explicitly disentangle conflicting task objectives. Moreover, we introduce Expert-Aware Negative Sampling (EANS), a novel strategy that leverages expert routing distributions as an intrinsic proxy for semantic similarity. By dynamically prioritizing informative hard negatives that share expert activation patterns with the query, EANS effectively sharpens the model's discriminative power and refines embedding boundaries. To ensure training stability, we further devise a two-stage learning paradigm that solidifies expert specialization before optimizing representations via EANS. TSEmbed achieves state-of-the-art performance on both the Massive Multimodal Embedding Benchmark (MMEB) and real-world industrial production datasets, laying a foundation for task-level scaling in universal multimodal embeddings.",
+      "authors": [
+        "Yebo Wu",
+        "Feng Liu",
+        "Ziwei Xie",
+        "Zhiyuan Liu",
+        "Changwang Zhang",
+        "Jun Wang",
+        "Li Li"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.AI"
+      ],
+      "published": "2026-03-05T03:43:52+00:00",
+      "link": "https://arxiv.org/pdf/2603.04772v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Synergizes MoE with Low-Rank Adaptation (LoRA)",
+      "llm_evidence_cn": "结合 MoE 与低秩自适应 (LoRA)",
+      "llm_evidence": "结合 MoE 与低秩自适应 (LoRA)",
+      "canonical_evidence": "结合 MoE 与低秩自适应 (LoRA)",
+      "llm_tldr_en": "Combines MoE and LoRA to create universal multimodal embeddings without task conflict.",
+      "llm_tldr_cn": "结合 MoE 与 LoRA 技术，构建无任务冲突的通用多模态嵌入模型。",
+      "llm_tldr": "结合 MoE 与 LoRA 技术，构建无任务冲突的通用多模态嵌入模型。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.08181v1",
+      "title": "AutoAdapt: An Automated Domain Adaptation Framework for LLMs",
+      "abstract": "Large language models (LLMs) excel in open domains but struggle in specialized settings with limited data and evolving knowledge. Existing domain adaptation practices rely heavily on manual trial-and-error processes, incur significant hyperparameter complexity, and are highly sensitive to data and user preferences, all under the high cost of LLM training. Moreover, the interactions and transferability of hyperparameter choices across models/domains remain poorly understood, making adaptation gains uncertain even with substantial effort. To solve these challenges, we present AutoAdapt, a novel end-to-end automated framework for efficient and reliable LLM domain adaptation. AutoAdapt leverages curated knowledge bases from literature and open-source resources to reduce expert intervention. To narrow the search space, we design a novel multi-agent debating system in which proposal and critic agents iteratively interact to align user intent and incorporate data signals and best practices into the planning process. To optimize hyperparameters under tight budgets, we propose AutoRefine, a novel LLM-based surrogate that replaces costly black-box search. Across 10 tasks, AutoAdapt achieves a 25% average relative accuracy improvement over state-of-the-art Automated Machine Learning baselines with minimal overhead.",
+      "authors": [
+        "Sidharth Sinha",
+        "Anson Bastos",
+        "Xuchao Zhang",
+        "Akshay Nambi",
+        "Chetan Bansal",
+        "Saravan Rajmohan"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-03-09T10:03:16+00:00",
+      "link": "https://arxiv.org/pdf/2603.08181v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Automated framework for efficient LLM domain adaptation",
+      "llm_evidence_cn": "用于大模型高效领域适配的自动化框架",
+      "llm_evidence": "用于大模型高效领域适配的自动化框架",
+      "canonical_evidence": "用于大模型高效领域适配的自动化框架",
+      "llm_tldr_en": "Presents AutoAdapt, an end-to-end framework to automate and optimize LLM adaptation to specialized domains.",
+      "llm_tldr_cn": "提出AutoAdapt，一个用于自动化和优化大模型在特定领域适配的端到端框架。",
+      "llm_tldr": "提出AutoAdapt，一个用于自动化和优化大模型在特定领域适配的端到端框架。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2603.01732v1",
+      "title": "Bootstrapping Embeddings for Low Resource Languages",
+      "abstract": "Embedding models are crucial to modern NLP. However, the creation of the most effective models relies on carefully constructed supervised finetuning data. For high resource languages, such as English, such datasets are readily available. However, for hundreds of other languages, they are simply non-existent. We investigate whether the advent of large language models can help to bridge this gap. We test three different strategies for generating synthetic triplet data used to optimise embedding models. These include in-context learning as well as two novel approaches, leveraging adapter composition and cross lingual finetuning of the LLM generator (XL-LoRA) respectively. We find that while in-context learning still falls short of strong non-synthetic baselines, adapter composition and XL-LoRA yield strong performance gains across a wide array of tasks and languages, offering a clear, scalable pathway to producing performant embedding models for a wide variety of languages.",
+      "authors": [
+        "Merve Basoz",
+        "Andrew Horne",
+        "Mattia Opper"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-03-02T10:59:33+00:00",
+      "link": "https://arxiv.org/pdf/2603.01732v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Leverages cross lingual finetuning of the LLM generator (XL-LoRA)",
+      "llm_evidence_cn": "利用LLM生成器的跨语言微调 (XL-LoRA)",
+      "llm_evidence": "利用LLM生成器的跨语言微调 (XL-LoRA)",
+      "canonical_evidence": "利用LLM生成器的跨语言微调 (XL-LoRA)",
+      "llm_tldr_en": "Uses LoRA-based adapter composition to bootstrap embeddings for low-resource languages.",
+      "llm_tldr_cn": "利用基于LoRA的适配器组合技术，为低资源语言引导生成嵌入模型。",
+      "llm_tldr": "利用基于LoRA的适配器组合技术，为低资源语言引导生成嵌入模型。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2603.01375v1",
+      "title": "Words & Weights: Streamlining Multi-Turn Interactions via Co-Adaptation",
+      "abstract": "Test-time policy adaptation for multi-turn interactions (T2PAM) is essential for aligning Large Language Models (LLMs) with dynamic user needs during inference time. However, existing paradigms commonly treat test-time adaptation as a single-axis problem, either purely refining instructions (Prompt Engineering) or only adjusting weights (Test-Time Training), ignoring that interaction failures stem from a coupled mix of ambiguity and incapacity. We argue that these two optimization paths are not merely additive but synergistic: semantic clarity acts as a pre-conditioner for effective parameter updates. To this end, we propose ROSA2, a framework that reformulates interaction as a joint optimization problem over the heterogeneous space of Words and Weights. By mathematically decomposing the error signal, ROSA2 utilizes textual gradients to rectify intent ambiguity and parameter updates to bridge capability gaps. Theoretically, we prove that this co-adaptation strictly reduces the required parameter shift for convergence. Empirically, ROSA2 outperforms state-of-the-art baselines by 30% on MATH while reducing interaction turns by 40%, demonstrating that refining the context unlocks the true potential of parameter updates.",
+      "authors": [
+        "Chenxing Wei",
+        "Hong Wang",
+        "Ying He",
+        "Zhongxiang Dai",
+        "Bo Jiang",
+        "F. Richard Yu",
+        "Yao Shu"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI",
+        "cs.LG"
+      ],
+      "published": "2026-03-02T02:16:20+00:00",
+      "link": "https://arxiv.org/pdf/2603.01375v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Test-time weight adaptation",
+      "llm_evidence_cn": "测试时权重自适应",
+      "llm_evidence": "测试时权重自适应",
+      "canonical_evidence": "测试时权重自适应",
+      "llm_tldr_en": "Proposes ROSA2 for joint optimization of prompts and weights during test-time adaptation.",
+      "llm_tldr_cn": "提出 ROSA2 框架，在测试阶段联合优化提示词与模型权重。",
+      "llm_tldr": "提出 ROSA2 框架，在测试阶段联合优化提示词与模型权重。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Recent advances in efficient adaptation of large language models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.01712v1",
+      "title": "FT-Dojo: Towards Autonomous LLM Fine-Tuning with Language Agents",
+      "abstract": "Fine-tuning large language models for vertical domains remains a labor-intensive and expensive process, requiring domain experts to curate data, configure training, and iteratively diagnose model behavior. Despite growing interest in autonomous machine learning, no prior work has tackled end-to-end LLM fine-tuning with agents. Can LLM-based agents automate this complete process? We frame this as a substantially open problem: agents must navigate an open-ended search space spanning data curation from diverse data sources, processing with complex tools, building a training pipeline, and iteratively refining their approach based on evaluation outcomes in rapidly growing logs--an overall scenario far more intricate than existing benchmarks. To study this question, we introduce FT-Dojo, an interactive environment comprising 13 tasks across 5 domains. We further develop FT-Agent, an autonomous system that mirrors human experts by leveraging evaluation-driven feedback to iteratively diagnose failures and refine fine-tuning strategies. Experiments on FT-Dojo demonstrate that purpose-built fine-tuning agents significantly outperform general-purpose alternatives, with FT-Agent achieving the best performance on 10 out of 13 tasks across all five domains. Ablations show that the approach generalizes effectively to 3B models, with additional insights on data scaling trade-offs and backbone sensitivity. Case analyses reveal that agents can recover from failures through cumulative learning from historical experience, while also exposing fundamental limitations in causal reasoning--highlighting both the promise and current boundaries of autonomous LLM fine-tuning.",
+      "authors": [
+        "Qizheng Li",
+        "Yifei Zhang",
+        "Xiao Yang",
+        "Xu Yang",
+        "Zhuo Wang",
+        "Weiqing Liu",
+        "Jiang Bian"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI",
+        "cs.LG"
+      ],
+      "published": "2026-03-02T10:37:11+00:00",
+      "link": "https://arxiv.org/pdf/2603.01712v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "autonomous LLM fine-tuning with language agents",
+      "llm_evidence_cn": "使用语言智能体进行自主大模型微调",
+      "llm_evidence": "使用语言智能体进行自主大模型微调",
+      "canonical_evidence": "使用语言智能体进行自主大模型微调",
+      "llm_tldr_en": "Proposes FT-Dojo, a framework using LLM agents to automate the end-to-end fine-tuning process for vertical domains.",
+      "llm_tldr_cn": "提出 FT-Dojo 框架，利用大模型智能体自动化垂直领域的端到端微调过程。",
+      "llm_tldr": "提出 FT-Dojo 框架，利用大模型智能体自动化垂直领域的端到端微调过程。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.05357v1",
+      "title": "DiSCTT: Consensus-Guided Self-Curriculum for Efficient Test-Time Adaptation in Reasoning",
+      "abstract": "Test-time adaptation offers a promising avenue for improving reasoning performance in large language models without additional supervision, but existing approaches often apply a uniform optimization objective across all inputs, leading to inefficient or unstable adaptation on heterogeneous reasoning problems. We propose DiSCTT, a difficulty-aware, consensus-guided self-curriculum framework that dynamically allocates test-time optimization strategies based on instance-level epistemic uncertainty estimated from agreement among sampled reasoning trajectories. Inputs with high consensus are consolidated via supervised fine-tuning using majority-agreed solutions as pseudo-labels, while low-consensus inputs are optimized via reinforcement learning with a consensus-regularized objective that encourages diversity under relevance constraints. Across a broad suite of mathematical and general reasoning benchmarks, DiSCTT consistently outperforms strong test-time adaptation baselines, achieving higher accuracy with reduced variance and substantially lower computation and wall-clock training times. These results demonstrate that explicitly accounting for instance difficulty and uncertainty enables more stable, efficient, and effective test-time adaptation for reasoning models.",
+      "authors": [
+        "Mohammad Mahdi Moradi",
+        "Sudhir Mudur"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-03-05T16:38:50+00:00",
+      "link": "https://arxiv.org/pdf/2603.05357v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Efficient test-time adaptation framework for reasoning tasks in LLMs.",
+      "llm_evidence_cn": "大模型推理任务的高效测试时自适应框架。",
+      "llm_evidence": "大模型推理任务的高效测试时自适应框架。",
+      "canonical_evidence": "大模型推理任务的高效测试时自适应框架。",
+      "llm_tldr_en": "Proposes a self-curriculum framework for dynamic and efficient test-time adaptation of reasoning models.",
+      "llm_tldr_cn": "提出一种自课程框架，用于推理模型动态且高效的测试时自适应。",
+      "llm_tldr": "提出一种自课程框架，用于推理模型动态且高效的测试时自适应。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Recent advances in efficient adaptation of large language models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2603.01788v1",
+      "title": "nchellwig at SemEval-2026 Task 3: Self-Consistent Structured Generation (SCSG) for Dimensional Aspect-Based Sentiment Analysis using Large Language Models",
+      "abstract": "We present Self-Consistent Structured Generation (SCSG) for Dimensional Aspect-Based Sentiment Analysis in SemEval-2026 Task 3 (Track A). SCSG enhances prediction reliability by executing a LoRA-adapted large language model multiple times per instance, retaining only tuples that achieve a majority consensus across runs. To mitigate the computational overhead of multiple forward passes, we leverage vLLM's PagedAttention mechanism for efficient key--value cache reuse. Evaluation across 6 languages and 8 language--domain combinations demonstrates that self-consistency with 15 executions yields statistically significant improvements over single-inference prompting, with our system (leveraging Gemma 3) ranking in the top seven across all settings, achieving second place on three out of four English subsets and first place on Tatar-Restaurant for DimASTE.",
+      "authors": [
+        "Nils Constantin Hellwig",
+        "Jakob Fehle",
+        "Udo Kruschwitz",
+        "Christian Wolff"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-03-02T12:13:03+00:00",
+      "link": "https://arxiv.org/pdf/2603.01788v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Uses LoRA-adapted large language model for sentiment analysis",
+      "llm_evidence_cn": "使用LoRA适配的大语言模型进行情感分析",
+      "llm_evidence": "使用LoRA适配的大语言模型进行情感分析",
+      "canonical_evidence": "使用LoRA适配的大语言模型进行情感分析",
+      "llm_tldr_en": "Applies LoRA-adapted LLMs with self-consistency to improve sentiment analysis reliability.",
+      "llm_tldr_cn": "应用LoRA适配的LLM并结合自一致性方法，提升了情感分析的可靠性。",
+      "llm_tldr": "应用LoRA适配的LLM并结合自一致性方法，提升了情感分析的可靠性。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.01875v1",
+      "title": "KDFlow: A User-Friendly and Efficient Knowledge Distillation Framework for Large Language Models",
+      "abstract": "Knowledge distillation (KD) is an essential technique to compress large language models (LLMs) into smaller ones. However, despite the distinct roles of the student model and the teacher model in KD, most existing frameworks still use a homogeneous training backend (e.g., FSDP and DeepSpeed) for both models, leading to suboptimal training efficiency. In this paper, we present a novel framework for LLM distillation, termed \\textbf{KDFlow}, which features a decoupled architecture and employs SGLang for teacher inference. By bridging the training efficiency of FSDP2 and the inference efficiency of SGLang, KDFlow achieves full utilization of both advantages in a unified system. Moreover, instead of transferring full logits across different processes, our framework only transmits the teacher's hidden states using zero-copy data transfer and recomputes the logits on the student side, effectively balancing the communication cost and KD performance. Furthermore, our framework supports both off-policy and on-policy distillation and incorporates KD algorithms for cross-tokenizer KD through highly extensible and user-friendly APIs. Experiments show that KDFlow can achieve \\textbf{1.44$\\times$ to 6.36$\\times$} speedup compared to current KD frameworks, enabling researchers to rapidly prototype and scale LLM distillation with minimal engineering overhead. Code is available at: https://github.com/songmzhang/KDFlow",
+      "authors": [
+        "Songming Zhang",
+        "Xue Zhang",
+        "Tong Zhang",
+        "Bojie Hu",
+        "Yufeng Chen",
+        "Jinan Xu"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.AI",
+        "cs.LG"
+      ],
+      "published": "2026-03-02T13:54:19+00:00",
+      "link": "https://arxiv.org/pdf/2603.01875v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "efficient framework for model compression and distillation",
+      "llm_evidence_cn": "高效的模型压缩与蒸馏框架",
+      "llm_evidence": "高效的模型压缩与蒸馏框架",
+      "canonical_evidence": "高效的模型压缩与蒸馏框架",
+      "llm_tldr_en": "Presents KDFlow, a decoupled framework that optimizes training and inference efficiency for LLM distillation.",
+      "llm_tldr_cn": "提出KDFlow，一个通过解耦架构优化大模型蒸馏训练和推理效率的框架。",
+      "llm_tldr": "提出KDFlow，一个通过解耦架构优化大模型蒸馏训练和推理效率的框架。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Memory-efficient fine-tuning strategies for large models",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.07926v1",
+      "title": "IMSE: Intrinsic Mixture of Spectral Experts Fine-tuning for Test-Time Adaptation",
+      "abstract": "Test-time adaptation (TTA) has been widely explored to prevent performance degradation when test data differ from the training distribution. However, fully leveraging the rich representations of large pretrained models with minimal parameter updates remains underexplored. In this paper, we propose Intrinsic Mixture of Spectral Experts (IMSE) that leverages the spectral experts inherently embedded in Vision Transformers. We decompose each linear layer via singular value decomposition (SVD) and adapt only the singular values, while keeping the singular vectors fixed. We further identify a key limitation of entropy minimization in TTA: it often induces feature collapse, causing the model to rely on domain-specific features rather than class-discriminative features. To address this, we propose a diversity maximization loss based on expert-input alignment, which encourages diverse utilization of spectral experts during adaptation. In the continual test-time adaptation (CTTA) scenario, beyond preserving pretrained knowledge, it is crucial to retain and reuse knowledge from previously observed domains. We introduce Domain-Aware Spectral Code Retrieval, which estimates input distributions to detect domain shifts, and retrieves adapted singular values for rapid adaptation. Consequently, our method achieves state-of-the-art performance on various distribution-shift benchmarks under the TTA setting. In CTTA and Gradual CTTA, it further improves accuracy by 3.4 percentage points (pp) and 2.4 pp, respectively, while requiring 385 times fewer trainable parameters. Our code is available at https://github.com/baek85/IMSE.",
+      "authors": [
+        "Sunghyun Baek",
+        "Jaemyung Yu",
+        "Seunghee Koh",
+        "Minsu Kim",
+        "Hyeonseong Jeon",
+        "Junmo Kim"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-03-09T03:42:44+00:00",
+      "link": "https://arxiv.org/pdf/2603.07926v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Adapts only singular values via SVD for minimal parameter updates",
+      "llm_evidence_cn": "通过SVD仅调整奇异值以实现极小参数更新",
+      "llm_evidence": "通过SVD仅调整奇异值以实现极小参数更新",
+      "canonical_evidence": "通过SVD仅调整奇异值以实现极小参数更新",
+      "llm_tldr_en": "Introduces a spectral expert fine-tuning method for efficient test-time adaptation.",
+      "llm_tldr_cn": "引入了一种基于谱专家的微调方法，用于高效的测试时自适应。",
+      "llm_tldr": "引入了一种基于谱专家的微调方法，用于高效的测试时自适应。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2603.02083v1",
+      "title": "$π$-StepNFT: Wider Space Needs Finer Steps in Online RL for Flow-based VLAs",
+      "abstract": "Flow-based vision-language-action (VLA) models excel in embodied control but suffer from intractable likelihoods during multi-step sampling, hindering online reinforcement learning. We propose \\textbf{\\textit{$\\boldsymbolπ$-StepNFT}} (Step-wise Negative-aware Fine-Tuning), a critic-and-likelihood-free framework that requires only a single forward pass per optimization step and eliminates auxiliary value networks. We identify that wider exploration spaces necessitate finer-grained, step-wise guidance for alignment. Empirically, $π$-StepNFT unlocks latent potential on LIBERO with competitive few-shot robustness. Moreover, it achieves superior generalization on ManiSkill, outperforming value-based baselines in OOD scenarios by preventing overfitting to multimodal features. This property offers a scalable solution promising for complex real-world applications.",
+      "authors": [
+        "Siting Wang",
+        "Xiaofeng Wang",
+        "Zheng Zhu",
+        "Minnan Pei",
+        "Xinyu Cui",
+        "Cheng Deng",
+        "Jian Zhao",
+        "Guan Huang",
+        "Haifeng Zhang",
+        "Jun Wang"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.CV"
+      ],
+      "published": "2026-03-02T17:04:49+00:00",
+      "link": "https://arxiv.org/pdf/2603.02083v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Step-wise fine-tuning for flow-based vision-language-action models",
+      "llm_evidence_cn": "针对流式视觉-语言-动作模型的分步微调方法",
+      "llm_evidence": "针对流式视觉-语言-动作模型的分步微调方法",
+      "canonical_evidence": "针对流式视觉-语言-动作模型的分步微调方法",
+      "llm_tldr_en": "Introduces a step-wise fine-tuning framework to improve reinforcement learning for embodied VLA models.",
+      "llm_tldr_cn": "引入一种分步微调框架，以改进具身VLA模型在强化学习中的表现。",
+      "llm_tldr": "引入一种分步微调框架，以改进具身VLA模型在强化学习中的表现。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.02439v1",
+      "title": "Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data",
+      "abstract": "Data-driven models of dynamical systems require extensive amounts of training data. For many practical applications, gathering sufficient data is not feasible due to cost or safety concerns. This work uses the Subset Extended Kalman Filter (SEKF) to adapt pre-trained neural network models to new, similar systems with limited data available. Experimental validation across damped spring and continuous stirred-tank reactor systems demonstrates that small parameter perturbations to the initial model capture target system dynamics while requiring as little as 1% of original training data. In addition, finetuning requires less computational cost and reduces generalization error.",
+      "authors": [
+        "Joshua E. Hammond",
+        "Tyler A. Soderstrom",
+        "Brian A. Korgel",
+        "Michael Baldea"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-03-02T22:25:31+00:00",
+      "link": "https://arxiv.org/pdf/2603.02439v1",
+      "tags": [
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "adapting pre-trained models with limited data and small parameter perturbations",
+      "llm_evidence_cn": "利用有限数据和微小参数扰动调整预训练模型",
+      "llm_evidence": "利用有限数据和微小参数扰动调整预训练模型",
+      "canonical_evidence": "利用有限数据和微小参数扰动调整预训练模型",
+      "llm_tldr_en": "Uses Subset Extended Kalman Filter to adapt pre-trained models to new systems with minimal data and cost.",
+      "llm_tldr_cn": "使用子集扩展卡尔曼滤波以极低的数据和计算成本将预训练模型迁移至新系统。",
+      "llm_tldr": "使用子集扩展卡尔曼滤波以极低的数据和计算成本将预训练模型迁移至新系统。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "New architectures for low resource model fine tuning",
+      "matched_requirement_id": "req-11",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.08258v1",
+      "title": "WaDi: Weight Direction-aware Distillation for One-step Image Synthesis",
+      "abstract": "Despite the impressive performance of diffusion models such as Stable Diffusion (SD) in image generation, their slow inference limits practical deployment. Recent works accelerate inference by distilling multi-step diffusion into one-step generators. To better understand the distillation mechanism, we analyze U-Net/DiT weight changes between one-step students and their multi-step teacher counterparts. Our analysis reveals that changes in weight direction significantly exceed those in weight norm, highlighting it as the key factor during distillation. Motivated by this insight, we propose the Low-rank Rotation of weight Direction (LoRaD), a parameter-efficient adapter tailored to one-step diffusion distillation. LoRaD is designed to model these structured directional changes using learnable low-rank rotation matrices. We further integrate LoRaD into Variational Score Distillation (VSD), resulting in Weight Direction-aware Distillation (WaDi)-a novel one-step distillation framework. WaDi achieves state-of-the-art FID scores on COCO 2014 and COCO 2017 while using only approximately 10% of the trainable parameters of the U-Net/DiT. Furthermore, the distilled one-step model demonstrates strong versatility and scalability, generalizing well to various downstream tasks such as controllable generation, relation inversion, and high-resolution synthesis.",
+      "authors": [
+        "Lei Wang",
+        "Yang Cheng",
+        "Senmao Li",
+        "Ge Wu",
+        "Yaxing Wang",
+        "Jian Yang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-09T11:27:28+00:00",
+      "link": "https://arxiv.org/pdf/2603.08258v1",
+      "tags": [
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Low-rank Rotation of weight Direction (LoRaD) adapter",
+      "llm_evidence_cn": "权重方向低秩旋转 (LoRaD) 适配器",
+      "llm_evidence": "权重方向低秩旋转 (LoRaD) 适配器",
+      "canonical_evidence": "权重方向低秩旋转 (LoRaD) 适配器",
+      "llm_tldr_en": "Proposes LoRaD, a parameter-efficient adapter for diffusion distillation inspired by low-rank adaptation.",
+      "llm_tldr_cn": "受低秩适配启发，提出 LoRaD 适配器用于扩散模型蒸馏的参数高效微调。",
+      "llm_tldr": "受低秩适配启发，提出 LoRaD 适配器用于扩散模型蒸馏的参数高效微调。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2603.02170v1",
+      "title": "SageBwd: A Trainable Low-bit Attention",
+      "abstract": "Low-bit attention, such as SageAttention, has emerged as an effective approach for accelerating model inference, but its applicability to training remains poorly understood. In prior work, we introduced SageBwd, a trainable INT8 attention that quantizes six of seven attention matrix multiplications while preserving fine-tuning performance. However, SageBwd exhibited a persistent performance gap to full-precision attention (FPA) during pre-training. In this work, we investigate why this gap occurs and demonstrate that SageBwd matches full-precision attention during pretraining. Through experiments and theoretical analysis, we reach a few important insights and conclusions: (i) QK-norm is necessary for stable training at large tokens per step, (ii) quantization errors primarily arise from the backward-pass score gradient dS, (iii) reducing tokens per step enables SageBwd to match FPA performance in pre-training, and (iv) K-smoothing remains essential for training stability, while Q-smoothing provides limited benefit during pre-training.",
+      "authors": [
+        "Jintao Zhang",
+        "Marco Chen",
+        "Haoxu Wang",
+        "Kai Jiang",
+        "Ion Stoica",
+        "Joseph E. Gonzalez",
+        "Jianfei Chen",
+        "Jun Zhu"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-03-02T18:39:49+00:00",
+      "link": "https://arxiv.org/pdf/2603.02170v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Trainable INT8 attention that preserves fine-tuning performance",
+      "llm_evidence_cn": "可训练的INT8注意力机制，保留微调性能",
+      "llm_evidence": "可训练的INT8注意力机制，保留微调性能",
+      "canonical_evidence": "可训练的INT8注意力机制，保留微调性能",
+      "llm_tldr_en": "Develops a low-bit attention mechanism to accelerate and reduce memory during LLM training.",
+      "llm_tldr_cn": "开发了一种低比特注意力机制，旨在加速LLM训练并降低显存占用。",
+      "llm_tldr": "开发了一种低比特注意力机制，旨在加速LLM训练并降低显存占用。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Memory-efficient fine-tuning strategies for large models",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}

@@ -1,0 +1,1138 @@
+Title: Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data
+
+URL Source: https://arxiv.org/pdf/2603.02439v1
+
+Published Time: Wed, 04 Mar 2026 01:15:37 GMT
+
+Number of Pages: 22
+
+Markdown Content:
+# Using the Subset Extended Kalman Filter to Adapt Pre-Trained Neural Network Models of Dynamical Systems with Limited Data 
+
+## Joshua E. Hammond a, Brian A. Korgel a,b,c , Tyler A. Soderstrom d and Michael Baldea a,e ,∗
+
+> a
+
+McKetta Department of Chemical Engineering, The University of Texas at Austin, 200 East Dean Keeton St., Stop C0400, Austin, 78712, TX, United States 
+
+> b
+
+Energy Institute, The University of Texas at Austin, 2304 Whitis Ave., Stop C2400, Austin, 78712, TX, United States 
+
+> c
+
+Texas Materials Institute, The University of Texas at Austin, 204 E. Dean Keeton St., Stop C2201, Austin, 78712, TX, United States 
+
+> d
+
+ExxonMobil Technology and Engineering, Spring, TX, United States 
+
+> e
+
+Institute for Computational Engineering and Sciences, The University of Texas at Austin, 201 E. 24th St., POB 4.102, Stop C0200, Austin, 78712, TX, United States 
+
+A B S T R A C T 
+
+Data-driven models of dynamical systems require extensive amounts of training data. For many practical applications, gathering sufficient data is not feasible due to cost or safety concerns. This work uses the Subset Extended Kalman Filter (SEKF) to adapt pre-trained neural network models to new, similar systems with limited data available. Experimental validation across damped spring and continuous stirred-tank reactor systems demonstrates that small parameter perturbations to the initial model capture target system dynamics while requiring as little as 1% of original training data. In addition, finetuning requires less computational cost and reduces generalization error. 
+
+## 1. Introduction 
+
+Data-driven models have emerged as powerful tools for approximating the behavior of complex dynamical systems across diverse domains. Artificial Neural Networks (ANNs), in particular, demonstrate remarkable capability in learning nonlinear mappings from arbitrary inputs to outputs. For example, ANN models can effectively capture dynamics governed by ordinary differential equations of the form  
+
+> 𝑑 𝒙
+> 𝑑𝑡
+
+= 𝑓 (𝒙 , 𝒖 , 𝑝 ) without requiring explicit knowledge of the underlying physics [1]. However, these data-driven ap-proaches suffer from fundamental limitations that impede their widespread deployment in practical applications, par-ticularly industrial settings. Neural network models provide no guarantee of performance outside the range of the train-ing data, exhibit poor generalization when the statistical properties of operating conditions change from those en-countered during training, and require extensive datasets to achieve satisfactory generalization. The acquisition of sufficient training data presents substantial barriers in many practical applications, where data collection may be con-strained by safety considerations, operational costs, or time limitations. Transfer learning offers a principled approach to address data scarcity by leveraging knowledge acquired from data-rich source domains to improve learning in data-scarce target domains. This paradigm has achieved remarkable success in computer vision and natural language processing, where 
+
+> ∗
+
+Corresponding Author.  
+
+> joshua.hammond@utexas.edu
+
+(J.E. Hammond);  
+
+> korgel@che.utexas.edu
+
+(B.A. Korgel); tyler.a.soderstrom@exxonmobil.com 
+
+(T.A. Soderstrom); mbaldea@che.utexas.edu (M. Baldea) 
+
+> ORCID
+
+(s): 0000-0001-7025-0150 (J.E. Hammond);  
+
+> 0000-0001-6242-7526
+
+(B.A. Korgel); 0000-0001-6400-0315 (M. Baldea) 
+
+established practices include layer-wise freezing and fine-tuning of pre-trained networks. The conventional methodol-ogy exploits hierarchical feature representations: early layers encode generic, transferable features while later layers cap-ture task-specific patterns, providing natural guidance for se-lective parameter adaptation. However, the direct application of such techniques to neural network models of dynamical systems presents challenges that remain largely unaddressed. Unlike image classification, where discrete architectural lay-ers correspond to progressively abstract feature hierarchies, dynamical systems models lack clear analogues for layer-wise feature extraction, complicating the identification of which parameters to adapt during transfer learning. Further-more, existing approaches predominantly rely on gradient-based optimization methods that lack probabilistic frame-works to mitigate overfitting when target data is severely limited. Four fundamental questions thus arise. First, whether models trained on functionally similar source dynamical sys-tems can be effectively leveraged to improve target system performance when data from the target system is severely limited remains unclear. Second, the extent to which small parameter perturbations to a source system model can cap-ture target system dynamics—particularly when systems dif-fer through parametric variations in governing equations— has not been systematically characterized. Third, principled strategies for parameter adaptation that mitigate overfitting to scarce target observations are notably absent from the ex-isting literature. This knowledge gap is particularly striking given the prevalence of parametric variability in industrial applications, including unit-to-unit differences in thermal systems, and simulation-to-real transfer scenarios. Fourth, whether there exist heuristics or principles to guide which ANN model parameters should be modified during transfer learning for dynamical systems remains an open question. 
+
+J.E. Hammond et al.: Preprint submitted to Elsevier Page 1 of 16 
+
+> arXiv:2603.02439v1 [cs.LG] 2 Mar 2026 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data
+
+Unlike computer vision, where layer-wise feature hierarchies inform parameter selection, no analogous framework exists for dynamical systems models, complicating the design of effective transfer learning strategies. This work addresses these questions through a transfer learning framework based on the Subset Extended Kalman Filter (SEKF) for neural network models of dynamical sys-tems [2]. The key hypothesis is that transfer learning can be formulated as Bayesian inference: when the two systems are similar, the source model parameters 𝝅  define a Gaussian prior distribution 𝑝 (𝝅 ) =  (𝝅  , 𝑷 0) over target model parameters. Adaptation then proceeds through sequential Bayesian updating as target observations become available. The SEKF provides an efficient mechanism for computing the posterior 𝑝 (𝝅  | , 𝝅  ), with the process noise covari-ance 𝑸 controlling prior flexibility and the measurement noise covariance 𝑹 weighting observation reliability. Unlike gradient-based optimization methods that lack explicit prior information, the SEKF maintains estimates of parameter uncertainty through covariance propagation, enabling prin-cipled regularization in data-limited regimes. Experimental validation across two benchmark systems— a damped spring system and a Temperature Control Lab (TCLab) experiment—yields four principal findings. First, small parameter changes to source models suffice to cap-ture target system dynamics: cosine similarities between source and adapted parameters exceed an average value of 99% across all experimental conditions. Second, fine-tuning source model parameters via SEKF to reflect the target system substantially outperforms retraining from random initialization when target data availability is limited. Fine-tuning the target model achieves accuracy comparable to the source system model with as little as 1% of the original training dataset. Third, the SEKF approach reduces over-fitting relative to gradient-based optimization, as evidenced by smaller train-test performance gaps. Fourth, contrary to established practices in computer vision, parameter changes distribute across all network layers rather than concentrating in output layers, suggesting that transfer learning for dynam-ical systems requires coordinated adaptation throughout the architecture. These results establish the SEKF framework as a principled approach for developing system-specific data-driven models when training observations are severely constrained. 
+
+## 2. Related Works 
+
+Transfer learning has achieved remarkable success in domains such as computer vision and natural language pro-cessing, where pre-trained models are adapted to new tasks with limited data. A key challenge in these applications is mitigating overfitting to the small target datasets, which is addressed by modifying only a subset of model parameters during fine-tuning. For instance, it is common practice to freeze the weights of earlier layers and retrain only the final layers when performing transfer learning on deep computer vision ANN classification models. This approach is guided by the intuition that earlier layers capture generalizable features, such as edges and textures, that are transferable across tasks, while the later layers learn task-specific combi-nations of these features corresponding to different classes. This parameter-efficient strategy has enabled the widespread adoption of transfer learning in scenarios where data is scarce. 
+
+2.1. Transfer Learning for Dynamical Systems 
+
+While transfer learning has achieved remarkable success in computer vision and natural language processing, its application to dynamical systems and regression remains relatively underexplored. Forgione et al. [3] introduced Jaco-bian Feature Regression for rapid recurrent neural network adaptation when system dynamics change, demonstrating parameter-efficient adaptation through feature-space modi-fications. Alhajeri et al. [4] extended this paradigm to chem-ical process control, applying transfer learning-based recur-rent neural networks to model predictive control with limited operational data. However, both approaches rely on gradient-based fine-tuning methods applied to all ANN parameters that lack probabilistic frameworks to mitigate overfitting, representing a critical limitation when target system data is severely constrained. Unlike transfer learning for computer vision, there is no heuristic or intuition to guide which ANN model parameters should be modified. The question of which network layers to adapt during transfer learning has received attention in the context of fluid dynamics. Chatzi et al. [5] provided spectral analysis frameworks for understanding layer-wise retraining in turbulence modeling, revealing that optimal adaptation strategies differ substantially between dynamical systems and traditional image classification tasks. Nevertheless, sys-tematic investigations of how parameter changes distribute across network architectures in regression-based dynamical system transfer learning remain absent from the literature. 
+
+2.2. Neural Network System Identification 
+
+Foundational work on neural ordinary differential equa-tions by Chen et al. [1] established continuous-depth archi-tectures as natural representations for dynamical systems, enabling direct modeling of continuous time dynamics 𝑑 𝒙  
+
+> 𝑑𝑡
+
+=
+
+𝑓 (𝒙 , 𝒖 , 𝜃 ). Kutz and Brunton [6] provide a comprehensive review of machine learning methods for dynamical system prediction, highlighting persistent challenges in generaliza-tion beyond training distributions and data efficiency. Physics-informed approaches have emerged to incorpo-rate domain knowledge when data is scarce. Chatzi and Naseri [7] proposed discrepancy modeling frameworks that decompose neural ordinary differential equations into physics-informed and purely data-driven components. Velioglu et al. [8] demonstrated physics-informed neural networks for continuously stirred tank reactor modeling with limited data, building on the foundational framework of Raissi et al. [9]. Wang and Wu [10] combined meta-learning with physics-informed fine-tuning to enable rapid adaptation for chemical reactor modeling. While these methods reduce data requirements through physics constraints, they require explicit knowledge of governing equations, an assumption   
+
+> J.E. Hammond et al.: Preprint submitted to Elsevier Page 2 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data
+
+that does not hold for many scenarios where model form uncertainty dominates. 
+
+2.3. Kalman Filtering for Neural Network Training 
+
+The Extended Kalman Filter offers a probabilistic al-ternative to gradient-based optimization, treating neural network parameters as states to be estimated. Haykin’s [11] seminal work established theoretical foundations for EKF-based neural network training, framing parameter updates as Bayesian posterior estimation. Recent advances include KalmanNet [12], which hybridizes model-based Kalman filtering with data-driven recurrent neural networks for systems with partially known dynamics, and differentiable Kalman filter frameworks [13] that enable end-to-end learn-ing. Chang [14] introduced low-rank EKF approximations for online neural network learning from streaming data, addressing computational tractability for large-scale mod-els. However, these methods focus primarily on online learning scenarios rather than transfer learning contexts, and none systematically investigate how Kalman filtering-based approaches compare to gradient methods in mitigating overfitting when adapting pre-trained models with minimal target data. 
+
+2.4. Parameter-Efficient Fine-Tuning and Overfitting Reduction 
+
+In natural language processing and computer vision, parameter-efficient fine-tuning methods have demonstrated that small, targeted parameter modifications suffice for ef-fective domain adaptation. LoRA [15] showed that low-rank updates to weight matrices enable adaptation of large lan-guage models without full retraining. Ding et al. [16] estab-lished that parameter-efficient fine-tuning inherently reduces overfitting through implicit regularization mechanisms. In scientific computing domains, Käser et al. [17] found that when predicting chemical properties, finetuning the later layers of the ANN model yields better generalization than full finetuning when the amount of data from the target domain is limited. From a Bayesian perspective, parameter-efficient meth-ods implicitly place strong priors on frozen parameters (effectively infinite precision, constraining them exactly to source values) and weak priors on adapted parameters. Layer-freezing heuristics in computer vision thus encode prior beliefs about which parameters are transferable. How-ever, for dynamical systems where no clear layer-wise hierarchy exists, principled methods for encoding prior un-certainty across all parameters—rather than binary freeze / unfreeze decisions—remain unexplored. Whether Bayesian optimization frameworks that maintain full covariance struc-tures offer advantages over gradient-based fine-tuning in this context has not been systematically investigated. 
+
+2.5. Gaps Addressed by This Work 
+
+Despite these advances, four critical gaps persist. First, whether models trained on functionally similar source dy-namical systems can be effectively leveraged to improve target system performance when data from the target system is severely limited remains unclear. Second, the extent to which small parameter perturbations to a source system model can capture target system dynamics—particularly when systems differ through parametric variations in gov-erning equations—has not been systematically character-ized. Third, principled strategies for parameter adaptation that mitigate overfitting to scarce target observations are notably absent from the existing literature. Fourth, whether there exist heuristics or principles to guide which ANN model parameters should be modified during transfer learn-ing for dynamical systems remains an open question This addresses these gaps using the Subset Extended Kalman Filter (SEKF) to transfer ANN models of source dynamical systems to target systems. We demonstrate that small parameter perturbations embedded within a proba-bilistic updating scheme enable effective transfer learning for dynamical systems with as little as 1% of original train-ing data, while inherently mitigating overfitting through Bayesian noise modeling. 
+
+## 3. Transfer Learning of Dynamical Systems 
+
+3.1. System Definition 
+
+Consider a source dynamical system governed by ordi-nary differential equations of the form 
+
+𝑑 𝒙 
+
+𝑑𝑡 = 𝑓 (𝒙 , 𝒖 , 𝑝 ), (3.1) where 𝒙 ∈ IR 𝑛 𝑥 denotes the state vector, 𝒖 ∈ IR 𝑛 𝑢 
+
+represents the input or manipulated variable vector, and 𝑝 ∈IR 𝑛 𝑝 comprises the physical parameters of the source system. The dynamics described by Eq. (3.1) are assumed to be well-posed, admitting unique solutions for specified initial conditions 𝒙 0 and input trajectories within the operating domain of interest. A neural network surrogate model 𝜙 ∶ IR 𝑛 𝑥 × IR 𝑛 𝑢 ×IR 𝑛 𝜋 → IR 𝑛 𝑥 ×𝑛 𝑜𝑢𝑡 approximates the discrete-time evolution of the source system at time 𝑘 across 𝑛 𝑜𝑢𝑡 predictions according to ̃
+
+𝒙 𝑘 +1… 𝑘 +𝑛 𝑜𝑢𝑡 = 𝜙 (𝒙 𝑘 , 𝒖 𝑘 …𝑘 +𝑛 𝑜𝑢𝑡 −1 , 𝝅 ), (3.2) The neural network 𝜙 may comprise various architec-tures such as multi-layer perceptrons (MLPs), recurrent neural networks (RNNs), or neural ordinary differential equations (NODEs), with the specific choice depending on the complexity of the underlying dynamics and com-putational requirements. The parameters of the neural net-work 𝝅 ∈ IR 𝑛 𝜋 are optimized using data from the source system  = {( ̂𝒙 𝑘 ,̂ 𝒖 𝑘 ,̂ 𝒙 𝑘 +1… 𝑘 +𝑛 𝑜𝑢𝑡 )} 𝑁 
+
+> 𝑘 =1
+
+. Training the neural network weights minimizes a loss function  such as mean squared error that quantifies the discrepancy between predicted ̃ 𝒙 𝑘 +1… 𝑘 +𝑛 𝑜𝑢𝑡 and measured states ̂ 𝒙 𝑘 +1… 𝑘 +𝑛 𝑜𝑢𝑡 .Transfer learning aims to model a target  dynami-cal system that is similar to the source  system but has   
+
+> J.E. Hammond et al.: Preprint submitted to Elsevier Page 3 of 16
+
+Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data 
+
+Table 1 
+
+Summary of source and target dynamical systems used for transfer learning experiments. 
+
+Source System Target System 
+
+System Space 𝑑 𝒙  
+
+> 𝑑𝑡
+
+= 𝑓  (𝒙 , 𝒖 , 𝑝  ) 𝑑 𝒙  
+
+> 𝑑𝑡
+
+= 𝑓  (𝒙 , 𝒖 , 𝑝  )
+
+Data Space   dim  ≫ dim 
+
+Model Space ̃ 𝒙 𝑘 +1… 𝑘 +𝑛 𝑜𝑢𝑡 = 𝜙  (𝒙 𝑘 , 𝒖 𝑘 …𝑘 +𝑛 𝑜𝑢𝑡 −1 , 𝝅  )̃ 𝒙 𝑘 +1… 𝑘 +𝑛 𝑜𝑢𝑡 = 𝜙  (𝒙 𝑘 , 𝒖 𝑘 …𝑘 +𝑛 𝑜𝑢𝑡 −1 , 𝝅  ) 𝜙  and 𝜙  have identical structures 0 5 10 15 20      
+
+> Time (s)
+> −6
+> −5
+> −4
+> −3
+> −2
+> −1012
+> Position
+> -3.48
+> Initial Position Initial Velocity Source Trajectory Noisy Measurements N(0 ,0.1)
+> Source Model Prediction Target Trajectory cT= 0 .9cS
+
+Figure 1: Example trajectory of a damped spring-mass system (solid line) given initial position (blue triangle) and velocity (black arrow). A neural network trained on noisy measurements (blue +) makes predictions (orange ×) of future positions given the initial position and velocity. A target system with slightly different damping coefficient (dashed line) illustrates the transfer learning objective. 
+
+significantly less training data available 𝑁  ≪ 𝑁  . If the two systems are sufficiently similar, it is hypothesized that there exists a set of optimal neural network parameters 
+
+𝝅  that can be obtained by adapting the previously-trained source parameters 𝝅  using only the limited target data  .Ideally, this process of finetuning yields a target model that performs better than re-initializing and retraining the neural network from scratch using only  . Table 1 summarizes the definitions of the source and target systems used in this work and how their respective spaces relate to one another. 
+
+Example 3.1. Consider a damped spring mass system gov-erned by the second-order ordinary differential equation 
+
+𝑚̈ 𝑥 + 𝑐̇𝑥 + 𝑘𝑥 = 𝑢 , where 𝑚 is the mass, 𝑐 is the damping coefficient, 𝑘 is the spring constant, and 𝑢 is a constant external forcing function. A neural network surrogate model 
+
+𝜙 is trained to predict the position at each second over the next 𝑛 𝑜𝑢𝑡 20 seconds 𝑥 1…20 given the initial position and velocity [𝑥 0,̇𝑥 0]. Figure 1 illustrates an example trajectory of the system given the initial conditions, with the blue 
+
++ markers denoting measurements and model predictions shown with the orange × markers. Now consider a target system that is identical to the source system except that the damping coefficient is reduced by 10%, i.e., 𝑐  = 0 .9𝑐  . Figure 1 shows this trajectory with a dashed line. The objective of transfer learning is to adapt the neural network parameters 𝝅  trained on the source system to accurately predict the dynamics of the target system using only a limited dataset  collected from the target system. Successful transfer learning would enable accurate prediction of the target system’s trajectories with minimal additional data and computational effort. 
+
+3.2. Assumptions 
+
+The transfer learning framework developed in this work relies on the following assumptions: 1. Functional Similarity : The source and target sys-tems share the same functional form of governing equations. This assumption ensures that the represen-tational capacity required to model both systems is similar. In contexts where the governing equations are unknown, comparing the trajectories generated by the two systems given the same input can provide empirical evidence of functional similarity. 2. Data Domain Overlap : The state and input variables of the target system occupy a similar range and scale as those of the source system, i.e., the operating domains substantially overlap. This assumption ensures that the features learned by the source model remain relevant for the target system. 3. Sufficient Source Training : The source model has been trained to convergence on a sufficiently large and representative dataset such that 𝝅 𝑠 constitutes a high-quality approximation of the source system dynamics. 4. Limited Target Data : The target dataset 𝑡 is in-sufficient for training a neural network from random initialization to satisfactory performance, motivating the transfer learning approach. These assumptions define the scope of applicability for the proposed methodology. Systems violating these assump-tions, such as those with substantially different governing equations or non-overlapping operating domains, may re-quire alternative approaches beyond the framework pre-sented here. 
+
+3.2.1. Transfer Learning via Gradient Descent 
+
+Gradient-based fine-tuning adapts the pre-trained source parameters 𝝅  to the target system by minimizing the mean squared prediction error on the target dataset: MSE (𝝅 ) = 1
+
+𝑁 
+
+> 𝑁
+
+∑
+
+> 𝑖 =1
+
+‖‖̂𝒙 𝑖 − 𝜙 (̂ 𝒙 𝑖 −1 ,̂ 𝒖 𝑖 −1 , 𝝅 )‖‖22 . (3.3) 
+
+J.E. Hammond et al.: Preprint submitted to Elsevier Page 4 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data 
+
+𝝅  = arg min 
+
+> 𝝅
+
+MSE (𝝅 ) (3.4) Three optimization algorithms are employed in this work. We modify the Adam optimizer [18] to update a subset of model parameters that have the highest gradient with respect to the loss function. More details on this method are available in [2]. The Limited-memory Broyden-Fletcher-Goldfarb-Shanno (L-BFGS)[19] algorithm approximates curvature information using gradient history, offering accelerated con-vergence for smooth objectives at the cost of increased memory requirements. For transfer learning, parameters are initialized as 𝝅 0 =
+
+𝝅  , and optimization proceeds via mini-batch stochastic gra-dient descent with early stopping based on validation loss. For comparison, retraining experiments initialize parameters from the same random distribution used for source model training. Hyperparameters including learning rate, batch size, and learning rate scheduling are determined through the ASHA algorithm [20] as detailed in Appendix A. 
+
+3.3. Transfer Learning via Subset Extended Kalman Filter 
+
+Transfer learning can be cast as Bayesian inference over neural network parameters. Let 𝑝 (𝝅  | ) denote the prior distribution over target parameters informed by source train-ing. Under the assumption of functional similarity, we model this prior as Gaussian centered at the source parameters: 
+
+𝑝 (𝝅  ) =  (𝝅  , 𝑷 0), where 𝑷 0 encodes uncertainty about parameter transferability. Given target observations  , the goal is to compute the posterior 𝑝 (𝝅  | , 𝝅  ). The Ex-tended Kalman Filter (EKF) [2] provides an efficient sequen-tial approximation to this posterior through recursive appli-cation of Bayes’ rule, treating neural network parameters as hidden states to be estimated from noisy observations [11]. This formulation casts parameter adaptation as a state esti-mation problem: 
+
+𝝅 𝑘 +1 = 𝝅 𝑘 + 𝒘 𝑘 (3.5a) 
+
+𝒘 𝑘 ∼  (𝟎 , 𝑸 ) (3.5b) ̃
+
+𝒙 𝑘 +1… 𝑘 +𝑛 𝑜𝑢𝑡 = 𝜙 (̂𝒙 𝑘 ,̂ 𝒖 𝑘 …𝑘 +𝑛 𝑜𝑢𝑡 −1 , 𝝅 𝑘 ) + 𝒗 𝑘 , (3.5c) 
+
+𝒗 𝑘 ∼  (𝟎 , 𝑹 ) (3.5d) where Eq. (3.5a) models parameter evolution with process noise covariance 𝑸 ∈ IR 𝑛 𝜋 ×𝑛 𝜋 , and Eq. (3.5c) relates pa-rameters to observed state transitions with measurement noise covariance 𝑹 ∈ IR 𝑛 𝑥 ×𝑛 𝑥 . The EKF recursively updates parameter estimates through prediction and correction steps involving the Jacobian 𝑯 𝑘 = 𝜕𝜙 ∕𝜕 𝝅 evaluated at the current estimate. This formulation admits a Bayesian interpretation. Equa-tion (3.5a) models epistemic uncertainty: parameters may evolve from their source values, with 𝑸 quantifying expected deviation—larger values indicate weaker prior constraints. Equation (3.5c) models aleatoric uncertainty: observations are corrupted by noise with covariance 𝑹 . The Kalman gain 
+
+𝑲 𝑘 = 𝑷 𝑘 𝑯 ⊤𝑘 (𝑯 𝑘 𝑷 𝑘 𝑯 ⊤𝑘 + 𝑹 )−1 optimally balances prior information (encoded in the covariance 𝑷 𝑘 ) against new ob-servations, automatically providing stronger regularization when target data is scarce or noisy. Direct application of the EKF to neural networks is computationally prohibitive due to the (𝑛 2 
+
+> 𝜋
+
+) storage and 
+
+(𝑛 3 
+
+> 𝜋
+
+) inversion costs associated with the covariance matrix. The Subset Extended Kalman Filter (SEKF) addresses this limitation by updating only a subset 𝑘 ⊂ {1 , … , 𝑛 𝜋 } of parameters at each step, with |𝑘 | = 𝑚 ≪ 𝑛 𝜋 [11]. The algorithm maintains and updates only the 𝑚 × 𝑚 submatrix of the covariance corresponding to selected parameters. For transfer learning, the SEKF initializes 𝝅 0 = 𝝅 
+
+with initial covariance 𝑷 0 = 𝜎 20 𝑰 , encoding the source parameters as a Bayesian prior. The process noise 𝑸 controls regularization strength: small values constrain parameters near the source model, while larger values permit greater adaptation. This probabilistic framework provides implicit regularization against overfitting by weighting new obser-vations against prior information encoded in the covari-ance structure. The parameters 𝜎 20 and 𝑸 are treated as hyperparameters and are tuned using methods described in Appendix A. More detail on the SEKF is available in [2]. 
+
+3.4. Evaluation Metrics 
+
+Evaluating the effectiveness of transfer learning requires metrics that quantify both model accuracy and generaliza-tion. When training, we use Mean Squared Error (MSE) loss as defined in Eq. (3.3). Loss  is computed for the training data  as well as for validation and test datasets. The validation error is used during training and hyperparameter tuning to prevent overfitting while the test error is used for final model assessment and approximation of generalization error. Since mitigating overfitting to the limited target data, and improving generalization is the primary goal (and chal-lenge) in transfer learning, specifically note the Train-Test Gap as the difference between the loss on the training data and the loss on the held-out test data as shown in Eq. (3.6). More details on model training are available in Appendix A. Train-Test Gap = (
+
+> 𝑇 𝑒𝑠𝑡
+
+) − (
+
+> 𝑇 𝑟𝑎𝑖𝑛
+
+). (3.6) We use values from the source system to normalize these metrics for better interpretability across different systems and scales. Specifically, we report the Normalized MSE 
+
+and Normalized Convergence time as shown in Eqs. (3.7) and (3.8) respectively. Normalized MSE = (
+
+> 𝑇 𝑒𝑠𝑡
+
+)
+
+(
+
+> 𝑇 𝑒𝑠𝑡
+
+) . (3.7) Normalized Convergence Time = 𝑡 
+
+> 𝑐𝑜𝑛𝑣𝑒𝑟𝑔𝑒
+
+𝑡 
+
+> 𝑐𝑜𝑛𝑣𝑒𝑟𝑔𝑒
+
+. (3.8) Finally, our assumptions dictate that the source and tar-get systems are functionally similar, and that the final models          
+
+> J.E. Hammond et al.: Preprint submitted to Elsevier Page 5 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data
+> Table 2
+> Metrics to quantify similarity between source and target systems.
+> Metric Purpose
+> Mean Squared Error (MSE) Quantify model prediction error Train-Test Gap Measure overfitting and generalization Normalized MSE Compare target model accuracy to source model Normalized Convergence Time Compare training efficiency to source model Wasserstein Distance Quantify similarity of source and target data distributions Cosine Similarity (CS) Quantify similarity of source and target functional spaces and models
+
+should therefore have similar parameters. We quantify the similarity of the source and target data distributions using the Wasserstein Distance as shown in Eq. (3.9). There, 𝑃 
+
+denotes the empirical distribution of the data  and Γ de-notes the set of all joint distributions with marginals 𝑃 ( )
+
+and 𝑃 ( ). We compare the functional similarity of the source and target systems using Cosine Similarity (CS) as shown in Eq. (3.10) between trajectories generated by both systems given the same input sequences. Similarly, we use CS to compare the similarity of source and target model parameters after transfer learning. Table 2 summarizes all metrics used to evaluate transfer learning performance. 
+
+𝑊 (𝑃 ( ), 𝑃 ( )) = inf     
+
+> 𝛾 ∈Γ( 𝑃 (),𝑃 ())
+
+𝔼 (𝑥,𝑦 )∼ 𝛾 [‖𝑥 − 𝑦 ‖]
+
+(3.9) cos (𝝅  , 𝝅  ) = 𝝅  ⋅ 𝝅 
+
+‖𝝅  ‖2‖𝝅  ‖2
+
+. (3.10) 
+
+## 4. Experiments 
+
+We evaluate how transfer learning (i.e. finetuning source model parameters) compares to retraining from random ini-tialization on two benchmark dynamical systems: (1) the damped spring system described in Example 3.1 and (2) a Temperature Control Laboratory (TCLab) system [21, 22] a small experimental system consisting of two heaters and two temperature sensors in a small enclosure. Using a year of simulated data, a NN model is trained to predict heater temperatures across a ten-minute prediction horizon given initial temperatures, and heater settings across the prediction horizon. While the damped spring system provides a simple, well-understood test case for validating the transfer learn-ing framework, the TCLab case demonstrates the nearly-ubiquitous scenario of transferring models from simulated to physical systems where data is limited. A notable practical advantage of the finetuning approach—particularly when using the SEKF—is that target data can be gathered online 
+
+during normal system operation rather than requiring ded-icated, discrete experiments. Because the SEKF processes observations sequentially, the model can be adapted contin-uously as new operational data becomes available, avoiding the need for disruptive model redeployment cycles that batch gradient-based methods would require. In addition to comparing parameter initialization meth-ods, we compare the effect of the optimizer choice and amount of data available from the target system. A summary of the experimental design is provided in Table 3 with more details available in Appendix B. 
+
+4.1. Results 
+
+Figure 2 shows normalized test loss as a function of target data availability for both initialization methods across both benchmark systems. Finetuning consistently achieves lower test loss than retraining, with the advantage being most pronounced at small dataset sizes. As more target data be-comes available, the performance gap narrows, confirming that transfer learning provides the greatest benefit in data-scarce scenarios. For the damped spring system, the GLM interaction analysis (Section 4.2.3) shows that finetuning and retraining reach effectively equivalent performance at approximately 1,000 samples. For the TCLab system, the convergence occurs sooner—the interaction terms are not in-dividually significant, suggesting that finetuning’s advantage diminishes more rapidly with increasing data in the noisier, real-world setting. The regularization benefit of finetuning is evident in the train-test gap comparison shown in Figure 3. Retraining from random initialization produces larger gaps between training and test performance, indicating greater overfitting. Finetuning constrains optimization to remain near the well-generalized source parameters, resulting in models that gen-eralize better to unseen data. Figure 4 demonstrates that finetuned model parameters maintain high cosine similarity with source parameters, typ-ically exceeding 0.99. This confirms that effective transfer learning for dynamical systems occurs within a small neigh-borhood of the source parameter space, validating our as-sumption of functional similarity between source and target systems. Contrary to common heuristics in image classification transfer learning, Figure 5 reveals that weight changes during finetuning distribute across all layers of the neural network rather than concentrating in later layers when finetuning using Adam or L-BFGS. In contrast, changes to model parameters are concentrated in a few parameters in the earlier and later layers when using the SEKF to finetune. Updates performed by the Adam algorithm tend to be smaller in                                        
+
+> J.E. Hammond et al.: Preprint submitted to Elsevier Page 6 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data
+> Table 3
+> Summary of TL experiments Manipulated Parameter Initialization: Finetune, Retrain Optimization Methods: SEKF, Adam, LBFGS Dataset Sizes: 10, 50, 100, 500, 1,000 (Damped Spring) 0.5 hr, 1 hr, 4 hr, 12 hr, 24 hr (10-second sampling frequency) (TCLab) Transfer: 𝑚 ,𝑘 ,𝑐 ,𝑢 ±10% (Damped Spring) Simulated →Real (TCLab) Replicates: 10 (Damped Spring) 5 (TCLab)
+> Table 4
+> Average cosine similarity between source and target param-eters, broken down by system, initialization method, and optimizer.
+> System Method Optimizer Cosine Similarity
+> Damped Spring Finetune Adam 0.9959 ± 0 .0113
+> L-BFGS 0.9984 ± 0 .0156
+> SEKF 0.9977 ± 0 .0238
+> Retrain Adam 0.6519 ± 0 .1205
+> L-BFGS 0.6819 ± 0 .1210
+> SEKF 0.6047 ± 0 .2385
+> TCLab Finetune Adam 0.9943 ± 0 .0078
+> L-BFGS 0.9998 ± 0 .0005
+> SEKF 0.9887 ± 0 .0171
+> Retrain Adam 0.8557 ± 0 .1274
+> L-BFGS 0.9305 ± 0 .0820
+> SEKF 0.7505 ± 0 .2451
+
+magnitude, and more uniformly distributed across more parameters. In contrast, updates performed by L-BFGS tend to be larger in magnitude, and concentrated in fewer param-eters. SEKF updates even more sparse, and restricted to just a few neurons. Considered jointly, Figures 4 and 5 reveal that effective transfer learning for dynamical systems requires small but holistic parameter changes. Figure 4 establishes that the 
+
+magnitude of change is small—finetuned parameters remain very close to the source—while Figure 5 demonstrates that these small changes may often be distributed throughout the architecture. This combination challenges the standard computer vision transfer learning paradigm, where early layers encoding generic features are typically frozen while only later task-specific layers are adapted. For dynamical systems, the optimal strategy permits all layers to adapt while constraining the overall adaptation to remain near the source parameters. The three optimizers achieve this distributed adaptation through distinct mechanisms visible in Figure 5. Adam produces small, uniformly distributed updates across a large number of parameters in every layer, reflecting its adaptive learning rate that scales updates inversely with gradient history. L-BFGS concentrates larger updates in fewer pa-rameters, leveraging second-order curvature information to identify the most influential weights for reducing prediction error. SEKF exhibits the most selective behavior, restricting updates to specific neurons while leaving others unchanged; this sparsity arises from the subset selection mechanism that updates only parameters with the highest expected impact on prediction uncertainty. Despite these contrasting update patterns, all three optimizers achieve a final cosine similarity of greater than 0.98 when compared with source parameters (Table 4), suggesting that multiple paths through parameter space lead to similarly effective target models. This finding explains why optimizer choice does not significantly affect generalization performance (Section 4.2.4)—the critical fac-tor is maintaining proximity to the source model, which finetuning achieves regardless of the specific optimization trajectory. This joint analysis also explains why finetuning substan-tially outperforms retraining: retrained models converge to parameter configurations with low cosine similarity to the source (Table 4), indicating they occupy different regions of parameter space entirely. Since successful transfer requires finding a specific “nearby but distributed” solution, retrain-ing from random initialization has no mechanism to locate this favorable region, particularly when data is limited. The SEKF framework is well-suited to this setting because it treats source parameters as a Bayesian prior and computes full-network Jacobians, enabling coordinated updates across all layers while naturally constraining parameters to remain close to the well-generalized source model. Convergence time varies substantially across optimizers, as shown in Figure 6. SEKF requires significantly more com-putation than gradient-based methods, particularly when retraining from scratch. However, when finetuning, all op-timizers converge more quickly due to the favorable initial-ization. 
+
+4.2. Statistical Analysis 
+
+Due to violations of standard ANOVA assumptions (non-normality, heteroscedasticity, and non-sphericity in the residuals), we employ two robust statistical methods: (1) Permutation ANOVA, a non-parametric approach that makes no distributional assumptions, and (2) Generalized Linear Models (GLM) with a Gamma distribution and   
+
+> J.E. Hammond et al.: Preprint submitted to Elsevier Page 7 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data
+
+log link, which appropriately models the positive, right-skewed distribution of loss values and convergence times as Normalized Metric = Parameter Initialization Effect ×
+
+Optimization Method Effect × Datset Size Effect. The de-pendent variables analyzed are normalized test loss, train-test gap (a measure of overfitting), and normalized conver-gence time. 
+
+4.2.1. Effect of Target Data Availability 
+
+The amount of target domain data has the strongest and most consistent effect across all outcomes in both systems. Permutation ANOVA reveals highly significant main effects of data size on normalized test loss (damped spring: 𝐹 =8.29 , 𝑝 = 2 × 10 −4 ; TCLab: 𝐹 = 24 .88 , 𝑝 = 2 × 10 −4 ), train-test gap (damped spring: 𝐹 = 6 .02 , 𝑝 = 2 × 10 −4 ; TCLab: 
+
+𝐹 = 67 .43 , 𝑝 = 2 × 10 −4 ), and convergence time (damped spring: 𝐹 = 14 .19 , 𝑝 = 2 × 10 −4 ; TCLab: 𝐹 = 2 .87 , 𝑝 =0.017 ). The GLM coefficients quantify these effects: relative to the smallest dataset (10 samples for damped spring, 0.5 hours for TCLab), increasing to the largest dataset reduces log-normalized test loss by approximately 1.1 units (damped spring) and 1.2 units (TCLab), corresponding to roughly 3-fold improvements in prediction accuracy. 
+
+4.2.2. Effect of Initialization Method 
+
+Initialization method (finetuning vs. retraining) signif-icantly affects model performance, though the magnitude differs between systems. For the damped spring system, Permutation ANOVA shows strong main effects on test loss (𝐹 = 6 .58 , 𝑝 = 2 × 10 −4 ), train-test gap ( 𝐹 = 4 .73 , 𝑝 = 2 × 10 −4 ), and convergence time ( 𝐹 = 64 .04 , 𝑝 = 2×10 −4 ). The GLM estimates that retraining increases log-normalized test loss by 1.89 units relative to finetuning ( 𝑝 = 1 .88 × 10 −26 ), representing approximately a 6.6-fold increase in prediction error. For the TCLab system, the effect of initialization on test loss is weaker: Permutation ANOVA yields 𝐹 = 0 .75 ,
+
+𝑝 = 0 .389 , though the GLM detects a marginally significant effect ( 𝛽 = 0 .38 , 𝑝 = 0 .038 ). However, initialization sig-nificantly affects generalization: retraining produces larger train-test gaps in both systems (damped spring: 𝛽 = 1 .08 ,
+
+𝑝 = 4.50 × 10 −10 ; TCLab: 𝛽 = 0.29 , 𝑝 = 0.025 ), confirming that finetuning provides implicit regularization against overfitting. 
+
+4.2.3. Interaction Between Initialization and Data Size 
+
+A critical finding emerges from the GLM interaction terms: the advantage of finetuning over retraining depends strongly on data availability. For the damped spring system, the interaction coefficients between retraining and data size are highly significant and negative (e.g., retrain × 1000 samples: 𝛽 = −1 .88 , 𝑝 = 6 .56 × 10 −14 ), indicating that the performance gap between initialization methods narrows substantially as more target data becomes available. At the smallest data size (10 samples), retraining yields normal-ized test loss approximately 6.6 × higher than finetuning; at 1000 samples, this gap shrinks to approximately 1.0 ×—effectively equivalent performance. The TCLab system shows a similar but weaker pattern. The interaction terms are not individually significant at 𝛼 =0.05 , but the direction is consistent: finetuning’s advantage diminishes with increasing data. This confirms that transfer learning provides the greatest benefit precisely when it is most needed—in data-scarce scenarios. 
+
+4.2.4. Effect of Optimizer 
+
+Optimizer choice (Adam, L-BFGS, SEKF) has context-dependent effects. For test loss, optimizer effects are not sig-nificant in the damped spring system (Permutation ANOVA: 
+
+𝐹 = 1 .05 , 𝑝 = 0 .394 ) but are significant in TCLab ( 𝐹 =6.46 , 𝑝 = 0 .002 ), suggesting that optimizer selection be-comes more important when dealing with noisy real-world data. The SEKF’s advantage in the TCLab system likely reflects the benefit of explicit noise modeling in sim-to-real transfer: the measurement noise covariance 𝑹 directly accounts for sensor noise present in physical data, while the process noise covariance 𝑸 controls how far parameters may deviate from the simulation-trained prior. In the damped spring case, where both source and target are simulated with controlled noise, this probabilistic machinery offers less benefit over gradient-based methods. Critically, optimizer choice does not significantly affect the train-test gap in either system (damped spring: 𝐹 = 1 .10 ,
+
+𝑝 = 0.330 ; TCLab: 𝐹 = 0.32 , 𝑝 = 0.739 ). All three optimizers achieve statistically indistinguishable general-ization performance despite following different optimiza-tion trajectories. This null result has practical significance: practitioners can select optimizers based on computational constraints without sacrificing generalization. For convergence time, optimizer effects are highly sig-nificant in both systems (damped spring: 𝐹 = 322 .9, 𝑝 =2 × 10 −4 ; TCLab: 𝐹 = 9 .62 , 𝑝 = 2 × 10 −4 ). The GLM reveals that SEKF requires substantially more computa-tion than gradient-based methods due to the matrix inver-sion performed. Relative to Adam, the SEKF increases log-normalized time by 2.14 units in the damped spring system (𝑝 = 5 .01 × 10 −13 ), corresponding to approximately 8.5 ×
+
+longer training times. However, a significant interaction between SEKF and initialization method (damped spring: 
+
+𝛽 = 3 .42 , 𝑝 = 9 .99 × 10 −15 ; TCLab: 𝛽 = 2 .02 , 𝑝 = 0 .024 )indicates that SEKF’s computational overhead is most pro-nounced when retraining from scratch; when finetuning, the relative disadvantage is reduced because parameter updates remain localized near the well-initialized source parameters. 
+
+4.2.5. Summary of Statistical Findings 
+
+Table 5 summarizes the key statistical findings. The ev-idence strongly supports the conclusions that (1) target data availability is the dominant factor affecting all outcomes, (2) finetuning outperforms retraining, especially when data is limited, (3) finetuning provides regularization benefits reflected in smaller train-test gaps, and (4) optimizer choice affects computational efficiency but not generalization qual-ity.                                                
+
+> J.E. Hammond et al.: Preprint submitted to Elsevier Page 8 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data
+> Table 5
+> Summary of Permutation ANOVA results ( 𝐹 -statistics and 𝑝 -values) for main effects across both benchmark systems. Significant effects ( 𝑝 < 0.05 ) are shown in bold. Damped Spring TCLab Outcome Factor 𝐹 𝑝 𝐹 𝑝
+> Test Loss Data Size 8.29 2 × 10 −4 24.88 2 × 10 −4
+> Init Method 6.58 2 × 10 −4 0.75 0.389 Optimizer 1.05 0.394 6.46 0.002
+> Train-Test Gap Data Size 6.02 2 × 10 −4 67.43 2 × 10 −4
+> Init Method 4.73 2 × 10 −4 7.87 0.007
+> Optimizer 1.10 0.330 0.32 0.739 Conv. Time Data Size 14.19 2 × 10 −4 2.87 0.017
+> Init Method 64.04 2 × 10 −4 6.11 0.008
+> Optimizer 322.94 2 × 10 −4 9.62 2 × 10 −4
+
+## 5. Conclusion 
+
+This work investigated transfer learning for neural net-work models of dynamical systems, demonstrating that pre-trained source models can be efficiently adapted to related target systems using severely limited data. The experimental evidence from both simulated (damped spring-mass) and physical (Temperature Control Laboratory) systems sup-ports several conclusions with implications for practitioners and researchers working on data-driven modeling of dynam-ical systems. 
+
+Finetuning substantially outperforms retraining from scratch. Across all experimental conditions, initializing from pre-trained source parameters yields significantly lower test error than random initialization. This advantage is most pronounced when target data is limited—with as few as 10 samples or 0.5 hours of operational data, finetuning achieves performance that retraining cannot match even with substantially more data. For industrial applications where data collection is constrained by cost, safety, or time, this finding suggests that investing in high-quality source models and leveraging transfer learning provides greater returns than attempting to train target-specific models from scratch. 
+
+Effective transfer requires only small parameter per-turbations. Finetuned models maintain cosine similarity exceeding 0.99 with source parameters, demonstrating that successful adaptation occurs within a small neighborhood of weight space. This proximity validates the underlying assumption that functionally similar dynamical systems— those sharing governing equation structure and overlapping operating domains—can be modeled by neural networks with similar parameters. The practical implication is that transfer learning for dynamical systems is well-suited to parameter-efficient methods that constrain updates to remain near the source model, reducing both computational cost and overfitting risk. 
+
+Finetuning provides implicit regularization against overfitting. When training data is limited, overfitting poses a fundamental challenge. The experimental results demon-strate that finetuning exhibits smaller train-test gaps than retraining, indicating superior generalization. This regu-larization effect can be understood through the Bayesian lens: source parameters define an informative prior 𝑝 (𝝅 ) = 
+
+ (𝝅  , 𝑷 0) that biases optimization toward regions of pa-rameter space with favorable generalization properties. When target data is scarce, the posterior remains close to this prior because observations lack sufficient evidence to shift the dis-tribution substantially. Retraining from random initialization corresponds to an uninformative prior that offers no such guidance, explaining its inferior generalization. For prac-titioners, this suggests that transfer learning offers benefits beyond reduced data requirements—it also improves model reliability on unseen operating conditions. 
+
+Optimizer choice affects efficiency but not generaliza-tion. While Adam, L-BFGS, and SEKF differ substantially in convergence time, they achieve statistically indistinguish-able generalization performance as measured by train-test gap. This null result has practical significance: practitioners can select optimizers based on computational constraints, available infrastructure, or convergence speed without sac-rificing model quality. The SEKF, despite its Bayesian for-mulation and theoretical regularization properties, does not provide measurable generalization advantages over simpler gradient-based methods in the experimental settings studied. However, the SEKF’s sequential processing enables online adaptation during normal system operation, where conver-gence time is less critical because the system continues to operate while the model adapts. In contrast, gradient-based methods require assembling batch datasets, implying discrete data collection and model redeployment cycles. The operational continuity afforded by online adaptation may outweigh the SEKF’s slower convergence in practical deployments. 
+
+Effective transfer requires small but distributed pa-rameter changes. Unlike transfer learning for image clas-sification, where early layers encoding general features are typically frozen while later task-specific layers are adapted, dynamical system transfer learning exhibits dis-tributed parameter modifications across all layers while maintaining high cosine similarity with source parameters.   
+
+> J.E. Hammond et al.: Preprint submitted to Elsevier Page 9 of 16
+
+Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data 
+
+This combination—small magnitude changes distributed throughout the architecture—suggests that the hierarchi-cal feature abstraction paradigm underlying layer-freezing heuristics in computer vision does not directly transfer to regression problems in dynamical systems. Notably, the three optimizers achieve this distributed adaptation through distinct mechanisms: Adam produces small, uniform up-dates across many parameters; L-BFGS concentrates larger updates in fewer influential weights; and SEKF exhibits the most selective behavior, restricting updates to specific neurons. Despite these contrasting update patterns, all op-timizers achieve comparable generalization, indicating that multiple paths through parameter space lead to similarly effective target models provided they remain near the source. Practitioners should therefore adapt all network parameters rather than selectively freezing layers when applying transfer learning to system identification tasks. 
+
+Implications for modeling dynamical systems with limited data. The results presented here suggest a prac-tical workflow for developing neural network models of dynamical systems in data-scarce environments. First, train a high-quality source model using abundant data from a re-lated system—whether simulated, historical, or from similar equipment. Second, collect minimal target data sufficient to capture the essential differences between source and target systems. Third, finetune the source model on target data using standard gradient-based optimization, which provides computational efficiency without sacrificing generalization. This approach enables accurate modeling with as little as 1% of the data required for training from scratch, substantially lowering barriers to deploying data-driven methods in set-tings where comprehensive data collection is infeasible such as industrial, automotive, healthcare etc. 
+
+Limitations and future directions. The systems studied here satisfy the assumptions of functional similarity and overlapping operating domains. Transfer learning perfor-mance when these assumptions are violated—for example, when source and target systems have qualitatively different dynamics, or when the same model is deployed in signif-icantly different conditions—remains to be characterized. Additionally, the neural network architectures employed are relatively small; scaling behavior to larger models and more complex systems warrants investigation. Future work should also explore adaptive methods that automatically determine the appropriate degree of parameter regularization based on the similarity between source and target systems, potentially enabling robust transfer even when system relationships are uncertain. The SEKF process model (Eq. (3.5a)) already treats parameters as a random walk—an integrator driven by white noise—suggesting a natural extension to scenar-ios where physical parameters are non-constant but slowly varying. 
+
+## Acknowledgments 
+
+The authors would like to thank the industrial spon-sors of the Texas Wisconsin California Control Consortium (TWCCC) for their support of this research. 
+
+## Data and Code Availability 
+
+All code necessary to reproduce the results in this paper is available at https://github.com/joshuaeh/Subset-Extended-Kalman-Filte tree/transfer . No new data was generated for this study; all data used is either simulated or publicly available. 
+
+## CRediT authorship contribution statement 
+
+Joshua E. Hammond: Conceptualization, Methodol-ogy, Software, Writing - Original Draft, Writing - Review & Editing. Brian A. Korgel: Writing - Review & Editing, Supervision, Funding acquisition. Tyler A. Soderstrom: 
+
+Writing - Review & Editing, Funding acquisition. Michael Baldea: Conceptualization, Methodology, Writing - Review & Editing, Supervision, Funding acquisition. 
+
+## References                                 
+
+> [1] Ricky TQ Chen, Yulia Rubanova, Jesse Bettencourt, and David K Duvenaud. Neural ordinary differential equations. Advances in Neural Information Processing Systems , 31, 2018. [2] Joshua E Hammond, Tyler A Soderstrom, Brian A Korgel, and Michael Baldea. A selective kalman filtering approach to online neural network updating under system drift. Scientific Reports , 15 (1):43577, 2025. [3] Marco Forgione and Dario Piga. On the adaptation of recurrent neural networks for system identification. Automatica , 155:111092, 2023. [4] Mohammed S Alhajeri, Junwei Luo, Zhe Wu, Xunyuan Yin, and Panagiotis D Christofides. Transfer learning for neural network model predictive control of chemical processes. AIChE Journal , 70(1): e18257, 2024. [5] Eleni Chatzi and Vasilis Papadopoulos. Spectral analysis of layer-wise transfer learning in neural networks for turbulence modeling. Physics of Fluids , 35(4), 2023. [6] J Nathan Kutz and Steven L Brunton. Machine learning for fluid mechanics. Annual Review of Fluid Mechanics , 54:477–508, 2022. [7] Eleni Chatzi and Hadi Naseri. Discrepancy modeling framework for neural ordinary differential equations. Mechanical Systems and Signal Processing , 160:107857, 2021. [8] Tuna Velioglu et al. Physics-informed neural networks for cstr modeling with limited data. Computers and Chemical Engineering ,178:108365, 2024. [9] Maziar Raissi, Paris Perdikaris, and George E Karniadakis. Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations. Journal of Computational Physics , 378:686–707, 2019. [10] Yi Wang and Zhe Wu. Meta-learning with physics-informed fine-tuning for chemical reactor modeling. Industrial & Engineering Chemistry Research , 63(8):3842–3856, 2024. [11] Simon Haykin. Kalman Filtering and Neural Networks . John Wiley & Sons, 2001. [12] Guy Revach, Nir Shlezinger, Xiaoyong Ni, Adrià Lozano Escoriza, Ruud JG Van Sloun, and Yonina C Eldar. Kalmannet: Neural network aided kalman filtering for partially known dynamics. IEEE Transactions on Signal Processing , 70:1532–1547, 2022. [13] Huseyin Coskun, Felix Achilles, Robert DiPietro, Nassir Navab, and Federico Tombari. Long short-term memory kalman filters: Recurrent neural estimators for pose regularization. In Proceedings of
+
+J.E. Hammond et al.: Preprint submitted to Elsevier Page 10 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data 
+
+the IEEE International Conference on Computer Vision , pages 5524– 5532, 2017. [14] Peter Chang et al. Low-rank extended kalman filtering for online learning of neural networks. Journal of Machine Learning Research ,24(1):1–45, 2023. [15] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. Lora: Low-rank adaptation of large language models. arXiv preprint arXiv:2106.09685 , 2022. [16] Ning Ding, Yujia Qin, Guang Yang, Fuchao Wei, Zonghan Yang, Yusheng Su, Shengding Hu, Yulin Chen, Chi-Min Chan, Weizhu Chen, et al. Parameter-efficient fine-tuning of large-scale pre-trained language models. Nature Machine Intelligence , 5(3):220–235, 2023. [17] Silvan Käser and Markus Meuwly. Layer-freezing strategies for neural network potentials. Journal of Chemical Theory and Computation , 15 (12):6884–6895, 2019. [18] Diederik P Kingma. Adam: A method for stochastic optimization. 
+
+arXiv preprint arXiv:1412.6980 , 2014. [19] Richard H Byrd, Peihuang Lu, Jorge Nocedal, and Ciyou Zhu. Alimited memory algorithm for bound constrained optimization. SIAM Journal on scientific computing , 16(5):1190–1208, 1995. [20] Liam Li, Kevin Jamieson, Giulia DeSalvo, Afshin Rostamizadeh, and Ameet Talwalkar. A system for massively parallel hyperparameter tuning. Proceedings of Machine Learning and Systems , 2:230–246, 2020. [21] Junho Park, R Abraham Martin, Jeffrey D Kelly, and John D Heden-gren. Benchmark temperature microcontroller for process dynamics and control. Computers & Chemical Engineering , 135:106736, 2020. [22] PB de Moura Oliveira, John D Hedengren, and JA Rossiter. Intro-ducing digital controllers to undergraduate students using the tclab arduino kit. IFAC-PapersOnLine , 53(2):17524–17529, 2020. 10 50 100 500 1000  
+
+> Target Data Available ( |D T
+> train +validate |)
+> 10 0
+> 10 1
+> Normalized Test Loss (MSE)
+
+(a) Damped Spring               
+
+> Source ΦS
+> Finetune Retrain 0.5hr 1hr 4hr 12hr 24hr
+> Target Data Available ( |D T
+> train +validate |)
+> 10 0
+> 2×10 0
+> 3×10 0
+> 4×10 0
+> 6×10 0
+> Normalized Test Loss (MSE)
+
+(b) TCLab  
+
+> Source ΦS
+> Finetune Retrain
+
+Figure 2: Normalized test loss versus target data size for finetuning and retraining initialization methods. (a) Damped spring system. (b) TCLab system. Error bars indicate standard error across replicates. The dashed line indicates source model performance. Finetuning achieves lower test loss, especially with limited data. 10 50 100 500 1000  
+
+> Target Data Available ( |D T
+> train +validate |)
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> Train-Test Gap (MSE)
+
+(a) Damped Spring      
+
+> Finetune Retrain 0.5hr 1hr 4hr 12hr 24hr
+> Target Data Available ( |D T
+> train +validate |)
+> 0
+> 1
+> 2
+> 3
+> Train-Test Gap (MSE)
+
+(b) TCLab 
+
+> Finetune Retrain
+
+Figure 3: Train-test gap (test loss minus training loss) versus target data size, grouped by initialization method. Smaller gaps indicate better generalization. Finetuning exhibits consistently smaller train-test gaps than retraining across all data sizes in both systems. (a) Damped spring system. (b) TCLab system. J.E. Hammond et al.: Preprint submitted to Elsevier Page 11 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data 0.2 0.4 0.6 0.8 1.0 
+
+> Cosine Similarity with Source πS
+> 020 40 60 80 100
+> Percentage (%)
+
+(a) Damped Spring      
+
+> Retrain Finetune
+> 0.20.40.60.81.0
+> Cosine Similarity with Source πS
+> 020 40 60 80
+> Percentage (%)
+
+(b) TCLab 
+
+> Retrain Finetune
+
+Figure 4: Distribution of cosine similarity between adapted model parameters and source model parameters. Dashed ver-tical lines indicate mean cosine similarity for each initialization method, with horizontal error bars showing ±1 standard deviation. (a) Damped spring system. (b) TCLab system. Finetuned models cluster tightly near 1.0, indicating that successful adaptation requires only small perturbations from the source model. Retrained models exhibit much wider spread and lower similarity, occupying different regions of parameter space. J.E. Hammond et al.: Preprint submitted to Elsevier Page 12 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data ADAM W B W B W B W B           
+
+> LBFGS SEKF
+> 0.00.20.40.60.81.01.2
+> |πS−πT|
+> πS
+> Layer 1 Layer 2 Layer 3 Layer 4
+
+Figure 5: Changes in model weights during transfer learning for the damped spring system when 𝑐  = 0 .9𝑐  and 1,000 target examples. Each subplot shows the distribution of weight changes in a specific layer of the neural network. Contrary to common heuristics in image classification, weight changes are distributed across all layers rather than concentrated in later layers. This suggests that transfer learning for dynamical systems requires holistic parameter adjustments. Adam L-BFGS SEKF 
+
+> Optimizer
+> 10 −2
+> 10 −1
+> 10 0
+> Normalized Convergence Time
+
+(a) Damped Spring   
+
+> Finetune Retrain
+> Adam L-BFGS SEKF
+> Optimizer
+> 10 −3
+> 10 −2
+> 10 −1
+> Normalized Convergence Time
+
+(b) TCLab 
+
+> Finetune Retrain
+
+Figure 6: Normalized convergence time by optimizer and initialization method. Left: Damped spring system. Right: TCLab system. SEKF exhibits the longest convergence times, especially when retraining. Finetuning reduces convergence time across all optimizers. J.E. Hammond et al.: Preprint submitted to Elsevier Page 13 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data                                         
+
+> Table 6
+> Source Damped Spring-Mass System Parameters
+> Parameter Value Units
+> Mass, 𝑚 1.0 kg Damping Coefficient, 𝑐 0.5 Ns/m Spring Constant, 𝑘 1.0 N/m Force, 𝑢 0NInitial Position 𝑥 0Uniform(-5, 5) mInitial Velocity ̇𝑥 Uniform(-5, 5) m/s
+> Table 7
+> Source Damped Spring-Mass System NN Hyperparameters
+> Hyperparameter Values
+> Learning Rate 10 −6 –10 −1
+> Batch Size 16,32,64,128 LR Patience 10, 20, 50, 100 LR Factor 0.1 – 0.9 Maximum Epochs 1000 Num. Samples 100 Max. Concurrent Samples 4
+> Table 8
+> Summary of all Damped Spring-Mass Trials 2Parameter Initialization Methods: Finetune, Retrain 3Optimization Methods: SEKF, Adam, LBFGS 8Target Systems: ±10% change in 𝑚 ,𝑐 ,𝑘 ,𝑢
+> 5Training Dataset Sizes: 10, 50, 100, 500, 1,000 10 Replicates per Target System and Dataset Size 2,400 Total Trials
+
+## A. Experimental Details 
+
+A.1. Damped Spring-Mass System 
+
+The Damped Spring-Mass system is governed by the second-order ordinary differential equation: 
+
+𝑚 𝑑 2𝑥 𝑑𝑡 2 + 𝑐 𝑑𝑥 𝑑𝑡 + 𝑘𝑥 = 𝑢, (A.11) where 𝑥 is the position of the mass, 𝑚 is the mass, 𝑐 is the damping coefficient, 𝑘 is the spring constant, and 𝑢 is the external force applied to the system. Source System parameters are listed in Table 6. The source NN model is trained on 100,000 datapoints generated by simulating the system with uniformly sampled random initial positions and velocities over a time horizon of 20 seconds. The MLP model consists of 2 hidden layers with 32 neurons each and sigmoid activation functions. The model is trained using the Adam optimizer with hyperparameters listed in Table 7 tuned with the ASHA algorithm using the ray python library. The 8 target systems differ from the source system by changing one of the physical parameters of the system by ±10% 
+
+(±1 N in the case of force 𝑢 ). Each system is similarly simulated to generate 100,000 input-output pairs for training the target models separated into 10 replicates of 10,000 pairs each. Within each target dataset, 9,000 pairs are held out as a test dataset to approximate the generalization error of the target models. Training and validation datasets are created by selecting the first 10, 50, 100, 500, and 1,000 datapoints from the remaining 1,000 pairs and splitting them into 90% training and 10% validation sets. 
+
+A.2. Temperature Control Lab 
+
+The Temperature Control Lab (TCLab) is a pocket-sized experimental platform consisting of two heaters and two temperature sensors mounted on an Arduino-based board, designed for teaching and research in process dynamics and   
+
+> J.E. Hammond et al.: Preprint submitted to Elsevier Page 14 of 16
+
+Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data 
+
+Table 9 
+
+Transfer Learning Hyperparameters All Mini-batches per Epoch 50 Max. Epochs 100 Adam Learning Rate 10 −6 –10 −1 
+
+Mini-batch Size 1–8, 000 
+
+LR Patience 10 LR Factor 0.1 – 0.9 LBFGS Learning Rate 10 −6 –1
+
+Mini-batch Size 1–8,000 History Size 10 Max. Line Searches 10 SEKF Measurement Noise 𝑅 0.01 Process Noise 𝑄 10 −6 , 10 −4 , 10 −2 , 10 −1 
+
+Initial Covariance 𝑃 0 0.01, 1.0, 10, 100 Mini-batch Size 1, 2, 4, 8 
+
+Table 10 
+
+TCLab Model Parameters 
+
+Parameter Value Units 
+
+Mass, 𝑚 0.004 kg Heat Capacity, 𝑐 𝑝 500 J/(kg ⋅K) Heat Transfer Coefficient, 𝑈 10 W/(m 2⋅K) Exposed Surface Area, 𝐴 1.0 × 10 −3 m2
+
+Inter-heater Surface Area, 𝐴 𝑠 2.0 × 10 −4 m2
+
+Emissivity, 𝜖 0.9 –Stefan-Boltzmann Constant, 𝜎 5.67 × 10 −8 W/(m 2⋅K4)Heater 1 Factor, 𝛼 1 0.01 W/% Heater 2 Factor, 𝛼 2 0.0075 W/% Ambient Temperature, 𝑇 ∞ 296.15 (23 ◦C) K
+
+control [21, 22]. Figure 7 shows the physical device. We use a second-order physics-based model of the TCLab system based on energy balances for each heater [21]. The governing equations for the two heater temperatures are coupled nonlinear energy balances: 
+
+𝑚𝑐 𝑝 
+
+𝑑𝑇 1
+
+𝑑𝑡 = 𝑈 𝐴 (𝑇 ∞ − 𝑇 1) + 𝜖𝜎𝐴 (𝑇 4∞ − 𝑇 41 ) + 𝑄 𝐶 12 + 𝑄 𝑅 12 + 𝛼 1𝑄 1 (A.12) 
+
+𝑚𝑐 𝑝 
+
+𝑑𝑇 2
+
+𝑑𝑡 = 𝑈 𝐴 (𝑇 ∞ − 𝑇 2) + 𝜖𝜎𝐴 (𝑇 4∞ − 𝑇 42 ) − 𝑄 𝐶 12 − 𝑄 𝑅 12 + 𝛼 2𝑄 2 (A.13) where 𝑇 1 and 𝑇 2 are the heater temperatures, 𝑇 ∞ is the ambient temperature, and 𝑄 1 and 𝑄 2 are the heater power inputs (0–100%). The inter-heater heat transfer comprises convective and radiative components: 
+
+𝑄 𝐶 12 = 𝑈 𝐴 𝑠 (𝑇 2 − 𝑇 1) (A.14) 
+
+𝑄 𝑅 12 = 𝜖𝜎𝐴 𝑠 (𝑇 42 − 𝑇 41 ) (A.15) Table 10 lists the model parameters used for simulation. The source system was simulated for one year with a measurement frequency of 10 seconds, generating approximately 3.15 million data points. Heater power inputs were generated using a pseudo-random scheme: at random intervals of 1–10 minutes, each heater was assigned a uniformly sampled power setting (0–100%), with a 50% probability of being set to zero to encourage exploration of cooling dynamics. The neural network model predicts both heater temperatures over a 10-minute (60 sample) prediction horizon given initial temperatures and heater power inputs across the horizon. A Neural ODE model is employed to capture the dynamics of the system. An architecture with two hidden layers is utilized with 32 neurons each layer and sigmoid activation. The target system represents a physical TCLab unit, with real-world disturbances such as sensor noise and unmodeled dynamics. The target system was operated for one week, collecting data at 10-second intervals. Heater power inputs followed 
+
+J.E. Hammond et al.: Preprint submitted to Elsevier Page 15 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data      
+
+> Table 11
+> Summary of all TCLab Trials 2Parameter Initialization Methods: Finetune, Retrain 3Optimization Methods: SEKF, Adam, LBFGS 5Training Dataset Sizes: 0.5 hours, 1 hour, 4 hours, 12 hours, 24 hours 5Replicates 150 Total Trials
+
+the same pseudo-random scheme as the source system to ensure comparable excitation. Then, each day was used as a separate training dataset with the final two days held out for testing. Within each training dataset, training and validation sets were created by selecting the first 0.5 hours, 1 hour, 4 hours, 12 hours, and 24 hours of data and splitting them into 90% training and 10% validation sets. 
+
+## B. Supplementary Data 
+
+This appendix provides additional visualizations that complement the main text figures. These include full scatter plots showing individual trial results, detailed breakdowns by system and replicate, and diagnostic plots for statistical model validation. 
+
+B.1. Example Predictions 
+
+Example prediction trajectories from both the damped spring and TCLab systems are selected by choosing specific examples at the 90th, 50th, and 10th percentiles of test loss for each initialization method. Figure 8 shows damped spring trajectories, comparing source model predictions (trained on 𝑐  = 0 .5) with finetuned and retrained target models (adapting to 𝑐  = 0 .45 ) using 100 training samples. The finetuned model closely tracks the target system even in the worst-case scenario (90th percentile), while the retrained model exhibits substantial deviation. Figure 9 presents analogous results for the TCLab system, demonstrating transfer from simulation to physical hardware using 4 hours of real-world data. These visualizations confirm that finetuning maintains predictive accuracy across the distribution of outcomes, whereas retraining produces more variable and often degraded performance. 
+
+B.2. Full Test Loss Results 
+
+Figure 10 presents complete strip plots of normalized test loss for all individual trials across both experimental systems. Note that strip plots represent the target data available as a categorical variable and thus the horizontal variance within each condition is presented to characterize differences between optimizers, not to suggest that one optimizer has more data than another. Each point represents a single trial, colored by initialization method (blue: finetune, orange: retrain). Panels are organized by target data size to illustrate the distribution of outcomes within each condition. 
+
+B.3. Train-Test Gap Details 
+
+Figure 12 presents complete scatter plots of the train-test gap for all individual trials, providing a detailed view of generalization performance across experimental conditions. 
+
+B.4. Convergence Time Analysis 
+
+Figure 13 shows normalized convergence time broken down by target data size for each optimizer, illustrating how computational efficiency varies across data regimes and optimization methods. 
+
+B.5. Statistical Model Diagnostics 
+
+## C. Statistical Analysis Details 
+
+This appendix presents the complete GLM coefficient tables from the Gamma regression models used in the statistical analysis. Tables include only coefficients with 𝑝 < 0.05 .
+
+C.1. Damped Spring System 
+
+Tables 12–14 present the complete GLM coefficient estimates for the damped spring system, covering normalized test loss, train-test gap, and convergence time outcomes respectively. 
+
+C.2. TCLab System 
+
+Tables 15–17 present the complete GLM coefficient estimates for the TCLab system, covering normalized test loss, train-test gap, and convergence time outcomes respectively.   
+
+> J.E. Hammond et al.: Preprint submitted to Elsevier Page 16 of 16
+
+Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data 
+
+Table 12 
+
+GLM (Gamma) significant coefficients for normalized test loss—Damped Spring. Reference levels: Adam optimizer, Finetune initialization, 10 training samples. Effect Coef. Std.Err. 𝑧 𝑝 
+
+Intercept 1.120 0.125 8.93 4.11 × 10 −19 
+
+L-BFGS 0.352 0.177 1.99 4.70 × 10 −2 
+
+Retrain 1.887 0.177 10.64 1.88 × 10 −26 
+
+50 Samples −0.844 0.177 −4.76 1.94 × 10 −6 
+
+100 Samples −1.005 0.177 −5.67 1.47 × 10 −8 
+
+500 Samples −1.093 0.177 −6.17 7.00 × 10 −10 
+
+1000 Samples −1.108 0.177 −6.25 4.17 × 10 −10 
+
+Retrain × 50 Samples −1.749 0.251 −6.98 3.04 × 10 −12 
+
+Retrain × 100 Samples −1.825 0.251 −7.28 3.34 × 10 −13 
+
+Retrain × 500 Samples −1.878 0.251 −7.49 6.99 × 10 −14 
+
+Retrain × 1000 Samples −1.880 0.251 −7.50 6.56 × 10 −14 
+
+Table 13 
+
+GLM (Gamma) significant coefficients for train-test gap—Damped Spring. Reference levels: Adam optimizer, Finetune initialization, 10 training samples. Effect Coef. Std.Err. 𝑧 𝑝 
+
+Intercept −2.929 0.122 −23.99 3.85 × 10 −127 
+
+Retrain 1.077 0.173 6.24 4.50 × 10 −10 
+
+50 Samples −0.366 0.173 −2.12 3.40 × 10 −2 
+
+100 Samples −0.431 0.173 −2.49 1.27 × 10 −2 
+
+500 Samples −0.475 0.173 −2.75 6.00 × 10 −3 
+
+1000 Samples −0.481 0.173 −2.78 5.40 × 10 −3 
+
+L-BFGS × Retrain 0.815 0.244 3.34 8.50 × 10 −4 
+
+Retrain × 50 Samples −1.011 0.244 −4.14 3.50 × 10 −5 
+
+Retrain × 100 Samples −1.048 0.244 −4.29 1.76 × 10 −5 
+
+Retrain × 500 Samples −1.075 0.244 −4.40 1.08 × 10 −5 
+
+Retrain × 1000 Samples −1.077 0.244 −4.41 1.04 × 10 −5 
+
+L-BFGS × Retrain × 50 Samples −0.844 0.345 −2.45 1.45 × 10 −2 
+
+L-BFGS × Retrain × 100 Samples −0.836 0.345 −2.42 1.55 × 10 −2 
+
+L-BFGS × Retrain × 500 Samples −0.818 0.345 −2.37 1.78 × 10 −2 
+
+L-BFGS × Retrain × 1000 Samples −0.816 0.345 −2.36 1.82 × 10 −2 
+
+Figure 7: The Temperature Control Lab (TCLab) hardware platform. Image courtesy of APMonitor.com. J.E. Hammond et al.: Preprint submitted to Elsevier Page 17 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data 0.0 2.5 5.0 7.5 10 .0 12 .5 15 .0 17 .5 20 .0
+
+> −4
+> −2024
+> Position
+> 90 th  Percentile
+
+(a)          
+
+> True Initial Position Initial Velocity Source ΦS
+> Adam L-BFGS SEKF
+> 0.02.55.07.510 .012 .515 .017 .520 .0
+> −4
+> −2024
+
+(b)          
+
+> True Initial Position Initial Velocity Source ΦS
+> Adam L-BFGS SEKF
+> 0.02.55.07.510 .012 .515 .017 .520 .0
+> −4
+> −2024
+> Position
+> 50 th  Percentile
+
+(c)          
+
+> True Initial Position Initial Velocity Source ΦS
+> Adam L-BFGS SEKF
+> 0.02.55.07.510 .012 .515 .017 .520 .0
+> −4
+> −2024
+
+(d)          
+
+> True Initial Position Initial Velocity Source ΦS
+> Adam L-BFGS SEKF
+> 0.02.55.07.510 .012 .515 .017 .520 .0
+
+Time (s) 
+
+> −4
+> −2024
+> Position
+> 10 th  Percentile
+
+(e)          
+
+> True Initial Position Initial Velocity Source ΦS
+> Adam L-BFGS SEKF
+> 0.02.55.07.510 .012 .515 .017 .520 .0
+
+Time (s) 
+
+> −4
+> −2024
+
+(f)  
+
+> True Initial Position Initial Velocity Source ΦS
+> Adam L-BFGS SEKF
+
+Figure 8: Example prediction trajectories for the damped spring system at the 90th, 50th, and 10th percentiles of test loss for the source model. Target system has 𝑐  = 0 .45 (10% reduction from source). Finetuned models (middle row) maintain accuracy comparable to the source model, while retrained models (bottom row) exhibit larger prediction errors, especially in worst-case scenarios. 
+
+Table 14 
+
+GLM (Gamma) significant coefficients for normalized convergence time—Damped Spring. Reference levels: Adam optimizer, Finetune initialization, 10 training samples. Effect Coef. Std.Err. 𝑧 𝑝 
+
+Intercept −5.161 0.209 −24.67 2.33 × 10 −134 
+
+SEKF 2.138 0.296 7.23 5.01 × 10 −13 
+
+Retrain −1.036 0.296 −3.50 4.65 × 10 −4 
+
+SEKF × Retrain 3.418 0.442 7.74 9.99 × 10 −15 
+
+L-BFGS × 50 Samples 2.036 0.418 4.87 1.14 × 10 −6 
+
+SEKF × 50 Samples 1.543 0.418 3.69 2.26 × 10 −4 
+
+SEKF × 100 Samples 2.108 0.418 5.04 4.72 × 10 −7 
+
+SEKF × 500 Samples 2.336 0.418 5.58 2.36 × 10 −8 
+
+SEKF × 1000 Samples 2.126 0.418 5.08 3.77 × 10 −7 
+
+L-BFGS × Retrain × 50 Samples −1.176 0.592 −1.99 4.69 × 10 −2 
+
+SEKF × Retrain × 50 Samples −1.286 0.624 −2.06 3.95 × 10 −2 
+
+SEKF × Retrain × 100 Samples −1.247 0.625 −1.99 4.62 × 10 −2 
+
+SEKF × Retrain × 500 Samples −1.526 0.625 −2.44 1.47 × 10 −2 
+
+SEKF × Retrain × 1000 Samples −1.381 0.625 −2.21 2.73 × 10 −2 
+
+J.E. Hammond et al.: Preprint submitted to Elsevier Page 18 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data 050 100 
+
+> Heater 2 (%)
+> 90 th  Percentile
+
+(a)   
+
+> Q1Q2Ta
+
+0 2 4 6 8 10 025 50 75 
+
+> T1 (◦C)
+
+(b)  
+
+> True Initial Temp. Source ΦS
+> Adam L-BFGS SEKF
+
+0 2 4 6 8 10 025 50 75 
+
+> T2 (◦C)
+
+(c)  
+
+> True Initial Temp. Source ΦS
+> Adam L-BFGS SEKF
+
+050 100 
+
+> Heater 2 (%)
+> 50 th  Percentile
+
+(d)   
+
+> Q1Q2Ta
+
+0 2 4 6 8 10 
+
+Time (min) 
+
+025 50 75 
+
+> T1 (◦C)
+
+(e)  
+
+> True Initial Temp. Source ΦS
+> Adam L-BFGS SEKF
+
+0 2 4 6 8 10 
+
+Time (min) 
+
+025 50 75 
+
+> T2 (◦C)
+
+(f)  
+
+> True Initial Temp. Source ΦS
+> Adam L-BFGS SEKF
+
+050 100 
+
+> Heater 2 (%)
+> 10 th  Percentile
+
+(g)   
+
+> Q1Q2Ta
+
+0 2 4 6 8 10 025 50 75 
+
+> T1 (◦C)
+
+(h)  
+
+> True Initial Temp. Source ΦS
+> Adam L-BFGS SEKF
+
+0 2 4 6 8 10 025 50 75 
+
+> T2 (◦C)
+
+(i)  
+
+> True Initial Temp. Source ΦS
+> Adam L-BFGS SEKF
+
+Figure 9: Example prediction trajectories for the TCLab system at the 90th, 50th, and 10th percentiles of test loss for the source model. Transfer learning adapts a simulation-trained model to physical hardware using 4 hours of experimental data. Finetuned models (middle row) accurately predict both heater temperatures, while retrained models (bottom row) show degraded performance, particularly for the second heater. J.E. Hammond et al.: Preprint submitted to Elsevier Page 19 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data 10 50 100 500 1000 
+
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> Normalized Test Loss (MSE)
+
+(a) 
+
+Damped Spring - Retrain     
+
+> ADAM L-BFGS SEKF
+> 10 50 100 500 1000
+> 10 0
+> 10 1
+> Normalized Test Loss (MSE)
+
+(b) 
+
+Damped Spring - Finetune     
+
+> ADAM L-BFGS SEKF
+> 0.5hr 1hr 4hr 12hr 24hr
+
+Target Data Available ( |D T 
+
+> train +validate
+
+|)
+
+> 10 0
+> 10 1
+> Normalized Test Loss (MSE)
+
+(c) 
+
+TCLab - Retrain     
+
+> ADAM L-BFGS SEKF
+> 0.5hr 1hr 4hr 12hr 24hr
+
+Target Data Available ( |D T 
+
+> train +validate
+
+|)
+
+> 10 0
+> 10 1
+> Normalized Test Loss (MSE)
+
+(d) 
+
+TCLab - Finetune 
+
+> ADAM L-BFGS SEKF
+
+Figure 10: Complete scatter plots of normalized test loss for all individual trials across both experimental systems. Each point represents a single trial, colored by initialization method (blue: finetune, orange: retrain). Panels are organized by target data size. 10 50 100 500 1000 
+
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> 10 2
+> Norm. Test Loss (MSE)
+
+(a) c(0.45)     
+
+> 10 50 100 500 1000
+
+(b) c(0.55)     
+
+> 10 50 100 500 1000
+
+(c) k(0.9)     
+
+> 10 50 100 500 1000
+
+(d) k(1.1)     
+
+> 10 50 100 500 1000
+
+Target Data Available 
+
+> 10 −3
+> 10 −2
+> 10 −1
+> 10 0
+> 10 1
+> 10 2
+> Norm. Test Loss (MSE)
+
+(e) m(0.9)     
+
+> 10 50 100 500 1000
+
+Target Data Available 
+
+(f) m(1.1)     
+
+> 10 50 100 500 1000
+
+Target Data Available 
+
+(g) u(-1.0)     
+
+> 10 50 100 500 1000
+
+Target Data Available 
+
+(h) u(1.0) Finetune Retrain 
+
+Figure 11: Normalized test loss broken down by target system for the damped spring experiments. Each of the 8 target systems (varying 𝑚 , 𝑐 , 𝑘 , 𝑢 by ±10% ) is shown separately to illustrate consistency of transfer learning benefits across different parameter perturbations. J.E. Hammond et al.: Preprint submitted to Elsevier Page 20 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data 10 50 100 500 1000 
+
+> 0510 15 20
+> Train-Test Gap
+
+(a) 
+
+Damped Spring - Retrain     
+
+> ADAM L-BFGS SEKF
+> 10 50 100 500 1000
+> 0.00 0.05 0.10 0.15 0.20 0.25 0.30
+> Train-Test Gap
+
+(b) 
+
+Damped Spring - Finetune     
+
+> ADAM L-BFGS SEKF
+> 0.5hr 1hr 4hr 12hr 24hr
+
+Training Duration 
+
+> −1012345
+> Train-Test Gap
+
+(c) 
+
+TCLab - Retrain     
+
+> ADAM L-BFGS SEKF
+> 0.5hr 1hr 4hr 12hr 24hr
+
+Target Data Available 
+
+> −10123
+> Train-Test Gap
+
+(d) 
+
+TCLab - Finetune 
+
+> ADAM L-BFGS SEKF
+
+Figure 12: Complete scatter plots of train-test gap (difference between training and test loss) for all trials. Lower values indicate better generalization. Finetuning consistently shows smaller gaps, particularly at low data sizes. 10 50 100 500 1000 
+
+Target Data Available 
+
+> 10 −2
+> 10 −1
+> 10 0
+> Normalized Convergence Time
+
+(a) 
+
+Damped Spring     
+
+> ADAM L-BFGS SEKF 0.5hr 1hr 4hr 12hr 24hr
+
+Target Data Available 
+
+> 10 −2
+> 10 −1
+> Normalized Convergence Time
+
+(b) 
+
+TCLab 
+
+> ADAM L-BFGS SEKF
+
+Figure 13: Normalized convergence time broken down by target data size for each optimizer. This visualization reveals how optimizer efficiency scales with data availability and whether the relative performance of optimizers changes across data regimes. J.E. Hammond et al.: Preprint submitted to Elsevier Page 21 of 16 Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data 
+
+Table 15 
+
+GLM (Gamma) significant coefficients for normalized test loss—TCLab. Reference levels: Adam optimizer, Finetune initialization, 0.5 hr training data. Effect Coef. Std.Err. 𝑧 𝑝 
+
+Intercept 1.554 0.131 11.89 1.32 × 10 −32 
+
+Retrain 0.384 0.185 2.08 3.79 × 10 −2 
+
+12 hr −1.076 0.185 −5.82 5.82 × 10 −9 
+
+24 hr −1.205 0.185 −6.52 7.00 × 10 −11 
+
+4 hr −0.792 0.185 −4.28 1.84 × 10 −5 
+
+SEKF × 12 hr 1.081 0.261 4.13 3.57 × 10 −5 
+
+SEKF × 24 hr 0.874 0.261 3.34 8.31 × 10 −4 
+
+SEKF × 4 hr 0.790 0.261 3.02 2.50 × 10 −3 
+
+SEKF × Retrain × 12 hr −1.337 0.370 −3.62 3.00 × 10 −4 
+
+SEKF × Retrain × 24 hr −1.023 0.370 −2.77 5.67 × 10 −3 
+
+L-BFGS × Retrain × 4 hr 0.742 0.370 2.01 4.47 × 10 −2 
+
+SEKF × Retrain × 4 hr −0.795 0.370 −2.15 3.14 × 10 −2 
+
+Table 16 
+
+GLM (Gamma) significant coefficients for train-test gap—TCLab. Reference levels: Adam optimizer, Finetune initialization, 0.5 hr training data. Effect Coef. Std.Err. 𝑧 𝑝 
+
+Intercept 1.210 0.091 13.35 1.19 × 10 −40 
+
+Retrain 0.288 0.128 2.25 2.45 × 10 −2 
+
+12 hr −0.657 0.128 −5.13 2.95 × 10 −7 
+
+24 hr −0.738 0.128 −5.76 8.62 × 10 −9 
+
+4 hr −0.541 0.128 −4.22 2.42 × 10 −5 
+
+SEKF × 12 hr −0.388 0.181 −2.14 3.24 × 10 −2 
+
+SEKF × 4 hr −0.441 0.181 −2.43 1.50 × 10 −2 
+
+Table 17 
+
+GLM (Gamma) significant coefficients for normalized convergence time—TCLab. Reference levels: Adam optimizer, Finetune initialization, 0.5 hr training data. Effect Coef. Std.Err. 𝑧 𝑝 
+
+Intercept −4.168 0.449 −9.28 1.65 × 10 −20 
+
+SEKF −1.800 0.635 −2.83 4.59 × 10 −3 
+
+SEKF × Retrain 2.025 0.898 2.25 2.42 × 10 −2 
+
+SEKF × 12 hr −2.197 0.898 −2.45 1.44 × 10 −2 
+
+SEKF × Retrain × 12 hr 3.106 1.270 2.45 1.45 × 10 −2 
+
+J.E. Hammond et al.: Preprint submitted to Elsevier Page 22 of 16

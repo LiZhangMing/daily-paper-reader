@@ -1,0 +1,349 @@
+Title: Quantum-Inspired Fine-Tuning for Few-Shot AIGC Detection via Phase-Structured Reparameterization
+
+URL Source: https://arxiv.org/pdf/2603.02281v1
+
+Published Time: Wed, 04 Mar 2026 01:05:14 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# Quantum-Inspired Fine-Tuning for Few-Shot AIGC Detection via Phase-Structured Reparameterization 
+
+Kaiyang Xing 1 Han Fang 2 Zhaoyun Chen 3 Zhonghui Li 1 Yang Yang 1 3 Weiming Zhang 4 Guoping Guo 4
+
+# Abstract 
+
+Recent studies show that quantum neural net-works (QNNs) generalize well in few-shot regimes. To extend this advantage to large-scale tasks, we propose Q-LoRA, a quantum-enhanced fine-tuning scheme that integrates lightweight QNNs into the low-rank adaptation (LoRA) adapter. Applied to AI-generated content (AIGC) detection, Q-LoRA consistently outperforms stan-dard LoRA under few-shot settings. We ana-lyze the source of this improvement and iden-tify two possible structural inductive biases from QNNs: (i) phase-aware representations, which encode richer information across orthogo-nal amplitude–phase components, and (ii) norm-constrained transformations, which stabilize op-timization via inherent orthogonality. However, Q-LoRA incurs non-trivial overhead due to quan-tum simulation. Motivated by our analysis, we further introduce H-LoRA, a fully classical vari-ant that applies the Hilbert transform within the LoRA adapter to retain similar phase structure and constraints. Experiments on few-shot AIGC detection show that both Q-LoRA and H-LoRA outperform standard LoRA by over 5% accuracy, with H-LoRA achieving comparable accuracy at significantly lower cost in this task. 
+
+# 1. Introduction 
+
+Quantum machine learning has shown great promise due to the unique computational properties of quantum systems. Among its key models, quantum neural networks (QNNs) have been theoretically and empirically suggested to pos-sess a strong generalization ability in few-shot classification 
+
+> 1
+
+Anhui University, Hefei, China 2National University of Singa-pore, Singapore, Singapore 3Institute of Artificial Intelligence, Hefei Comprehensive National Science Center, Hefei, China 
+
+> 4
+
+University of Science and Technology of China, Hefei, China. Correspondence to: Han Fang <fanghan@nus.edu.sg >, Yang Yang <sky yang@ahu.edu.cn >.
+
+Preprint. March 4, 2026. 
+
+(a) LoRA framework (b) Q-LoRA framework 
+
+(c) Detection accuracy of LoRA and Q-LoRA models with different training samples 
+
+Figure 1. Method of LoRA and Q-LoRA applied to the CLIP model, and their detection accuracy for AI-generated image detec-tion tasks under different training samples. 
+
+regimes (Caro et al., 2022). This advantage is often at-tributed to the geometric structure of Hilbert space and the norm-preserving nature of quantum operations, which to-gether constrain the model’s effective capacity and reduce overfitting in low-data settings. However, these findings remain limited to toy-scale architectures. This raises a natu-ral question: Can such sample-efficient inductive biases scale to large models and real-world tasks? 
+
+To explore whether quantum generalization benefits can scale to real-world tasks, we propose Q-LoRA, a quantum-inspired fine-tuning scheme that integrates a lightweight QNN into the Low-Rank Adaptation (LoRA) (Hu et al., 2022) framework, which is a widely used parameter-efficient method for adapting large pre-trained models. Specifically, we instantiate Q-LoRA on top of CLIP (Rad-ford et al., 2021), freezing the backbone and injecting the QNN into the LoRA bottleneck. A shallow classification head is then trained to detect AI-generated content (AIGC). As shown in Figure 1a and 1b, the architectural modifica-tions are minimal. Yet, as Figure 1c demonstrates, Q-LoRA 1
+
+> arXiv:2603.02281v1 [cs.LG] 2 Mar 2026
+
+consistently outperforms standard LoRA across varying few-shot sample sizes, with particularly notable gains in low-data regimes. These results suggest that the general-ization advantage of QNNs, previously observed only in small-scale models, can be effectively transferred to large-scale fine-tuning tasks via quantum-inspired design. This performance improvement motivates a deeper inquiry into its underlying cause. However, deploying Q-LoRA in practice reveals a major limitation: substantial computa-tional overhead due to quantum simulation. For instance, under a 200-sample training setting, Q-LoRA requires over 30 minutes per training epoch, compared to just a few sec-onds for standard LoRA. This pronounced efficiency gap calls into question the practicality of QNN-based methods for scalable fine-tuning. To address this limitation while retaining the benefits of Q-LoRA, we turn to a more principled understanding: what exactly enables QNNs to generalize better? We hypothe-size that the gains stem not from quantum mechanics per se, but from structural properties of QNNs that guide fea-ture extraction and transformation. Specifically, we iden-tify two key inductive biases: (i) phase-aware represen-tations, where information is encoded across orthogonal amplitude–phase components, and (ii) norm-constrained transformations, which promote smoother optimization by limiting updates to orthogonal subspaces. These insights suggest that it may be possible to emulate Q-LoRA’s bene-fits in a fully classical setting, thereby avoiding the cost of quantum simulation while preserving its performance gains. Guided by the above analysis, we propose H-LoRA, a fully classical variant that retains the core inductive biases of QNNs without relying on quantum computation. Con-cretely, H-LoRA applies the Hilbert transform to the fea-ture stream within LoRA, generating analytic signals that couple real and imaginary components into orthogonal am-plitude–phase representations. This operation inherently captures both structural advantages identified earlier: (i) it introduces phase-aware encoding by enriching features with quadrature components; (ii) it enforces norm-constrained transformations by maintaining fixed orthogonal coupling, thereby regularizing the optimization geometry. Experi-ments show that H-LoRA consistently matches or surpasses Q-LoRA in few-shot AIGC detection while reducing time consumption. The core contributions of this paper are as follows: • We empirically verify the generalization advantage of QNNs in large-scale few-shot tasks by introducing Q-LoRA, which integrates a lightweight QNN into the LoRA fine-tuning framework and achieves consistent gains on AIGC detection. • We conduct an in-depth analysis of where this advan-tage comes from, and distill two structural inductive biases: phase-aware encoding and norm-constrained transformations, which inspire the classical surrogate H-LoRA using Hilbert transform. • Extensive experiments show that H-LoRA and Q-LoRA both outperform LoRA. H-LoRA matches or surpasses performance to Q-LoRA while reducing time consumption. And validating the effectiveness of phase-structured inductive bias for few-shot adaptation in large models. 
+
+# 2. Related Work 
+
+2.1. Low-Rank Adaptation 
+
+The rapid scaling of large pre-trained models has motivated extensive research on parameter-efficient fine-tuning meth-ods, which aim to approach the performance of full fine-tuning while substantially reducing computational and stor-age costs. Among these methods, LoRA is based on the observation that task-specific updates often lie in a low-rank subspace, and freezes the backbone while optimizing low-rank update matrices. This design significantly reduces the number of trainable parameters and often matches or even surpasses full fine-tuning performance with minimal inference overhead. Despite its effectiveness, standard LoRA can suffer from suboptimal parameter utilization and limited generalization, especially in low-data regimes. Several extensions address these limitations by improving rank allocation or parame-ter efficiency, such as AdaLoRA, which dynamically redis-tributes rank budgets based on parameter importance (Zhang et al., 2023), and NoRM, which removes redundant compo-nents from trained LoRA adapters (Jiang et al., 2025). More recently, Q-LoRA introduces quantum-inspired inductive bi-ases into the LoRA framework via hybrid quantum–classical architectures, achieving improved generalization in few-shot settings (Kong et al., 2025). 
+
+2.2. Hybrid Quantum-Classical Neural Network 
+
+To explore the potential of quantum computing in machine learning and overcome the limitations of current quantum hardware, researchers have proposed quantum-classical hy-brid models. The core idea is to delegate parts of the compu-tation that are sensitive to quantum characteristics or benefit from high-dimensional Hilbert space processing to quantum units or simulators, while handling the remaining parts with efficient classical computers. Hybrid architectures integrat-ing quantum circuits as trainable layers in neural networks have shown potential in fields such as healthcare, AI security, and image processing (Gordienko et al., 2025). Common in-tegration approaches between QNNs and classical networks can be categorized into two types: 2One representative work (Dutta et al., 2025) incorporates a parameterized quantum circuit as a layer in a classical fully connected neural network, outperforming purely classical models in complex regression and prediction tasks. Similar approaches, such as those in (Pandey & Rudra) and (Lin et al., 2025), have integrated QNNs as intermediate layers for deepfake audio detection, achieving exceptional perfor-mance. The Q-LoRA proposed in this paper follows this same approach. Another line of work uses QNNs as final decision layers, following a classical network for feature extraction and fu-sion. QNNs then produce the final prediction based on the classical network’s output. For instance, (Xu et al., 2026) employs a QNN as the classification head, achieving supe-rior performance in AI-generated image detection compared to classical algorithms. 
+
+2.3. AI-Generated Content Detection 
+
+With the rapid development of generative models, synthetic content has become increasingly difficult to distinguish from authentic data, making it more prone to misuse in high-risk scenarios such as misinformation dissemination and identity impersonation. AIGC detection aims to determine whether images, audio, and other media are synthesized or manip-ulated by generative models. This problem is commonly formulated as a binary classification task, where the key objective is to capture residual traces left by the genera-tion process. For images, detectors typically focus on arti-facts such as abnormal textures, transform domain (Zhang et al., 2025; Karageorgiou et al., 2025)and color distribu-tions (Jia et al., 2025); for audio, they often rely on cues including micro-frequency variations (Kumari et al., 2025) and prosodic patterns to discriminate. 
+
+# 3. Preliminary 
+
+3.1. LoRA Implementation 
+
+The core idea of LoRA is to achieve parameter-efficient updates through low-rank decomposition. Specifically, in-stead of updating the full weight matrix W0 ∈ R(d×k),LoRA freezes it and injects a pair of trainable low-rank matrices B ∈ R(d×r) and A ∈ R(r×k), where the rank 
+
+r ≪ min (d, k ). The effective weight update is represented as ∆W = B · A. The input feature x is first projected into a low-dimensional subspace via: 
+
+y = xB T. (1) It is then projected back to the original space through : 
+
+z = yA T. (2) Finally, the LoRA branch output is scaled by a factor α/r 
+
+and added to the frozen backbone output: 
+
+h = W0x + ( α/r ) · z. (3) This approach significantly reduces the number of trainable parameters while maintaining the model’s expressive capac-ity, making it suitable for large-scale adaptation scenarios. 
+
+3.2. Hilbert Transform 
+
+Let s(t) ∈ R denote a real-valued signal, where t represents a continuous index such as time (for 1D signals) or a spatial coordinate after appropriate vectorization. In the context of neural networks, s(t) can be viewed as a real-valued feature activation along a particular dimension. The Hilbert Transform (HT) is a linear operator H[·] that maps a real-valued signal to another real-valued signal with a 90 ◦ phase shift at each frequency component. Formally, it is defined as the convolution: 
+
+H[s(t)] = 1
+
+π P.V. 
+
+Z ∞−∞ 
+
+s(τ )
+
+t − τ dτ, (4) where P.V. denotes the Cauchy principal value. In the fre-quency domain, the HT admits an equivalent and intuitive interpretation: it preserves the magnitude spectrum of s(t)
+
+while shifting the phase of positive frequencies by − π 
+
+> 2
+
+and negative frequencies by + π 
+
+> 2
+
+. Using the Hilbert Transform, one can construct the analytic signal: 
+
+sa(t) = s(t) + j · H [s(t)] , (5) which embeds the original real-valued signal into a complex-valued representation. This analytic signal admits an explicit amplitude–phase decomposition: 
+
+A(t) = |sa(t)|, Φ( t) = arg( sa(t)) , (6) where A(t) represents the instantaneous amplitude and Φ( t)
+
+represents the instantaneous phase. Importantly, the real and imaginary components of sa(t) form a quadrature pair: they are orthogonal and jointly encode complementary in-formation about the underlying signal. In one-dimensional signal processing, the HT is widely used for envelope detection and phase-based analysis in non-stationary signals, with applications in speech, radar, and fault diagnosis. Recent studies leverage HT-based phase representations for detecting synthetic or manipulated au-dio, demonstrating its effectiveness in forensic settings (Shi et al., 2025; Unoki et al., 2024). In two-dimensional image processing, HT and its extensions are applied to spatial fea-ture maps to enable robust edge detection, texture extraction, and phase congruency analysis, which is known to be insen-sitive to illumination changes (Yang et al., 2018a;b). HT-based representations are also fundamental in interferomet-ric fringe analysis for 3D shape reconstruction, highlighting their ability to capture fine-grained structural information from complex visual patterns (Guerra-Rosas et al., 2023). 3Figure 2. AI-generated image detection framework: (a) Q-LoRA: A QNN is connected after the CLIP features to extract high-dimensional features through quantum state encoding and processing, and likewise fused with the backbone features via a bypass LoRA module; (b) H-LoRA: The features extracted by CLIP undergo a Hilbert transform to separate and enhance the amplitude and phase characteristics of the signal, thereby enriching the model representation, and are finally fused with the backbone features through a bypass LoRA module, where FFT and IFFT denote Fast Fourier Transform and Inverse Fast Fourier Transform, respectively; (c) Overall Framework: Illustrates the system pipeline for detecting AI-generated images, which is based on a CLIP visual encoder and integrates multiple efficient fine-tuning adapters. 
+
+# 4. Method 
+
+4.1. Overview 
+
+To investigate whether the empirical benefits of QNNs in few-shot settings stem from their structural inductive biases, namely, phase-aware representations and norm-constrained transformations, we adopt few-shot AIGC detection as a representative benchmark. As shown in Figure 2, our framework builds upon a frozen CLIP visual encoder for feature extraction. The AIGC de-tection task is formulated as a binary classification problem. To enable efficient adaptation under limited data regimes, we incorporate parameter-efficient adapters in the form of LoRA modules. Specifically, an input image is first encoded by CLIP into semantic features. LoRA adapters are inserted into se-lected Transformer layers, where only low-rank updates are learned. Within the LoRA bottleneck, we introduce two alternative designs for structured inductive enhancement: 
+
+Q-LoRA and H-LoRA . Q-LoRA augments the low-rank subspace with a lightweight quantum neural network, in-jecting phase-aware and norm-constrained transformations via quantum circuits. H-LoRA retains the same integration strategy but replaces the quantum module with a classi-cal Hilbert transform pipeline that explicitly disentangles amplitude and phase components in feature space. These enhanced features are then projected back to the original space and fused with the backbone activation, followed by a lightweight classifier. Only the adapter and classifier parameters are updated during training. 
+
+4.2. Q-LoRA 
+
+Q-LoRA integrates a QNN module into the LoRA adapter structure, forming a hybrid quantum-classical fine-tuning scheme. The QNN adopts a 4-qubit architecture, as shown in Figure 2. Input features are first encoded into quantum states via RX gates. Two entangling layers follow, each consisting of: • Single-qubit RY rotations, • Controlled-Z (CZ) gates applied to qubit pairs (1–2, 3–4) and (2–3, 4–1) for cyclic entanglement. Finally, an additional layer of single-qubit RY rotations is applied, followed by a chain of CNOT gates, thereby intro-ducing global entanglement before all qubits are measured 4using the Pauli-Z operator to yield the quantum-enhanced feature vector. This architecture enables: • Phase-aware representations : where information is jointly encoded in orthogonal amplitude and phase components. • Norm-constrained transformations : due to the uni-tary nature of quantum gates, which regularize the optimization trajectory. Q-LoRA thus enhances feature expressiveness and learning stability while maintaining parameter efficiency through its modular entanglement design. 
+
+4.3. H-LoRA 
+
+We recognize that the core advantages of quantum neural networks may stem from two key structural inductive biases: (i) phase-aware representations, which encode information in orthogonal amplitude–phase components to enrich the expressivity of the feature space; and (ii) norm-constrained structured transformations, which regularize optimization through geometry-preserving transformations. To this end, we propose H-LoRA, a classical Hilbert-transform-based module that mimics quantum-inspired information encoding via analytic signal construction. The H-LoRA layer functions as a plug-and-play module embedded in the fine-tuning pipeline. It operates on the low-rank feature projection from upstream layers and processes the signal through the following steps: 
+
+1) Low-rank projection. The input feature x is first pro-jected via a low-rank matrix B to obtain a low-dimensional representation xl:
+
+xl = Bx. (7) 
+
+2) Analytic signal construction. To simulate quantum wavefunctions of the form ψ(t) = A(t)ejϕ (t), we construct the analytic signal of xl via the Hilbert transform: 
+
+xa[n] = xl[n] + j · H (xl[n]) , (8) where H(xl[n]) is the discrete Hilbert transform. The re-sulting signal admits an amplitude–phase decomposition: 
+
+A[n] = |xa[n]|, Φ[ n] = arg( xa[n]) . (9) These two orthogonal components represent the sig-nal’s energy and phase dynamics, analogous to quantum phase–amplitude representations. 
+
+3) Phase-aware augmentation. We combine the original projected feature xl, the amplitude A[n], and phase Φ[ n] to form the enhanced feature: 
+
+xenhanced = xl + A[n] + Φ[ n]. (10) This composition models the interaction between real, am-plitude, and phase information, mimicking the composite measurement process in quantum systems. 
+
+4) Norm-constrained structural transformation. Al-though H-LoRA does not employ unitary matrices, its en-hanced features lie in a constrained subspace due to the ge-ometric coupling of xl, A[n], and Φ[ n]. Specifically, A[n]
+
+and Φ[ n] are derived from xl and thus maintain bounded norm and correlation: 
+
+∥xenhanced ∥ ≤ ∥ xl∥ + ∥A[n]∥ + ∥Φ[ n]∥.
+
+This implies a norm-constrained transformation space, which induces a regularizing effect akin to quantum uni-taries that satisfy U †U = I.
+
+5) Reprojection and fusion. Finally, the enhanced feature is projected back to the original feature dimension using the second low-rank matrix A, modulated by a learnable scaling factor α:
+
+∆x = α · Ax enhanced , (11) 
+
+xoutput = x + ∆ x. (12) This completes the LoRA-style adjustment with Hilbert-based quantum-analogical inductive biases. 
+
+# 5. Experiments 
+
+5.1. Settings 
+
+All experiments were performed on the same server plat-form, equipped with an Intel(R) Xeon(R) Platinum 8369B CPU@2.90GHz as the central processor and an NVIDIA GeForce RTX 4090 GPU with 24GB of video memory as the graphics processor. 
+
+Image detection task. We use CLIP as the backbone. Un-less otherwise specified, we inject LoRA adapters into the last 6 transformer blocks, with rank r = 4 and α = 1 , and use a single linear layer as the classifier head. We train for up to 20 epochs with batch size 16 and learning rate 
+
+5 × 10 −4. The input resolution is 224 × 224 . Data are sourced from AIGCDetectionBenchMark: for training, we randomly sample from the Stable Diffusion v1.4 subset. For testing, we randomly select 100 images from each generator category: Midjourney, Wukong, VQDM, Stable Diffusion v1.4 (SD1.4), Stable Diffusion v1.5 (SD1.5), Glide, and ADM. We consider few-shot training sizes of 200, 400 and 5800, where each number denotes the total number of train-ing examples, including both real and AI-generated images. To assess stability under data scarcity, we run 10 indepen-dent trials with seeds {0, 1, ..., 9}. In each trial, the few-shot training set is re-sampled at random, and we report the aver-age across trials. 
+
+Audio detection task. We additionally conduct few-shot au-dio forgery detection on ASVspoof 2019 LA (Todisco et al., 2019) to examine cross-modality generalization. Whisper (Radford et al., 2023) serves as the backbone. We inject LoRA adapters into the last 3 encoder layers, with rank 
+
+r = 4 and α = 1 , and use a single linear layer as the classi-fier head. We train for up to 20 epochs with batch size 16 and learning rate 2 × 10 −4. Audio is resampled to 16 kHz and cropped or padded to 4 seconds. Since our focus is the few-shot regime, we construct few-shot splits by random sampling: the training and test sets are randomly selected from the full pool (over 25k clips), with 1,500 clips used for testing. As in the image experiments, we repeat 10 trials with seeds {0, 1, ..., 9} and re-sample the few-shot training subset in each trial. 
+
+Metrics. We report Area Under the ROC Curve (AUC), Accuracy (ACC), Precision (PR), and Recall (RE) in few-shot image detection task and report AUC, F1-Score (F1), ACC, Equal Error Rate (EER) in few-shot audio detection task. 
+
+5.2. Results of Few-Shot Image Detection Task Quantitative analysis. In this section, we perform exper-iments to evaluate these methods under different few-shot settings for AI-generated image detection. Specifically, we use (i) CLIP with only the classification head fine-tuned, (ii) standard LoRA, (iii) Q-LoRA, and (iv) our classical simulation method H-LoRA. Table 1 summarizes cross-generator generalization when training on SD1.4 and testing on diverse generators under few-shot settings. Q-LoRA and H-LoRA consistently out-perform standard LoRA in the most constrained regime (200 samples), with Q-LoRA achieving an average ACC of 89.75% (an improvement of 5.44% over LoRA) and H-LoRA achieving 89.94% (an improvement of 5.63% over LoRA). As the training size increases to 400 and 800 sam-ples, performance improves for all methods, and the relative gaps narrow. Across most test generators, the improvements of Q-LoRA and H-LoRA are not driven by a single category, but are more pronounced on generators farther from the training distribution, where standard LoRA is more prone to over-fitting SD1.4-specific artifacts. The unweighted averages in Table 1 indicate that H-LoRA remains consistently com-petitive with Q-LoRA across training sizes and metrics, while both outperform standard LoRA. The simultaneous gains in threshold-free AUC and threshold-dependent ACC suggest that the improvements reflect more separable rep-resentations for real versus generated content, rather than calibration effects. These results indicate that H-LoRA re-produces much of Q-LoRA’s benefit using a purely classical implementation.        
+
+> Figure 3. Q-LoRA and H-LoRA t-SNE visualization
+> (a) Original Image (b) Q-LoRA (c) H-LoRA
+> Figure 4. Attention visualization of Q-LoRA and H-LoRA
+
+Visualization analysis. Beyond aggregate metrics, we also show the visual results of the similarity of the feature ex-tracted by H-LoRA and Q-LoRA. Figure 3 shows a t-SNE projection of the learned features, where the embeddings produced by H-LoRA and Q-LoRA exhibit substantial over-lap in the projected space, suggesting that the two methods induce broadly similar feature distributions under t-SNE projection. Figure 4 further visualizes attention maps on representative examples; the spatial patterns highlighted by H-LoRA are highly consistent with those of Q-LoRA, indi-cating that the two adaptations attend to comparable regions that are informative for detection. Together, these visualiza-tions complement the quantitative results by illustrating that the proposed classical surrogate can largely reproduce key representation characteristics associated with the quantum-inspired variant. 
+
+5.3. Results of Few-Shot Audio Detection Task 
+
+Besides image detection, we also perform the generated audio detection experiments. We compare (i) Whisper with 6Table 1. Performance comparison under different few-shot settings for AI-generated image detection. For each metric, the best and second-best results within the same training sample size are highlighted in bold and underline, respectively. MODEL 
+
+SAMPLES METRICS CLIP LORA Q-L ORA H-L ORA 200 400 800 200 400 800 200 400 800 200 400 800 
+
+MIDJOURNEY 
+
+AUC(%) 98.38 98.29 98.38 94.02 95.78 97.59 98.62 98.74 98.68 96.31 97.80 97.91 ACC(%) 93.40 92.85 91.85 82.60 80.55 78.70 90.40 86.15 81.75 86.10 81.90 84.85 PR(%) 93.86 90.96 88.56 77.80 73.42 71.37 87.62 79.93 73.45 80.37 75.08 77.95 RE(%) 93.00 95.50 96.50 93.60 97.40 98.20 96.00 98.60 99.50 96.40 98.40 98.70 
+
+WUKONG 
+
+AUC(%) 97.31 99.00 99.27 97.22 99.34 99.85 99.43 99.83 99.97 99.18 99.84 99.94 ACC(%) 92.70 94.95 95.90 91.00 95.30 97.80 95.00 97.90 99.12 95.80 98.40 98.35 PR(%) 93.05 94.73 95.56 88.33 93.62 96.81 94.86 97.60 98.76 95.02 97.86 98.15 RE(%) 92.30 95.30 96.30 94.90 97.50 98.90 95.40 98.30 99.50 96.80 99.00 98.60 
+
+SD1.4 
+
+AUC(%) 98.51 99.38 99.75 98.10 99.56 99.93 99.67 99.99 99.99 99.67 99.84 99.92 ACC(%) 94.40 96.75 97.60 93.25 96.60 98.60 96.50 99.10 99.75 97.20 98.75 98.70 PR(%) 96.28 98.26 98.89 93.35 95.91 99.10 97.48 99.01 99.75 97.93 99.30 99.51 RE(%) 92.40 95.20 96.30 93.50 97.60 98.10 95.60 99.20 99.70 96.50 98.20 97.90 
+
+SD1.5 
+
+AUC(%) 98.74 99.32 99.72 98.61 99.54 99.86 99.80 99.98 99.97 99.53 99.93 99.97 
+
+ACC(%) 94.70 96.35 97.25 93.55 96.75 98.05 97.00 99.15 99.37 96.90 98.65 98.80 PR(%) 96.59 97.65 97.90 93.54 96.46 98.25 98.80 99.41 99.75 98.20 99.19 99.60 RE(%) 92.70 95.00 96.60 93.80 97.40 97.90 95.20 98.90 99.00 95.60 98.10 98.00 
+
+GLIDE 
+
+AUC(%) 94.35 97.09 98.09 92.15 96.78 99.14 97.60 99.41 99.64 97.59 98.99 99.48 ACC(%) 85.20 89.00 90.15 80.50 86.65 91.30 89.70 92.50 94.87 90.75 91.95 93.35 PR(%) 81.56 85.32 86.05 74.92 81.10 86.42 87.18 88.39 91.27 87.03 87.92 89.42 RE(%) 91.30 94.60 96.10 92.70 97.50 98.60 93.60 98.60 99.50 96.40 99.30 99.00 
+
+VQDM 
+
+AUC(%) 91.75 95.24 96.67 91.96 96.20 98.65 95.90 99.16 99.38 96.61 98.65 99.92 
+
+ACC(%) 81.50 84.75 86.65 81.15 84.95 88.80 85.10 90.00 90.75 87.75 91.50 91.95 
+
+PR(%) 76.15 78.84 86.91 76.31 79.23 82.96 79.56 84.76 85.15 82.73 87.17 88.12 
+
+RE(%) 91.90 95.20 96.10 93.20 96.50 98.20 95.60 98.30 99.00 96.40 98.30 97.70 
+
+ADM 
+
+AUC(%) 87.22 91.91 93.81 80.03 87.71 94.96 91.33 96.80 97.52 90.96 95.34 95.42 ACC(%) 73.45 77.45 78.90 68.15 70.85 74.50 74.50 76.00 78.12 75.05 80.35 78.75 PR(%) 67.28 70.11 71.38 62.50 64.22 67.16 67.82 68.64 69.80 67.97 73.76 71.09 RE(%) 91.60 96.10 96.80 94.40 97.00 98.10 95.20 98.90 99.30 96.70 98.40 99.00 
+
+AVERAGE 
+
+AUC(%) 95.18 97.17 97.96 93.15 96.42 98.57 97.48 99.13 99.31 97.12 98.63 98.74 ACC(%) 87.91 90.30 91.19 84.31 87.38 89.68 89.75 91.54 91.96 89.94 91.64 92.11 
+
+PR(%) 86.40 87.98 88.64 80.96 83.42 86.01 87.61 88.25 88.28 87.03 88.61 89.12 
+
+RE(%) 92.17 95.27 96.39 93.76 97.27 98.10 95.29 98.69 99.38 96.40 98.53 98.44 
+
+only the classification head fine-tuned, (ii) standard LoRA, and (iii) our classical simulation method H-LoRA under different few-shot settings for audio forgery detection. As shown in Table 2, under random few-shot splits, H-LoRA achieves consistent improvements over Whisper with lin-ear classifier probing and standard LoRA across 50, 100 and 200-shot. The gains are reflected not only in the best in threshold-free AUC (99.43%) but also in in the highest threshold-dependent metrics, such as F1 (96.73%) and ACC (96.77%), and are accompanied by a lower EER (0.0333), which is a primary metric in ASVspoof-style anti-spoofing evaluation. Furthermore, under the 50-sample setting, H-LoRA’ s 90.69% demonstrates a more significant advantage over LoRA’s 72.99% in terms of ACC. These trends sug-gest that the proposed phase-structured reparameterization provides a useful inductive bias beyond the image domain. 
+
+Table 2. Algorithm performance with varying sample sizes in audio forgery detection METHOD SAMPLES AUC(%) F1(%) ACC(%) EER 50 90.85 72.54 72.99 0.1616 WHISPER 100 93.71 87.42 88.19 0.1260 200 95.82 89.93 90.69 0.0957 50 92.86 78.89 80.34 0.1358 LORA 100 97.45 89.39 90.40 0.0711 200 99.04 95.54 95.67 0.0431 50 96.52 88.32 89.33 0.0871 H-L ORA 100 98.57 94.37 94.58 0.0548 200 99.43 96.73 96.77 0.0333 
+
+75.4. Efficiency and Practicality Analysis             
+
+> Table 3. Efficiency comparison between H-LoRA and Q-LoRA. METHOD H-L ORA Q-L ORA INFERENCE TIME (SEC )0.09 65.68 TRAINING TIME (EPOCH /SEC )4.07 2088.34 ADDITIONAL PARAMETER 024
+
+In this section, we compare the efficiency H-LoRA and Q-LoRA for image detection task. As seen in Table 3, de-spite achieving comparable detection performance, H-LoRA demonstrates overwhelming advantages in both training and inference efficiency. Specifically, H-LoRA requires only 0.09 seconds for inference and 4.07 seconds per training epoch, whereas Q-LoRA incurs 65.68 seconds for inference and over 2,000 seconds per epoch. Moreover, H-LoRA compared to LoRA introduces no additional trainable pa-rameters, in contrast to Q-LoRA, which adds 24 parameters. These results clearly indicate that H-LoRA effectively pre-serves the efficiency of standard LoRA while avoiding the substantial time overhead introduced by explicit QNN. 
+
+5.5. Ablation Experiment     
+
+> (a) Rank (b) Samples
+> Figure 5. Accuracy of LoRA, Q-LoRA and H-LoRA under differ-ent ranks and training sample sizes
+
+We conduct ablations to better evaluate which factors con-tribute to the improvements of H-LoRA. 
+
+Effect of rank. We vary the adapter rank r ∈ { 2, 4, 6}
+
+while keeping the rest of the training protocol fixed, and test the detection accuracy. As shown in the figure 5a, increasing rank improves performance for all methods, reflecting the increased expressive capacity of higher-rank adaptations. However, H-LoRA and Q-LoRA consistently outperform standard LoRA across all rank settings. The relative gains are especially evident at r = 2 where we observe that the proposed structured transformation is beneficial even under a severely constrained parameter budget. 
+
+Effect of training sample size. The ablation results in Figure 5b are consistent with the observations in Section 5.2: Q-LoRA and H-LoRA yield the largest performance gains in the lowest-data regime, while the gap narrows as the training sample size increases, indicating reduced reliance on strong inductive bias when more supervision is available.                           
+
+> Table 4. Performance of different types of intermediate layers in LoRA METHOD H-L ORA LINEAR TANH SIGMOID SILU
+> AUC(%) 97.12 96.32 96.51 96.89 97.01 ACC(%) 89.94 87.79 88.30 87.19 88.36 PR(%) 87.03 85.57 85.70 84.20 85.91 RE(%) 96.40 96.44 95.14 95.87 95.59
+
+Effect of nonlinearity. To test whether the gains stem merely from added nonlinearity on low rank features, we re-place the intermediate transformation in the LoRA pathway with common activation functions or linear layers and eval-uate the resulting variants. The results in Table 4 show that these generic nonlinear or linear insertions do not match the performance of H-LoRA in terms of ACC, with all achieving values below 89%, despite introducing additional expressive components. Moreover, Table 5 shows that increasing the number of intermediate Linear layers yields diminishing returns: performance tends to plateau around 89.5%, and ACC does not improve monotonically with more layers. Together, these findings support the view that the improve-ment is not merely due to adding nonlinearity, but is more closely related to the proposed phase-aware representation and norm-constrained structured transformation.                                
+
+> Table 5. Performance of Number of Intermediate Linear Layers in LoRA METHOD H-L ORA 12345AUC(%) 97.12 96.32 97.39 97.52 97.58 97.61
+> ACC(%) 89.94 87.79 88.90 89.60 89.10 89.30 PR(%) 87.03 85.57 86.04 86.25 85.77 86.68 RE(%) 96.40 96.44 96.41 97.19 97.17 96.23
+
+# 6. Conclusion 
+
+In this work, we introduce H-LoRA, a fully classical yet quantum-inspired fine-tuning method for few-shot learn-ing. Starting from the empirical success of Q-LoRA, we analyze the structural inductive biases behind its perfor-mance, specifically, phase-aware representations and norm-constrained transformations, and show that these can be reproduced classically using the Hilbert transform. By inte-grating this insight into the LoRA adapter, H-LoRA retains the generalization benefits of Q-LoRA without incurring its heavy simulation cost. Experimental results on few-shot AIGC detection confirm that H-LoRA matches or exceeds Q-LoRA’s accuracy, while offering significantly improved efficiency. 8Acknowledgements 
+
+This work was supported in part by the National Natural Sci-ence Foundation of China under Grant 62272003, in part by the Quantum Science and Technology-National Science and Technology Major Project under Grant 2021ZD0302300, in part by the Science and Technology Major Project of Anhui Province under Grant 202423s06050001. 
+
+# Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+# References 
+
+Caro, M. C., Huang, H.-Y., Cerezo, M., Sharma, K., Sorn-borger, A., Cincio, L., and Coles, P. J. Generalization in quantum machine learning from few training data. Nature communications , 13(1):4919, 2022. Dutta, S. S., Sandeep, S., et al. Hybrid quantum neural networks: Harnessing dressed quantum circuits for en-hanced tsunami prediction via earthquake data fusion. 
+
+EPJ Quantum Technology , 12(1):4, 2025. Gordienko, Y., Trochun, Y., Taran, V., Khmelnytskyi, A., and Stirenko, S. HNN-QCn: Hybrid neural network with multiple backbones and quantum transformation as data augmentation technique. AI , 6(2):36, 2025. Guerra-Rosas, E., L ´opez- ´Avila, L. F., Garza-Flores, E., Vidales-Basurto, C. A., and ´Alvarez-Borrego, J. Classifi-cation of skin lesion images using artificial intelligence methodologies through radial fourier–mellin and hilbert transform signatures. Applied Sciences , 13(20):11425, 2023. Hu, E. J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L., Chen, W., et al. LoRA: Low-rank adaptation of large language models. ICLR , 1(2):3, 2022. Jia, Z., Huang, C., Zhu, Y., Fei, H., Duan, X., Yuan, Z., Deng, Y., Zhang, J., Zhang, J., and Zhou, J. Secret lies in color: Enhancing AI-generated images detection with color distribution analysis. In Proceedings of the Computer Vision and Pattern Recognition Conference , pp. 13445–13454, 2025. Jiang, S., Liao, Y., Zhang, Y., Wang, Y., and Wang, Y. Fine-tuning with reserved majority for noise reduction. In The Thirteenth International Conference on Learning Representations , 2025. Karageorgiou, D., Papadopoulos, S., Kompatsiaris, I., and Gavves, E. Any-resolution AI-generated image detection by spectral learning. In Proceedings of the Computer Vision and Pattern Recognition Conference , pp. 18706– 18717, 2025. Kong, X., Li, L., Chen, Z., Xue, C., Xu, X., Liu, H., Wu, Y., Fang, Y., Fang, H., Chen, K., et al. Quantum-enhanced llm efficient fine tuning. arXiv preprint arXiv:2503.12790 , 2025. Kumari, K., Abbasihafshejani, M., Pegoraro, A., Rieger, P., Arshi, K., Jadliwala, M., and Sadeghi, A.-R. Voicer-adar: Voice deepfake detection using micro-frequency and compositional analysis. In NDSS , 2025. Lin, C.-H. A., Liu, C.-Y., Chen, S. Y.-C., and Chen, K.-C. Quantum-trained convolutional neural network for deepfake audio detection. In 2025 IEEE International Conference on Acoustics, Speech, and Signal Processing Workshops (ICASSPW) , pp. 1–5. IEEE, 2025. Pandey, A. and Rudra, B. Hybrid classical quantum learn-ing model framework for detection of deepfake audio. In Proceedings of the 11th International Conference on Information Systems Security and Privacy , volume 2, pp. 231–239. Radford, A., Kim, J. W., Hallacy, C., Ramesh, A., Goh, G., Agarwal, S., Sastry, G., Askell, A., Mishkin, P., Clark, J., et al. Learning transferable visual models from natural language supervision. In International conference on machine learning , pp. 8748–8763. PmLR, 2021. Radford, A., Kim, J. W., Xu, T., Brockman, G., McLeavey, C., and Sutskever, I. Robust speech recognition via large-scale weak supervision. In International conference on machine learning , pp. 28492–28518. PMLR, 2023. Shi, C., Qiu, X., Wu, M., Niu, X., Li, X., and Abdullahi, S. M. Audio copy-move forgery detection with decreas-ing convolutional kernel neural network and spectrogram fusion. Complex & Intelligent Systems , 11(9):382, 2025. Todisco, M., Wang, X., Vestman, V., Sahidullah, M., Del-gado, H., Nautsch, A., Yamagishi, J., Evans, N., Kin-nunen, T., and Lee, K. A. ASVspoof 2019: Future hori-zons in spoofed and fake audio detection. arXiv preprint arXiv:1904.05441 , 2019. Unoki, M., Li, K., Chaiwongyen, A., Nguyen, Q.-H., and Zaman, K. Deepfake speech detection: Approaches from acoustic features related to auditory perception to deep neural networks. IEICE Transactions on Information and Systems , 2024. Xu, J. C., Fang, H., Yang, Y., et al. AI-generated image detection algorithm based on classical-quantum hybrid neural network. Sci China Inf Sci , 69(1):112501, 2026. 9Yang, Y., Kou, K. I., and Zou, C. Edge detection meth-ods based on modified differential phase congruency of monogenic signal. Multidimensional Systems and Signal Processing , 29(1):339–359, 2018a. Yang, Z., Zhang, Q., Zhou, F., and Yang, L. Hilbert spec-trum analysis of piecewise stationary signals and its appli-cation to texture classification. Digital Signal Processing ,82:1–10, 2018b. Zhang, H., He, Q., Bi, X., Li, W., Liu, B., and Xiao, B. Towards universal AI-generated image detection by varia-tional information bottleneck network. In Proceedings of the Computer Vision and Pattern Recognition Conference ,pp. 23828–23837, 2025. Zhang, Q., Chen, M., Bukharin, A., Karampatziakis, N., He, P., Cheng, Y., Chen, W., and Zhao, T. AdaloRA: Adaptive budget allocation for parameter-efficient fine-tuning. arXiv preprint arXiv:2303.10512 , 2023. 10 A. Hilbert Transform of Discrete Signals 
+
+Given a discrete signal x(n) of length N , where n = 0 , 1, 2, . . . , N − 1, the N -point Discrete Fourier Transform (DFT) of 
+
+x(n) is computed to obtain its frequency-domain representation X(k), where k = 0 , 1, 2, . . . , N − 1:
+
+X(k) =  
+
+> N−1
+
+X
+
+> n=0
+
+x(n) · exp 
+
+
+
+−j · 2πkn N
+
+
+
+Next, the negative frequency components of X(k) (i.e., for k > N 
+
+> 2
+
+) are inverted in magnitude to obtain the symmetric frequency-domain representation Y (k):
+
+Y (k) = 
+
+(
+
+X(k) for k = 0 , 1, . . . , N 
+
+> 2
+
+,
+
+−X(k) for k = N 
+
+> 2
+
++ 1 , N 
+
+> 2
+
++ 2 , . . . , N − 1.
+
+Finally, the inverse N -point Discrete Fourier Transform (IDFT) of the symmetric frequency-domain representation Y (k) is applied to obtain the Hilbert-transformed discrete signal h(n):
+
+h(n) = 1
+
+N 
+
+> N−1
+
+X
+
+> k=0
+
+Y (k) · exp 
+
+
+
+j · 2πkn N
+
+
+
+This results in the Hilbert transform of the original discrete signal x(n).
+
+# B. More Attention Visualization      
+
+> Original Image Q-LoRA H-LoRA Original Image Q-LoRA H-LoRA
+
+We further conducted additional visualization experiments to demonstrate the similarity between H-LoRA and Q-LoRA in feature capturing. The images on the left show the original images, and the ones on the right show the corresponding attention heatmaps. As can be seen, both H-LoRA and Q-LoRA focus on key areas of the images (such as the prominent parts of the objects) with high similarity. This indicates that the two methods exhibit consistent performance in feature capturing, providing further support for the two possible structural inductive biases. 
+
+# C. Training Loss Curve of H-LoRA 
+
+We present the training loss curves for both the image and audio experiments. As shown in the left figure, the image experiment demonstrates a rapid convergence, indicating that the model is easy to train. Similarly, the right figure, showing the audio experiment, also reveals a relatively smooth and fast convergence, further validating the ease of training with H-LoRA across different domains. These results suggest that H-LoRA efficiently learns the task, even in low-data regimes. 11 (a) Training Loss of H-LoRA in image detection task (b) Training Loss of H-LoRA in audio detection task 
+
+12
