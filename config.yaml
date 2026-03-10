@@ -25,3 +25,53 @@ subscriptions:
     stage: A
     diff_threshold_pct: 15
   keyword_recall_mode: or
+  intent_profiles:
+    - tag: PEFT
+      description: 帮我找最近的大模型高效微调的论文
+      enabled: true
+      keywords:
+        - keyword: PEFT
+          keyword_cn: 参数高效微调
+          query: Parameter-efficient fine-tuning methods for large language models
+        - keyword: LoRA
+          keyword_cn: 低秩自适应
+          query: Low-Rank Adaptation of large language models
+        - keyword: Prompt Tuning
+          keyword_cn: 提示微调
+          query: Soft prompt tuning and prefix tuning techniques
+        - keyword: QLoRA
+          keyword_cn: 量化低秩自适应
+          query: Quantized Low-Rank Adaptation for LLMs
+        - keyword: Memory-efficient
+          keyword_cn: 内存高效微调
+          query: Memory-efficient fine-tuning strategies for large models
+        - keyword: Delta Tuning
+          keyword_cn: 增量微调
+          query: Delta tuning methods for pre-trained language models
+      intent_queries:
+        - query: State of the art parameter efficient fine tuning techniques
+          query_cn: 最先进的参数高效微调技术
+          enabled: true
+          source: manual
+          note: ''
+        - query: Recent advances in efficient adaptation of large language models
+          query_cn: 大语言模型高效适配的最新进展
+          enabled: true
+          source: manual
+          note: ''
+        - query: Comparative study of PEFT methods for LLMs
+          query_cn: 大模型参数高效微调方法的对比研究
+          enabled: true
+          source: manual
+          note: ''
+        - query: Survey of efficient fine tuning for foundation models
+          query_cn: 基础模型高效微调综述
+          enabled: true
+          source: manual
+          note: ''
+        - query: New architectures for low resource model fine tuning
+          query_cn: 低资源模型微调的新架构
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-03-10T04:11:15.220Z'
