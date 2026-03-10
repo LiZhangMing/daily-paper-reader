@@ -1,0 +1,657 @@
+Title: LORA-CRAFT: Cross-layer Rank Adaptation via Frozen Tucker Decomposition of Pre-trained Attention Weights
+
+URL Source: https://arxiv.org/pdf/2602.17510v1
+
+Published Time: Fri, 20 Feb 2026 02:07:25 GMT
+
+Number of Pages: 7
+
+Markdown Content:
+# LORA-CRAFT: Cross-layer Rank Adaptation via Frozen Tucker Decomposition of Pre-trained Attention Weights 
+
+## Kasun Dewage Marianna Pensky Suranadi De Silva Shankadeep Mondal 
+
+## University of Central Florida 
+
+## KasunTharuka.Dewage@ucf.edu, Marianna.Pensky@ucf.edu, su966204@ucf.edu, shankhadeep.mondal@ucf.edu 
+
+# Abstract 
+
+We introduce CRAFT ( Cross-layer Rank Adaptation via 
+
+Frozen Tucker), a parameter-efficient fine-tuning (PEFT) method that applies Tucker tensor decomposition to pre-trained attention weight matrices stacked across transformer layers and trains only small square adaptation matrices on the resulting frozen Tucker factors. Existing tensor-based PEFT methods decompose gradient updates : LoTR applies Tucker decomposition with shared factor matrices, while SuperLoRA groups and reshapes ∆W across layers before applying Tucker decomposition. Separately, methods like PiSSA apply SVD to pre-trained weights but operate inde-pendently per layer. CRAFT bridges these two lines of work: it performs full Tucker decomposition via Higher-Order SVD (HOSVD) directly on pre-trained weights organized as cross-layer 3D tensors, freezes all resulting factors, and adapts the model through lightweight trainable transformations applied to each factor matrix. Experiments on the GLUE bench-mark using RoBERTa-base and RoBERTa-large demonstrate that CRAFT achieves competitive performance with exist-ing methods while requiring only 41K Tucker adaptation parameters —a count independent of model dimension and depth at fixed Tucker ranks. 
+
+# 1 Introduction 
+
+The transformer architecture [15] has become the dominant paradigm in natural language processing, but adapting large pre-trained models to downstream tasks remains computa-tionally prohibitive. Parameter-efficient fine-tuning (PEFT) methods address this challenge by training only a small sub-set of parameters while keeping the bulk of the model frozen. LoRA [7] pioneered the approach of decomposing weight updates into low-rank matrices, reducing trainable param-eters from millions to thousands. However, LoRA and its variants treat each weight matrix independently, missing a crucial insight: attention mechanisms in transformers ex-hibit strong multi-way correlations across layers. Recently, two complementary research directions have begun to exploit this observation. The first line of work analyzes gradient updates using ten-sor decomposition techniques. LoTR [1] represents gradient updates as a tensor and applies Tucker decomposition with shared left and right factor matrices across layers while main-taining per-layer core tensors. SuperLoRA [3] extends this by grouping and reshaping ∆W across multiple layers before ap-plying Tucker decomposition, achieving up to 10-fold param-eter reduction over LoRA. VeRA [9] shares random frozen matrices across layers, and LoRETTA [18] employs tensor-train decomposition for ultra-low-parameter fine-tuning. The second approach is based on decomposition of the 
+
+pre-trained weights themselves . For example, PiSSA [12] ap-plies SVD to pre-trained weight matrices, initializing LoRA adapters with the principal singular values and vectors while freezing the residual components. This technique converges faster than standard LoRA by directly leveraging the low-rank structure inherent in pre-trained models. However, PiSSA operates independently on each layer’s weight matrix, missing cross-layer correlations. Before proceeding, we briefly clarify the Tucker decompo-sition terminology used throughout this paper. The Tucker decomposition of an N th-order tensor expresses it as a core tensor multiplied by a factor matrix along each mode. When all N factor matrices are present and optimized, this is some-times called Tucker-N (or full Tucker) decomposition. In the case of a 3D-tensor, a Tucker-2 decomposition retains factor matrices for only two of the three modes, leaving the third mode uncompressed. For instance, LoTR [1] employs Tucker-2, sharing factor matrices across the output and input dimen-sions while maintaining per-layer core tensor slices. CRAFT employs Tucker-3 (i.e., full Tucker decomposition for third-order tensors), compressing all three modes simultaneously: layers, output dimensions, and input dimensions. We propose CRAFT, which unifies the two aforementioned directions by performing tensor decomposition on pre-trained weights organized as cross-layer tensors. CRAFT differs from all prior approaches in two key ways: 1. Cross-layer decomposition of pre-trained weights. Like PiSSA, CRAFT decomposes pre-trained weights rather than gradient updates, directly captur-ing the low-rank structure present in the trained model. But unlike PiSSA’s per-layer matrix SVD, CRAFT stacks weights across layers into 3D tensors and applies full Tucker-3 decomposition, simultaneously capturing cross-layer, output-dimension, and input-dimension patterns. 2. Frozen factors with trainable adaptation matri-ces. While SuperLoRA and LoTR train the Tucker factors or core tensors themselves, CRAFT freezes all 
+
+Tucker factors (including the core tensor) obtained from HOSVD and introduces small square adaptation ma-trices J(1) , J (2) , J (3) as the only trainable parameters, 1
+
+> arXiv:2602.17510v1 [cs.LG] 19 Feb 2026
+
+Figure 1: PCA of Vectorized Attention Weights Across Models and Layers. Each point represents one row of a weight matrix W (ℓ) 
+
+> α
+
+, projected onto the first two principal components computed from the pooled set {w(ℓ) 
+
+> α
+
+} at each layer. Q (pink) exhibits higher dispersion (Eq. 1), while K (olive) and V (green) concentrate near the origin. The two-component explained-variance ratio (shown in titles) decreases in deeper layers for ViT and GPT-2, indicating that the weight distribution spreads over a higher effective dimensionality. initialized near identity. This yields a trainable param-eter count independent of both model dimension d and number of layers NL, for fixed Tucker ranks. 
+
+Advantages of CRAFT. The CRAFT framework offers several distinct advantages: (a) With a small number of Tucker adaptation parameters, which at fixed ranks is in-dependent of both the model dimension d and the number of layers NL, it achieves accuracy comparable to methods with significantly larger parameter budgets. (b) Beyond train-ing efficiency, CRAFT enables substantial storage savings :the pre-trained weight matrices W (ℓ) 
+
+> α
+
+can be replaced by the compact Tucker factors U (1) , U (2) , U (3) and the small core tensor G, together with the three trained adaptation matri-ces J(1) , J (2) , J (3) . (c) Due to the small trainable parame-ter space, CRAFT is expected to offer faster training per epoch compared to methods that require optimization in higher-dimensional spaces such as LoRA or full fine-tuning. 
+
+(d) The method is theoretically grounded with approxima-tion guarantees inherited from HOSVD. A more detailed comparison with related work is presented in Section 4. 
+
+# 2 Choice of Adapted Projections 
+
+Following the original LoRA framework [7], CRAFT adapts the Q and V projection matrices while keeping K and O frozen. This Q+V configuration has become a widely adopted default in the PEFT literature, providing a practi-cal balance between expressiveness and parameter efficiency. Since the value projection WV enters the attention output in-dependently of the score computation, adapting both Q and V allows the method to influence both the attention pattern and the content of the attended representation. As a supplementary observation, PCA analysis of vector-ized attention weights across ViT-B/16, RoBERTa-base, and GPT-2 (Figure 1) shows that Q weights consistently exhibit greater dispersion across layers compared to K and V, which tend to cluster near the projected mean. Specifically, for each layer ℓ of a pre-trained transformer, let w(ℓ) 
+
+> α,i
+
+∈ Rdin denote 2the i-th row of projection matrix W (ℓ) 
+
+> α
+
+. We pool all rows from Q, K, V into a single set, compute the sample covariance, and project onto its leading eigenvectors Pk . The dispersion of projection type α is 
+
+σ(ℓ) 
+
+> α
+
+(k) = 
+
+ 1
+
+dout 
+
+> dout
+
+X
+
+> i=1
+
+Pk
+
+ w(ℓ) 
+
+> α,i
+
+− ¯μ(ℓ) 21/2
+
+. (1) 
+
+# 3 Methodology 
+
+## 3.1 Preliminaries: Notation 
+
+In what follows, we denote tensors by calligraphic letters. We denote elements of matrix A or tensor W by A(i, j ) and 
+
+W(i, j, k ). Following [8], we introduce the following notation. A third-order tensor W ∈ RI1×I2×I3 is a three-dimensional array with elements wi1i2i3 .
+
+Definition 1 (Mode-n Unfolding) . The mode-n unfolding (matricization) of tensor W, denoted W(n), arranges the mode-n fibers as columns of a matrix. For a third-order ten-sor: 
+
+W(1) ∈ RI1×I2I3 , W(2) ∈ RI2×I1I3 , W(3) ∈ RI3×I1I2 .
+
+Definition 2 (Mode-n Product) . The mode-n product of tensor W ∈ RI1×I2×I3 with matrix U ∈ RJ×In , denoted 
+
+W × n U , yields a tensor of size I1 × · · · × In−1 × J × In+1 ×· · · × IN . In particular, for n = 2 ,
+
+(W × 2 U )( i1, j, i 3) = 
+
+> I2
+
+X
+
+> i2=1
+
+W(i1, i 2, i 3) U (j, i 2).
+
+Definition 3 (Tucker Decomposition) . The Tucker decom-position of W ∈ RI1×I2×I3 with multilinear rank (r1, r 2, r 3)
+
+is: 
+
+W ≈ G × 1 U (1) ×2 U (2) ×3 U (3) 
+
+where G ∈ Rr1×r2×r3 is the core tensor and U (n) ∈ RIn×rn ,
+
+n = 1 , 2, 3, are factor matrices with orthonormal columns. 
+
+## 3.2 The CRAFT Methodology 
+
+Given a transformer with NL layers, CRAFT proceeds in three stages: tensor construction, frozen HOSVD decompo-sition, and adaptation via trainable matrices. The complete procedure is described in Algorithm 1. 
+
+Stage 1: Tensor Construction. For each projection type α ∈ { Q, V }, we construct a 3D tensor by stacking the pre-trained attention weight matrices across layers: 
+
+Wα = stack (W (1)  
+
+> α
+
+, W (2)  
+
+> α
+
+, . . . , W (NL) 
+
+> α
+
+) ∈ RNL×dout ×din 
+
+This construction treats the collection of weight matrices as a single multi-way array, enabling decomposition methods that capture correlations simultaneously across layers (mode-1), output dimensions (mode-2), and input dimensions (mode-3). 
+
+Stage 2: HOSVD Decomposition, Residual Com-putation, and Freezing. We compute the Tucker-3 de-composition of each Wα via HOSVD [4]. For each mode 
+
+n ∈ { 1, 2, 3}, we compute the mode-n unfolding W(n), take 
+
+Algorithm 1 CRAFT: Cross-layer Rank Adaptation via Frozen Tucker 
+
+Require: Pre-trained weight matrices {W (ℓ) 
+
+> α
+
+}NL 
+
+> ℓ=1
+
+for α ∈ { Q, V },with W (ℓ) 
+
+> α
+
+∈ Rdout ×din ; Tucker ranks (r1, r 2, r 3); learning rate η; loss L
+
+Ensure: Adapted weight tensor cWα; frozen factors U (n), n =1, 2, 3, core tensor G; trained matrices J(n), n = 1 , 2, 3 
+
+> 1:
+
+// Stage 1: Tensor Construction  
+
+> 2:
+
+for each projection α ∈ { Q, V } do  
+
+> 3:
+
+Stack: Wα ← stack (W (1)  
+
+> α
+
+, . . . , W (NL) 
+
+> α
+
+) ∈ RNL×dout ×din  
+
+> 4:
+
+end for  
+
+> 5:
+
+// Stage 2: HOSVD Decomposition (one-time)  
+
+> 6:
+
+for each projection α ∈ { Q, V } do  
+
+> 7:
+
+for n = 1 to 3 do  
+
+> 8:
+
+Compute mode-n unfolding: W(n) 
+
+> 9:
+
+Truncated SVD: U (n) 
+
+> α
+
+← first rn left singular vectors of 
+
+W(n) 
+
+> 10:
+
+end for  
+
+> 11:
+
+Core tensor: Gα ← W α ×1 (U (1)  
+
+> α
+
+)⊤ ×2 (U (2)  
+
+> α
+
+)⊤ ×3 (U (3)  
+
+> α
+
+)⊤ 
+
+> 12:
+
+Initial reconstruction: Rα ← G α ×1 U (1)  
+
+> α
+
+×2 U (2)  
+
+> α
+
+×3 U (3)  
+
+> α
+> 13:
+
+Freeze: Wα, Gα, Rα, U (1)  
+
+> α
+
+, U (2)  
+
+> α
+
+, U (3)  
+
+> α
+> 14:
+
+end for  
+
+> 15:
+
+// Stage 3: Initialize Trainable Adaptation  
+
+> 16:
+
+for each α ∈ { Q, V }, each n ∈ { 1, 2, 3} do  
+
+> 17:
+
+J(n) 
+
+> α
+
+← Irn + ϵ · E, Eij ∼ N (0 , σ 2) 
+
+> 18:
+
+end for  
+
+> 19:
+
+// Stage 4: Training (residual-preserving)  
+
+> 20:
+
+while not converged do  
+
+> 21:
+
+for each α ∈ { Q, V } do  
+
+> 22:
+
+Tα ← G α ×1 (U (1)  
+
+> α
+
+J(1)  
+
+> α
+
+) ×2 (U (2)  
+
+> α
+
+J(2)  
+
+> α
+
+) ×3 (U (3)  
+
+> α
+
+J(3)  
+
+> α
+
+) 
+
+> 23:
+
+cWα ← W α + ( Tα − R α) {Residual preservation}  
+
+> 24:
+
+Extract per-layer weights: cW (ℓ) 
+
+> α
+
+← cWα(ℓ, :, :)  
+
+> 25:
+
+end for  
+
+> 26:
+
+Forward pass using cW (ℓ) 
+
+> Q
+
+, cW (ℓ) 
+
+> V
+
+(K, O weights frozen at orig-inal values)  
+
+> 27:
+
+Compute loss L; update J(n) 
+
+> α
+
+← J(n) 
+
+> α
+
+−η ∇J(n)
+
+> α
+
+L, n = 1 , 2, 3 
+
+> 28:
+
+end while  
+
+> 29:
+
+return cWα; {U (n) 
+
+> α
+
+, Gα, J (n) 
+
+> α
+
+}, n = 1 , 2, 3
+
+its truncated SVD to obtain the first rn left singular vectors 
+
+U (n), and then compute the core tensor G = W × 1 (U (1) )⊤ ×2
+
+(U (2) )⊤ ×3 (U (3) )⊤.Since the Tucker decomposition with ranks (r1, r 2, r 3) <
+
+(NL, d out , d in ) is a lossy approximation, the initial recon-struction Rα = Gα ×1 U (1)  
+
+> α
+
+×2 U (2)  
+
+> α
+
+×3 U (3)  
+
+> α
+
+does not equal 
+
+Wα in general. To preserve the pre-trained weights exactly at initialization, we store both Wα and Rα as frozen buffers. Subsequently, all factors Wα, Rα, Gα, U (1)  
+
+> α
+
+, U (2)  
+
+> α
+
+, U (3)  
+
+> α
+
+are 
+
+frozen .
+
+Stage 3: Residual-Preserving Adaptation. We in-troduce trainable square matrices J(n) 
+
+> α
+
+∈ Rrn×rn , n = 1 , 2, 3,initialized near identity: 
+
+J(n) 
+
+> α
+
+= Irn + ϵ · E, Eij ∼ N (0 , σ 2) (2) with ϵ = 0 .01 and σ = 0 .02 . The adapted weight tensor is computed via the residual-preserving formula: 
+
+cWα = Wα +  Tα − R α
+
+, (3) where 
+
+Tα = Gα ×1 (U (1)  
+
+> α
+
+J(1)  
+
+> α
+
+) ×2 (U (2)  
+
+> α
+
+J(2)  
+
+> α
+
+) ×3 (U (3)  
+
+> α
+
+J(3)  
+
+> α
+
+) (4) 3CRAFT Architecture: Cross-layer Tucker Decomposition with Frozen Factors                                       
+
+> Pre-trained Weights
+> W(1)
+> QW(2)
+> QW(.. )
+> QW(L)
+> Q
+> Stack
+> 3D Weight Tensor
+> din
+> dout
+> NL
+> WQ
+> HOSVD
+> Frozen Tucker Factors
+> G
+> frozen
+> U(1)
+> frozen
+> U(2)
+> frozen
+> U(3)
+> frozen
+> Trainable
+> J(1) J(2) J(3)
+> r1×r1,r2×r2,r3×r3
+> Only these are trained!
+> cW=W+G × 1(U(1) J(1) )×2(U(2) J(2) )×3(U(3) J(3) )− G × 1U(1) ×2U(2) ×3U(3) 
+
+Figure 2: CRAFT Architecture Overview. Pre-trained attention weights (Q, V) are stacked across NL layers into 3D tensors. HOSVD decomposes each tensor into a core tensor G and factor matrices U (1) , U (2) , U (3) . All decomposition factors are frozen . Adaptation occurs only through small square matrices J(1) ∈ Rr1×r1 , J(2) ∈ Rr2×r2 , J(3) ∈ Rr3×r3 (shown in red), initialized near identity. The original pre-trained weights W are preserved exactly at initialization. This yields a trainable parameter count of 2( r21 + r22 + r23 )—independent of model dimension d and depth NL at fixed Tucker ranks. is the Tucker reconstruction with adapted factors. 
+
+Remark 1 (Weight Preservation at Initialization) . When 
+
+J(n) 
+
+> α
+
+= Irn for all n, we have Tα = Rα, so cWα = Wα.The adapted model therefore starts exactly at the pre-trained solution, regardless of the Tucker approximation error. This property, analogous to PiSSA’s residual design, is critical for stable fine-tuning. 
+
+The individual layer weights are extracted as cW (ℓ) 
+
+> α
+
+=
+
+cWα(ℓ, :, :) for ℓ = 1 , . . . , N L.
+
+# 4 Comparison with Related Work 
+
+## 4.1 Low-Rank Adaptation Methods 
+
+LoRA [7] introduced efficient fine-tuning by decompos-ing weight updates into low-rank matrices: ∆W =
+
+BA where B ∈ Rdout ×r and A ∈ Rr×din . Exten-sions include AdaLoRA [20] with adaptive rank allocation, QLoRA [5] combining quantization with low-rank adapta-tion, DoRA [11] decomposing weights into magnitude and direction, and GaLore [21] projecting gradients onto low-rank subspaces. BitFit [19] takes an orthogonal approach by training only bias terms. Adapter methods [6, 13] in-sert small trainable modules between frozen layers. Despite their success, LoRA-family methods apply matrix decompo-sition independently to each layer, missing correlations be-tween layers. 
+
+## 4.2 SVD-Based Weight Decomposition for PEFT 
+
+PiSSA [12] represents a key advance in leveraging pre-trained weight structure for PEFT. By applying SVD to each pre-trained weight matrix W and initializing LoRA adapters with the principal singular values and vectors (while freezing the residual), PiSSA achieves faster convergence and superior performance compared to standard LoRA. Related meth-ods include OLoRA [2], which uses QR decomposition for initialization, and MiLoRA [17], which adapts minor sin-gular components while preserving principal ones. These methods demonstrate the value of decomposing pre-trained weights rather than learning updates from random initial-ization. However, they all operate independently per layer ,missing cross-layer correlations. 
+
+## 4.3 Tensor-Based PEFT Methods 
+
+Several recent works have explored tensor decompositions for PEFT. For example, LoTR [1] constructs a 3D tensor from gradient updates across layers and applies Tucker-2 decom-position, sharing left and right factor matrices across lay-ers with per-layer core tensor slices. VeRA [9] shares ran-dom frozen projection matrices across all layers while train-ing only per-layer scaling vectors. LoRETTA [18] applies tensor-train decomposition to weight updates for ultra-low-parameter adaptation. FLoRA [14] explores low-rank core spaces for N-dimensional adaptation. SuperLoRA [3] is particularly relevant to our work. It proposes a unified PEFT framework that groups weight up-dates ∆W across multiple layers, reshapes them into higher-order tensors, and applies Tucker decomposition. However, like LoTR, SuperLoRA decomposes the gradient update ten-sor, not the pre-trained weights themselves. CRAFT is distinct: it decomposes the pre-trained weights themselves 
+
+as cross-layer 3D tensors using full Tucker-3 decomposition via HOSVD, preserves the original weights exactly through a residual formulation, and adapts through small trainable transformation matrices applied to each frozen factor. 
+
+## 4.4 Parameter Complexity Comparison 
+
+Proposition 1 (Trainable Parameter Count and Scaling Comparison) . CRAFT with Tucker ranks (r1, r 2, r 3) applied to np projection types has exactly 
+
+Ntrain = np · (r21 + r22 + r23 ) (5) 4Table 1: Design comparison of tensor-based PEFT meth-ods. “Indep. d, N L” indicates whether the Tucker adaptation parameter count is independent of model dimension d and number of layers NL at fixed ranks.                                  
+
+> Property LoTR SuperLoRA PiSSA CRAFT
+> Decomposes ∆W∆WWW
+> Cross-layer Yes Yes No Yes Tucker type Tucker-2 Tucker-nN/A Tucker-3 What trains Core slices Factors A, B J(1) , J (2) , J (3)
+> Factors frozen No No No Yes
+> Residual No No Yes Yes
+> Indep. d, N LNo No No Yes
+
+Tucker adaptation parameters (excluding the task-specific classifier head), independent of model dimension d and depth 
+
+NL for fixed ranks. For a model with NL layers and dimen-sion d (where dout ≍ din ≍ d), the trainable parameter counts of competing methods are: 1. Full fine-tuning : O(NL · d2) parameters 2. LoRA/PiSSA (rank r): O(NL · r · d) parameters 3. LoTR : O(NL · r2 + r · d) parameters 4. CRAFT : O(r21 + r22 + r23 ) parameters CRAFT is the only method among those compared with com-plexity independent of both NL and d at fixed ranks. 
+
+For the sake of justification of the parameter counts above, observe that full fine-tuning trains all NL weight matrices of size d × d, giving O(NLd2). LoRA and PiSSA introduce two rank-r factors per layer of sizes d × r and r × d, yielding 
+
+O(NLrd ) parameters. LoTR shares factor matrices of size 
+
+d × r across layers but maintains per-layer core slices of size 
+
+r × r, giving the parameter count of O(NLr2 + rd ).For each projection type α, CRAFT’s trainable param-eters are J(n) 
+
+> α
+
+∈ Rrn×rn , n = 1, 2, 3, which results in 
+
+np(r21 + r22 + r23 ) parameters independent of d and NL.
+
+Remark 2. In practice, a task-specific classifier head is also trained. For RoBERTa-base on GLUE with nlabels 
+
+classes, this adds 768 × nlabels + nlabels parameters. The 41K figure reported in this paper refers to the CRAFT-specific Tucker adaptation parameters only; the total trainable count is slightly higher depending on the task. 
+
+# 5 Experimental Results 
+
+## 5.1 Experimental Setup 
+
+We evaluate CRAFT on the GLUE benchmark [16] using RoBERTa-base (125M params, 12 layers) and RoBERTa-large (355M params, 24 layers) [10]. We follow the exper-imental protocol from [1] for fair comparison. CRAFT is ap-plied to Q and V projections with Tucker ranks (r1, r 2, r 3) = (24 , 100 , 100) , yielding: 
+
+Ntrain = 2 × (24 2 + 100 2 + 100 2) = 41 ,152 ≈ 41 K (6) Tucker adaptation parameters. The task-specific classifier head is also trained.  
+
+> Cross-layer
+> Weight Decomp.
+> Per-layer Cross-layer
+> ∆W W
+> LoRA
+> PiSSA
+> LoTR
+> SuperLoRA
+> VeRA
+> CRAFT
+> bridges both
+> CRAFT : Only method combining
+> cross-layer + weight decomposition
+
+Figure 3: PEFT Method Taxonomy. CRAFT uniquely combines cross-layer tensor structure with pre-trained weight decomposition.     
+
+> 20 40 60 80 100
+> 0
+> 500
+> 1,000
+> 1,500
+> Number of Layers ( NL)Trainable Parameters (K)  Parameter Number vs. Model Depth
+> LoRA (r=8)
+> PiSSA (r=8)
+> CRAFT (ours)
+
+Figure 4: Parameter Number vs. Model Depth. At fixed Tucker ranks, CRAFT’s Tucker adaptation parameter count remains constant regardless of model depth, while LoRA and PiSSA scale linearly with NL. Whether the same ranks suffice for significantly deeper models is an open ques-tion (see Section 6). 
+
+## 5.2 GLUE Benchmark Results 
+
+Table 2 shows that CRAFT achieves competitive perfor-mance with only 41K Tucker adaptation parameters :
+
+RoBERTa-large: CRAFT achieves 88.0 average score, matching the 3M-parameter Adpt P adapter while using 
+
+∼75 × fewer Tucker adaptation parameters. Compared to LoRA (0.8M params), CRAFT uses ∼20 × fewer parameters with a 1.0 point lower average. 
+
+RoBERTa-base: CRAFT achieves 84.5 average with 0.04M Tucker adaptation parameters, compared to 87.2 for LoRA with 0.3M parameters. The 2.7-point gap reflects the more constrained adaptation space; however, CRAFT uses 
+
+∼7× fewer parameters than LoRA and matches SST-2 per-formance exactly (95.1). 
+
+Efficiency-Accuracy Tradeoff: CRAFT offers an ex-treme point on the efficiency-accuracy Pareto frontier, pri-oritizing parameter efficiency. The method is particularly effective on RoBERTa-large, where the gap to the best base-line narrows to 1.0 point. 5Table 2: RoBERTa with different adaptation methods on the GLUE benchmark. Higher is better. ∗ indicates numbers taken from [7]. † indicates numbers from [7], using a restricted setup similar to [6]. CRAFT rows (highlighted) show our results with only 0.04M Tucker adaptation parameters (excluding the task-specific classifier head).                                                                                                                                                       
+
+> Model Method # Params MNLI SST-2 MRPC CoLA QNLI QQP RTE STS-B Avg.
+> RoBERTa base
+> FT ∗125.0M 87.6 94.8 90.2 63.6 92.8 91.9 78.7 91.2 86.4 BitFit ∗0.1M 84.7 93.7 92.7 62.0 91.8 84.0 81.5 90.8 85.2 Adpt D∗0.3M 87.1 94.2 88.5 60.8 93.1 90.2 71.5 89.7 84.4 Adpt D∗0.9M 87.3 94.7 88.4 62.6 93.0 90.6 75.9 90.3 85.4 LoRA ∗0.3M 87.5 95.1 89.7 63.4 93.3 90.8 86.6 91.5 87.2 CRAFT (ours) 0.04M 85.7 95.1 89.2 59.0 92.0 89.0 75.8 90.4 84.5 RoBERTa large  FT ∗355.0M 90.2 96.4 90.9 68.0 94.7 92.2 86.6 92.4 88.9 LoRA ∗0.8M 90.6 96.2 90.9 68.2 94.9 91.6 87.4 92.6 89.0 Adpt P†3.0M 90.2 96.1 90.2 68.3 94.8 91.9 83.8 92.1 88.4 Adpt P†0.8M 90.5 96.6 89.7 67.8 94.8 91.7 80.1 91.9 87.9 Adpt H†6.0M 89.9 96.2 88.7 66.5 94.7 92.1 83.4 91.0 87.8 Adpt H†0.8M 90.3 96.3 87.7 66.3 94.7 91.5 72.9 91.5 86.4 LoRA †0.8M 90.6 96.2 90.2 68.2 94.8 91.6 85.2 92.3 88.6 CRAFT (ours) 0.04M 90.2 96.2 90.2 67.7 94.7 89.7 84.2 91.4 88.0
+
+# 6 Advantages, Limitations, and Discussion 
+
+Extreme Parameter Efficiency. CRAFT achieves accu-racy comparable to methods with 7–75 × more trainable pa-rameters. On RoBERTa-large, CRAFT (41K Tucker adapta-tion parameters) matches the 3M-parameter Adpt P adapter while dramatically reducing the trainable parameter count. The Tucker adaptation parameter count np(r21 + r22 + r23 )
+
+depends only on the chosen Tucker ranks r1, r 2, r 3 and the number of adapted projection types np, but not on the model dimension d or depth NL. We emphasize that this indepen-dence holds for fixed Tucker ranks. Whether the same ranks suffice as model dimension or depth grows substantially—or whether ranks must increase to maintain accuracy—remains an open empirical question. In our experiments, r1 = 24 
+
+equals the layer count of RoBERTa-large, meaning no com-pression occurs along the layer mode for that model. Es-tablishing rank-scaling guidelines for significantly deeper or wider architectures is an important direction for future work. 
+
+Storage Savings. Beyond training, CRAFT enables compact storage of adapted models. Rather than stor-ing the full weight matrices W (ℓ) 
+
+> α
+
+∈ Rdout ×din for each layer ℓ, one can store the shared factor matrices U (1) ∈
+
+RNL×r1 , U (2) ∈ Rdout ×r2 , U (3) ∈ Rdin ×r3 , the small core tensor G ∈ Rr1×r2×r3 , and the three small trained ma-trices J(1) , J (2) , J (3) —a significant reduction when rn ≪
+
+min( NL, d ). We note that these storage savings apply at 
+
+deployment time; during training, the residual formulation requires storing both Wα and Rα as frozen buffers, which temporarily increases memory. 
+
+Training Speed. Due to the drastically smaller trainable parameter space, each gradient update in CRAFT operates on only r21 + r22 + r23 parameters per projection type, com-pared to 2rd per layer for LoRA. We expect this to lead to faster per-epoch training and reduced optimizer state mem-ory, though we have not conducted wall-clock comparisons in this work. 
+
+Limitations. Current evaluation focuses on RoBERTa and GLUE; extension to larger LLMs and generation tasks would strengthen the empirical contribution. The HOSVD pre-computation adds one-time setup cost of O(NLd2). On RoBERTa-base, CRAFT shows a 2.7-point average gap com-pared to LoRA, indicating that the highly constrained adap-tation space may limit performance on smaller models. Re-sults are reported for a single seed; future work should in-clude variance analysis across multiple seeds. 
+
+# 7 Conclusion 
+
+We introduced CRAFT, a parameter-efficient fine-tuning method that bridges pre-trained weight decomposition with cross-layer tensor structure. Key contributions: 1. Novel framework combining frozen HOSVD factors with trainable adaptation matrices and a residual-preserving formulation that guarantees exact recovery of pre-trained weights at initialization. 2. Extreme efficiency : 41K Tucker adaptation parame-ters at fixed ranks, independent of model dimension and depth—the only PEFT method among those compared with this property. 3. Empirical validation on the GLUE benchmark with RoBERTa-base and RoBERTa-large, demonstrating competitive performance with 7–75 × fewer trainable pa-rameters than existing methods. 
+
+# Acknowledgments 
+
+The first two authors of the paper gratefully acknowledge partial support by National Science Foundation (NSF) grant DMS-2014928. 
+
+# References 
+
+[1] Bershatsky, D., Cherniuk, D., Daulbaev, T., Mikhalev, A., and Oseledets, I. LoTR: Low tensor rank weight adaptation. In Proceedings of the 41st International Conference on Machine Learning (ICML) , 2024. 6[2] Büyükakyüz, A. OLoRA: Orthonormal low-rank adap-tation of large language models. arXiv preprint arXiv:2406.01775 , 2024. [3] Chen, X., Qian, Y., Jia, J., Liu, Z., and Xiao, T. SuperLoRA: Parameter-efficient unified adaptation of multi-layer attention modules. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pat-tern Recognition Workshops (CVPRW) , 2024. [4] De Lathauwer, L., De Moor, B., and Vandewalle, J. A multilinear singular value decomposition. SIAM Journal on Matrix Analysis and Applications , 21(4):1253–1278, 2000. [5] Dettmers, T., Pagnoni, A., Holtzman, A., and Zettle-moyer, L. QLoRA: Efficient finetuning of quantized large language models. In Advances in Neural Infor-mation Processing Systems (NeurIPS) , 2023. [6] Houlsby, N., Giurgiu, A., Jastrzebski, S., Morrone, B., De Laroussilhe, Q., Gesmundo, A., Attariyan, M., and Gelly, S. Parameter-efficient transfer learning for NLP. In Proceedings of the 36th International Conference on Machine Learning (ICML) , 2019. [7] Hu, E. J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L., and Chen, W. LoRA: Low-rank adaptation of large language models. In Proceedings of the International Conference on Learning Representa-tions (ICLR) , 2022. [8] Kolda, T. G. and Bader, B. W. Tensor decompositions and applications. SIAM Review , 51(3):455–500, 2009. [9] Kopiczko, D. J., Blankevoort, T., and Asano, Y. M. VeRA: Vector-based random matrix adaptation. In Pro-ceedings of the International Conference on Learning Representations (ICLR) , 2024. [10] Liu, Y., Ott, M., Goyal, N., Du, J., Joshi, M., Chen, D., Levy, O., Lewis, M., Zettlemoyer, L., and Stoyanov, V. RoBERTa: A robustly optimized BERT pretraining approach. arXiv preprint arXiv:1907.11692 , 2019. [11] Liu, S.-Y., Wang, C.-Y., Yin, H., Molchanov, P., Wang, Y.-C. F., Cheng, K.-T., and Chen, M.-H. DoRA: Weight-decomposed low-rank adaptation. In Proceed-ings of the 41st International Conference on Machine Learning (ICML) , 2024. [12] Meng, F., Wang, Z., and Zhang, M. PiSSA: Principal singular values and singular vectors adaptation of large language models. In Advances in Neural Information Processing Systems (NeurIPS) , 2024. [13] Rücklé, A., Geigle, G., Glockner, M., Beck, T., Pfeiffer, J., Reimers, N., and Gurevych, I. AdapterDrop: On the efficiency of adapters in transformers. In Proceed-ings of the Conference on Empirical Methods in Natural Language Processing (EMNLP) , 2021. [14] Si, C., Yang, Z., and Dai, Z. FLoRA: Low-rank core space for N-dimension. arXiv preprint arXiv:2405.14739 , 2024. [15] Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., and Polosukhin, I. Attention is all you need. In Advances in Neural Information Processing Systems (NeurIPS) , 2017. [16] Wang, A., Singh, A., Michael, J., Hill, F., Levy, O., and Bowman, S. R. GLUE: A multi-task benchmark and analysis platform for natural language understanding. In Proceedings of the Conference on Empirical Methods in Natural Language Processing (EMNLP) , 2018. [17] Wang, H., Ping, W., Xu, C., McAfee, M., Liu, O., Shoeybi, M., and Catanzaro, B. MiLoRA: Harnessing minor singular components for parameter-efficient fine-tuning. arXiv preprint arXiv:2406.09044 , 2024. [18] Yang, Y., Li, Z., Sun, X., and Oseledets, I. LoRETTA: Low-rank economic tensor-train adaptation for ultra-low-parameter fine-tuning of large language models. In 
+
+Proceedings of the Conference of the North American Chapter of the Association for Computational Linguis-tics (NAACL) , 2024. [19] Zaken, E. B., Goldberg, Y., and Ravfogel, S. BitFit: Simple parameter-efficient fine-tuning for transformer-based masked language models. In Proceedings of the 60th Annual Meeting of the Association for Computa-tional Linguistics (ACL) , 2022. [20] Zhang, Q., Chen, M., Bukharin, A., He, P., Cheng, Y., Chen, W., and Zhao, T. Adaptive budget allocation for parameter-efficient fine-tuning. In Proceedings of the International Conference on Learning Representations (ICLR) , 2023. [21] Zhao, J., Zhang, Z., Chen, B., Schoenholz, S. S., and Ganguli, S. GaLore: Memory-efficient LLM training by gradient low-rank projection. In Proceedings of the 41st International Conference on Machine Learning (ICML) ,2024. 7

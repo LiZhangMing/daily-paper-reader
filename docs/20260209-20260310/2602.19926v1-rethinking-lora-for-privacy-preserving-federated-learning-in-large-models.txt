@@ -1,0 +1,2018 @@
+Title: Rethinking LoRA for Privacy-Preserving Federated Learning in Large Models
+
+URL Source: https://arxiv.org/pdf/2602.19926v1
+
+Published Time: Tue, 24 Feb 2026 03:14:12 GMT
+
+Number of Pages: 36
+
+Markdown Content:
+Published as a conference paper at ICLR 2026 
+
+# RETHINKING LORA FOR PRIVACY -P RESERVING FED -
+
+# ERATED LEARNING IN LARGE MODELS 
+
+Jin Liu 1, Yinbin Miao 1, Ning Xi 1∗
+
+, Junkang Liu 2 
+
+> 1
+
+School of Cyber Engineering, Xidian University  
+
+> 2
+
+College of Intelligence and Computing, Tianjin University 
+
+{jinliu9787, junkangliukk }@gmail.com, {ybmiao, nxi }@xidian.edu.cn 
+
+## ABSTRACT 
+
+Fine-tuning large vision models (LVMs) and large language models (LLMs) un-der differentially private federated learning (DPFL) is hindered by a fundamental privacy-utility trade-off. Low-Rank Adaptation (LoRA), a promising parameter-efficient fine-tuning (PEFT) method, reduces computational and communication costs by introducing two trainable low-rank matrices while freezing pre-trained weights. However, directly applying LoRA in DPFL settings leads to performance degradation, especially in LVMs. Our analysis reveals three previously underex-plored challenges: (1) gradient coupling caused by the simultaneous update of two asymmetric low-rank matrices, (2) compounded noise amplification under differential privacy, and (3) sharpness of the global aggregated model in the pa-rameter space. To address these issues, we propose LA-LoRA ( Local Alternating 
+
+LoRA ), a novel approach that decouples gradient interactions and aligns update directions across clients to enhance robustness under stringent privacy constraints. Theoretically, LA-LoRA strengthens convergence guarantees in noisy federated environments. Extensive experiments demonstrate that LA-LoRA achieves state-of-the-art (SOTA) performance on Swin Transformer and RoBERTa models, showcasing robustness to DP noise and broad applicability across both LVMs and LLMs. For example, when fine-tuning the Swin-B model on the Tiny-ImageNet dataset under a strict privacy budget ( ϵ = 1 ), LA-LoRA outperforms the best baseline, RoLoRA, by 16.83% in test accuracy. Code is provided in 
+
+https://anonymous.4open.science/status/LA-LORA-50E5/ .
+
+## 1 INTRODUCTION 
+
+As foundation models such as GPT (Achiam et al., 2023), BERT (Kenton et al., 2019), and ViT (Dosovitskiy et al., 2020) scale in size and capacity, adapting them to downstream tasks in-creasingly relies on vast and heterogeneous datasets. However, centralized collection is becoming impractical due to data silos and rising concerns over user privacy (Liu et al., 2024b;a). Federated learning (FL, McMahan et al. (2017)) offers a privacy-preserving solution by enabling decentral-ized model training without sharing raw data across clients. Despite this promise, applying large-scale models in FL remains a major challenge. These models typically consist of billions of parameters, making full-model fine-tuning computationally expen-sive and communication-heavy. To mitigate this, parameter-efficient fine-tuning (PEFT) meth-ods, such as Low-Rank Adaptation (LoRA, Hu et al. (2021)), have been integrated into FL. Ap-proaches like FedIT (Zhang et al., 2024a) freeze the majority of the model weights and only update a lightweight set of LoRA parameters, reducing communication overhead to less than 0.1% of the full model while preserving performance . 
+
+However, privacy remains a critical concern in FL . Although raw data is not directly shared, transmitting gradients or model updates can still expose sensitive information. Prior work has shown that adversaries may reconstruct private data from such gradients (Liu et al., 2024c; Han et al., 2024; Fan et al., 2025; Ye et al., 2025). To provide formal privacy guarantees, differential privacy (DP, Dwork (2006)) is commonly integrated into federated optimization. 
+
+> ∗
+
+Corresponding author. 
+
+1
+
+> arXiv:2602.19926v1 [cs.LG] 23 Feb 2026
+
+Published as a conference paper at ICLR 2026 
+
+Figure 1: The illustration of DP-LoRA, FFA-LoRA, RoLoRA, and LA-LORA. DP-LoRA updates both noisy A and B simultaneously and sends them to the server for aggregation. FFA-LoRA freezes 
+
+A, updates only the noisy B, and sends it to the server. RoLoRA alternately updates noisy A and B
+
+across rounds. Our LA-LoRA alternately updates noisy A and B within each local round. While differentially private federated learning (DPFL) with PEFT methods (e.g., DP-LoRA, Liu et al. (2025e)) provides privacy guarantees, it often incurs reduced performance due to federated constraints. Federated training introduces additional complexities, including non-iid data distri-butions, noisy updates, and difficulties in aggregating LoRA modules. In practice, LoRA-based fine-tuning under privacy constraints often suffers from severe performance degradation. Beyond the prior finding of DP noise amplification in FFA-LoRA (Sun et al., 2024a), we identify two further challenges, leading to three key issues of LoRA in DPFL Feng et al. (2022); Feng & Patras (2023); Feng et al. (2024b;a): • Gradient coupling. Simultaneous updates to LoRA’s asymmetric matrices cause gradient inter-ference, destabilizing training, especially under DP noise and non-iid distributions. • Amplified DP noise. LoRA’s semi-quadratic update structure amplifies the impact of injected DP noise, severely degrading learning stability. • Sharp global solutions. LoRA’s low-rank constraints reduce client capacity, often resulting in sharp global minima after aggregation, compromising robustness and generalization. To overcome these, we propose LA-LoRA , a novel framework built on a structural rethinking of how LoRA fits into DPFL. Its core is a local alternating update mechanism that decouples gradient interference and suppresses DP noise. To further enhance stability and generalization, LA-LoRA incorporates a simple yet effective low-pass smoothing filter . We provide theoretical evidence that our update scheme ensures stable optimization while preserving the low-rank structure of LoRA. Extensive experiments on both image classification and language understanding tasks validate the effectiveness of LA-LoRA. Results show that LA-LoRA achieves strong performance while offering privacy protection and optimization stability. Our contributions are summarized as follows: • We identify two overlooked challenges of applying LoRA in DPFL: gradient coupling and ag-gregation sharpness. Along with noise amplification, these motivate the design of our algorithm. • We propose LA-LoRA, a novel algorithm that alternates local updates of LoRA components to mitigate gradient interference, noise amplification, and aggregation instability. A low-pass smoothing filter further enhances cross-client consistency and stability. • Theoretically, we prove that alternating updates yield unique closed-form solutions and ensure stable low-rank optimization, mitigating projection distortion in federated settings. • We validate our algorithm on both vision (Swin Transformer) and language (RoBERTa) models, covering image classification and NLP tasks. LA-LoRA outperforms SOTA privacy-preserving federated LoRA methods on various tasks and demonstrates significant performance gains. 
+
+## 2 BACKGROUND AND RELATED WORK 
+
+Definition 1 ((ϵ, δ )-DP, Dwork et al. (2014)) . Let ϵ > 0 and 0 < δ < 1. A random mechanism 
+
+M : X n → O satisfies (ϵ, δ )-DP if, for any two neighboring datasets D and D′ differing in one 
+
+2Published as a conference paper at ICLR 2026 
+
+sample, and for any measurable subset U ⊆ O of possible outputs, 
+
+Pr[ M(D) ∈ U ] ≤ eϵ · Pr[ M(D′) ∈ U ] + δ. (1) 
+
+Differentially private federated learning (DPFL). A general FL system with a central server and 
+
+N clients. Each client i holds a local dataset Di and performs local training on it. The server aggregates the model updates from all clients and updates the global model W . Our privacy goal is sample-level protection (changes to any single data sample should not significantly affect the output). Building on Noble et al. (2022), we provide (ϵ, δ )-DP guarantees. We perform privacy ac-counting via R´ enyi DP (RDP) (Mironov, 2017), composing per-step privacy loss for the subsampled Gaussian mechanism (Wang et al., 2019) with per-sample clipping, and finally convert to (ϵ, δ )-DP. To achieve DP in FL, each client i clips the per-sample gradients to a fixed ℓ2 norm to bound sensitiv-ity, then adds Gaussian noise to the aggregated clipped gradients locally, protecting the contribution of individual training examples. For a local mini-batch Bi, the privatized update is computed as: 
+
+gij = ∇L ij / max (1 , ∥∇L ij ∥2/C ) , ∀j ∈ B i, gi =
+
+X 
+
+> j∈B i
+
+gij + N (0 , C 2σ2)
+
+
+
+/|B i|, (2) where Lij denotes the loss for sample j on client i, C is the clipping norm bound, and σ is the Gaussian noise multiplier determined by the privacy budget (ϵ, δ ).
+
+Parameter-efficient fine-tuning (PEFT). The rapid scaling of modern pre-trained models has led to an increased demand for fine-tuning in resource-constrained environments. PEFT tackles this by training a small set of parameters while freezing most backbone weights, with representative methods including adapters (Houlsby et al., 2019), prefix-tuning (Li & Liang, 2021), prompt-tuning (Lester et al., 2021), LoRA (Hu et al., 2021; Tian et al., 2024) and other methods (Shin et al., 2023; Zaken et al., 2021). LoRA is particularly popular for its simplicity and strong perfor-mance under minimal parameter overhead: it augments a pre-trained weight matrix W0 ∈ Rm×n
+
+with two low-rank matrices, an up-projection B ∈ Rm×r and a down-projection A ∈ Rr×n with 
+
+r ≪ min {m, n }, and reparameterizes the weights as W = W0 +sBA while keeping W0 fixed. B is initialized to an zero matrix suppress early updates, while A uses a random Gaussian initialization. 
+
+PEFT in FL. PEFT in FL has been explored to reduce communication overhead, computational cost, and privacy risks. Accordingly, various strategies have been proposed, such as adapter-based (Cai et al., 2023; Ghiasvand et al., 2024), prompt-based (Zhao et al., 2023; Qiu et al., 2023), and selec-tive tuning approaches (Yu et al., 2023). Recently, LoRA-based methods have received increasing attention in FL. FedIT (Zhang et al., 2024a) directly incorporates LoRA into the standard FedAvg framework for instruction tuning. RoLoRA (Chen et al., 2024) addresses heterogeneity by alter-nately optimizing A and B across communication rounds. FedSA-LoRA (Guo et al., 2024) uploads only A to the server for aggregation, keeping B local to support personalized adaptation. Other works explore heterogeneous configurations (Cho et al., 2024; Wang et al., 2024) or personalized decomposition (Qi et al., 2024) to improve adaptability under system and data heterogeneity. Fed-BCGD (Liu et al., 2024b) proposes an accelerated block coordinate gradient descent framework for FL. FedSWA (Liu et al., 2024a) improves generalization under highly heterogeneous data by stochastic weight averaging. FedAdamW (Liu et al., 2025c) introduces a communication-efficient AdamW-style optimizer tailored for federated large models. FedNSAM (Liu et al., 2025a) studies the consistency relationship between local and global flatness in FL. FedMuon (Liu et al., 2025b) accelerates federated optimization via matrix orthogonalization. DP-FedPGN (Liu et al., 2025d) develops a penalizes gradient norms to encourage globally flatter minima in DP-FL. Table 1: Comparison of LoRA-based meth-ods in DPFL. ✓ denotes support, ✕ denotes not considered. Exp. indicates the effective expression ability under DP.                     
+
+> Method DP LVMs Exp. Speed
+> DP-LoRA ✓✕mid slow FFA-LoRA ✓✕low slow RoLoRA ✕✕mid mid LA-LoRA ✓✓high fast
+
+LoRA in DPFL. In DPFL, LoRA-based methods typ-ically apply DP mechanisms to the low-rank matrices 
+
+A and B, rather than the full model parameters, which significantly reduces computational and communication overhead. DP-LoRA (Liu et al., 2025e) computes per-sample gradients for A and B locally, clips them, adds Gaussian noise, and sends privatized updates for aggre-gation. FFA-LoRA (Sun et al., 2024a) freezes the down-projection matrix A and trains only the up-projection B,injecting calibrated noise into its updates. This design avoids noise amplification, but at the cost of reduced 3Published as a conference paper at ICLR 2026 model expressiveness. Despite recent efforts, differentially private federated LoRA methods still suffer from noticeable performance degradation and remain underexplored. Figure 1 shows the differences in the ideas of existing methods, while Table 1 compares their actual characteristics. 
+
+## 3 LIMITATIONS OF LORA UNDER PRIVACY -P RESERVING FL 
+
+Although LoRA is widely used for efficient adaptation, its behavior under differential privacy is still poorly understood. We show that DP interacts with the low-rank parameterization and causes failure modes that are further amplified in federated learning due to data heterogeneity and noisy local updates. We therefore focus on DPFL and include centralized DP experiments in Appendix A.6. 3.1 GRADIENT COUPLING IN ASYMMETRIC UPDATES 
+
+We find that simultaneously updating the two LoRA matrices A and B leads to intrinsic gradient coupling that destabilizes training under DP noise and data heterogeneity. In LoRA, A ∈ Rr×n
+
+projects the input into a lower-dimensional subspace, while B ∈ Rm×r maps this low-rank rep-resentation back to the original output space. Their asymmetric roles give rise to distinct gradient behaviors. More precisely, the gradients of the loss L with respect to A and B are interdependent: 
+
+∇AL = sB ⊤(∇W L), ∇B L = s(∇W L)A⊤. (3) Thus, the update direction for A (resp. B) is re-parameterized by the current B (resp. A). When both matrices are updated in the same step, the latent basis defined by A can shift while B adapts to outdated directions, creating representation drift and a mismatch between the two gradient path-ways. In the presence of DP perturbations and non-iid data, this coupling makes the trajectory more sensitive to perturbations and client drift, leading to oscillations and unstable convergence. To quantify this coupling, we compute the cosine similarity between ∇AL and ∇B L during each training step under the experimental setup described in Section 6. As shown in Figure 2(a), DP-LoRA (simultaneous updates) maintains persistently lower similarity, reflecting strong coupling and mismatch. LA-LoRA(-filter) (local alternating updates) achieves much higher similarity. This align-ment difference manifests in training dynamics and final performance: Figure 2 (b) shows that the simultaneous update of A and B in DP-LoRA leads to a higher test loss, whereas LA-LoRA(-filter) achieves a smoother convergence. Figure 2(c) further indicates that this problem. We observe sim-ilar trends in a non-private federated setup (Appendix A.7), which suggests that gradient alignment is inherently beneficial, while DP noise further amplifies the coupling issue.   
+
+> (a) Cosine Similarity. (b) Test Loss. (c) Test Accuracy.
+
+Figure 2: Comparison of cosine similarity between ∇AL and ∇B L, test loss and test accuracy for Swin-T on CIFAR-100 ( ϵ = 3 ). LA-LoRA(-filter) uses local alternating updates without smoothing. 3.2 STRUCTURAL AMPLIFICATION OF DP N OISE 
+
+Differential privacy injects noise into local sample gradients to protect client data. Noise is added independently to A and B. We ignore the LoRA scaling factor s. For client i, the resulting noisy low-rank term can be written as: 
+
+(Bi + NBi )( Ai + NAi ) = BiAi + BiNAi + NBi Ai + NBi NAi , (4) where NAi and NBi are Gaussian noises independently sampled per client i. This decomposition reveals that the update BiAi is perturbed by three terms: BiNAi , NBi Ai and NBi NAi . The first two are linear in the noise, while NBi NAi is non-Gaussian and introduces quadratic amplification effect. This structural cascade increases the variance of the aggregated updates and hinders convergence. 4Published as a conference paper at ICLR 2026 
+
+Figure 3: Scaling of perturbation Frobenius norms with σ on QNLI. We consider a synthetic example. In our setting, W ∈
+
+R1024 ×1024 with the dataset QNLI and other configurations described in Section 6. As the Gaussian noise scale σ
+
+changes, we report the Frobenius norms of the induced pertur-bations. Figure 3 indicates that for small σ, LoRA ( ∥N B NA +
+
+BNA + NB A∥F ) incurs smaller perturbations than full-model (∥N W ∥F ) updates. As σ increases, the multiplicative term (∥N B NA∥F ) grows quadratically and becomes the leading contribution, causing the total LoRA perturbation to exceed the full-model curve. 3.3 SHARPNESS IN GLOBAL AGGREGATION 
+
+A third distinct challenge arises after global aggregation. It is well established that the geometry of the loss landscape critically affects generalization. Conver-gence to flat minima, regions with low curvature, has been shown to promote robustness and better generalization, while sharp minima correlate with overfitting and instability (Hochreiter & Schmid-huber, 1997; Kaddour et al., 2022). We observe that this issue is aggravated in LoRA-based DPFL. In parameter space, each client con-tributes low-rank factors Ai and Bi, and the server aggregates them under naive FedAvg. Unlike full-parameter updates, low-rank factor aggregation alters the geometry of the global update in pa-rameter space. Specifically, heterogeneous factor directions across clients do not align, and their composition produces global updates that consistently land in narrower, high-curvature regions of the landscape. The problem is exacerbated by DP noise, which injects stochastic perturbations that destabilize the already misaligned updates.    
+
+> (a) DP-LoRA, ϵ=1 .(b) LA-LoRA(-filter), ϵ=1 .
+
+Figure 4: Comparison of global loss landscapes for fine-tuning Swin-T model on CIFAR-100. Figure 4 visualizes the loss landscapes of Swin-T trained with DP-LoRA and LA-LoRA(-filter) under ϵ = 1 . DP-LoRA pro-duces a sharper and more irregular landscape, while LA-LoRA(-filter) yields a flatter and smoother basin. This suggests that simulta-neous updates in DPFL may hinder general-ization by increasing the curvature of the ag-gregated model. Table 2 further confirms this sharpness issue via Hessian eigenvalue anal-ysis. See Section 6 for experimental setup. 
+
+## 4 OUR METHOD 
+
+We address the aforementioned challenges from two complementary perspectives. At the opti-mization level , we break the tight dependency between the two low-rank factors so that gradients are decoupled, cross-noise terms are avoided, and the update trajectory remains smoother. At the 
+
+pre-aggregation level , we further suppress residual variance by filtering out high-frequency com-ponents of DP perturbations on each client before aggregation, effectively smoothing noise and improving generalization. Building on these ideas, we develop LA-LoRA ( Local Alternating Lo w-
+
+Rank Adaptation), illustrated in Figure 5. It combines (i) a local alternating update strategy for the first perspective, and (ii) an optional Gaussian low-pass filter for the second, jointly improving stability and consistency under DPFL. 4.1 LOCAL ALTERNATING UPDATE STRATEGY 
+
+Instead of simultaneously updating both A and B, LA-LoRA adopts an alternating scheme, where the two low-rank matrices are updated in turn within each local training round. For client i at local step k of communication round t, we keep one factor fixed and update the other: • Update Bi if k is odd, keeping Ai fixed: Bti,k +1 = Bti,k − ηB ∇B Li(W0 + sB ti,k Ati,k ).• Update Ai if k is even, keeping Bi fixed: Ati,k +1 = Ati,k − ηA∇ALi(W0 + sB ti,k Ati,k ).5Published as a conference paper at ICLR 2026 
+
+Figure 5: Our LA-LoRA framework. Here, W0 denotes the frozen backbone from the server. Li(·) is the local training loss on client i’s private dataset Di, ηA, ηB are learning rates, and s is the LoRA scaling. Gradients ∇ALi and ∇B Li
+
+are taken with respect to the corresponding low-rank matrices. This local alternating design addresses the three challenges outlined in Section 3: 
+
+Challenge 1 (Gradient coupling) . By updating one matrix at a time, the gradients become condi-tionally independent, which alleviates the tightly coupled dynamics described in Eq. (3): 
+
+∇B Li = s(∇W Li)A⊤, ∇ALi = sB ⊤(∇W Li). (5) 
+
+Challenge 2 (Amplified DP noise) . Since only one matrix is updated and privatized at each step, the multiplicative noise term NBi NAi in Eq. (4) is eliminated. The perturbed update reduces to: 
+
+(Bi +NBi )Ai = BiAi +NBi Ai, if Ai is fixed ,Bi(Ai +NAi ) = BiAi +BiNAi , if Bi is fixed . (6) 
+
+Challenge 3 (Sharp global solutions) . Local alternating updates constrain each step to a struc-tured lower-dimensional subspace, the column space of Ai or the row space of Bi. This implicit regularization suppresses sensitivity to stochastic noise and client heterogeneity, yielding flatter and more stable global solutions. We report the maximum Hessian eigenvalue, which characterizes the steepest curvature of the loss surface (Sagun et al., 2018; Grosse & Martens, 2016). As shown in Table 2, LA-LoRA consistently achieves smaller eigenvalues than DP-LoRA across datasets and privacy settings, indicating a flatter loss landscape and more stable training dynamics. 4.2 SMOOTHING WITH A LOW -P ASS FILTER 
+
+Table 2: Maximum Hessian eigenvalue of Swin-B on CIFAR-100 and Tiny-ImageNet.               
+
+> Method CIFAR-100 Tiny-ImageNet
+> DP-LoRA ϵ=∞42.45 44.80 LA-LoRA ϵ=∞30.12 33.25 DP-LoRA ϵ=1 101.62 115.36 LA-LoRA ϵ=1 64.77 69.53
+
+To further improve training stability under DP, LA-LoRA introduces an optional low-pass smoothing filter applied to the LoRA gradients before aggre-gation. DP noise often manifests as high-frequency perturbations, which destabilize local updates and amplify sharpness in global aggregation (Zhang et al., 2024b). Our goal is to attenuate these high-frequency components via a lightweight operation that leaves the model architecture and the privacy mechanism unchanged. Specifically, we adopt a fixed 1D Gaussian kernel Gs = 116 [1 , 4, 6, 4, 1] , i.e., the standard 5-tap binomial low-pass filter. For A ∈ Rr×n, smoothing is applied row-wise along the input feature dimension; for B ∈ Rm×r , smoothing is applied column-wise along the output dimension. The filter acts along meaningful input/output feature axes while keeping different low-rank components decoupled. Denoting by ∗ the 1D convolution with symmetric padding, the filtered gradients are 
+
+b∇ALi[j, :] = Gs ∗ ∇ ALi[j, :] , ∀j ∈ [1 , r ], b∇B Li[: , j ] = Gs ∗ ∇ B Li[: , j ], ∀j ∈ [1 , r ], (7) From an optimization perspective, filtering noisy gradients with Gs can be interpreted as approxi-mately imposing a one-dimensional smoothness regularizer along the filtered dimension, discourag-ing abrupt changes between neighboring entries and inducing a low-pass effect on the update. 6Published as a conference paper at ICLR 2026 In practice, the Gaussian kernel Gs reduces DP-induced fluctuations while preserving the structural semantics encoded in A and B. The operation stabilizes local updates and alleviates sharpness in global aggregation with negligible overhead, making it suitable for federated environments. 4.3 LA-L ORA F RAMEWORK 
+
+Local client update. At global round t ∈ [T ], each selected client i fine-tunes only the LoRA factors (A, B ) on top of a frozen backbone W0 via the reparameterization W0 + sBA . The factors are initialized as Ati, 1 ← At−1 and Bti, 1 ← Bt−1. The client performs K local steps. At each step 
+
+k ∈ [K] it samples a mini-batch Bi ⊂ D i of size ⌊bR ⌋. b is the local data sampling rate, R is the size of Di. The client performs alternating updates of B and A across local steps. 
+
+Odd steps (update B). For each example j ∈ B i, compute the per-example gradient 
+
+gij = ∇B Li
+
+ W0 + sB ti,k Ati,k , d ij
+
+, (8) Perform per-example ℓ2-norm clipping with threshold C: gij ← gij / max {1, ∥gij ∥2/C }. Aggre-gate over the mini-batch and inject Gaussian noise to ensure DP: 
+
+gi = 1 /(bR ) X
+
+> j∈B i
+
+gij + C/ (bR ) · N (0 , σ 2). (9) Smooth the noisy gradient with a fixed operator Gs (low-pass filter) to obtain bgi = Gs ∗ gi, then 
+
+Bti,k +1 = Bti,k − ηB bgi, Ati,k +1 = Ati,k .
+
+Even steps (update A). Repeat the same procedure for A with learning rate ηA.After K alternating steps, the client returns the locally updated (and smoothed) factors  Ati, B ti
+
+
+
+for server-side aggregation. Throughout, W0 remains frozen and only the low-rank adaptation BA 
+
+is modified; gradient clipping with Gaussian noise provides privacy, while Gs suppresses high-frequency perturbations and stabilizes optimization. 
+
+Server aggregation. The server averages client uploads: 
+
+At = 1 /|C t| X
+
+> i∈C t
+
+Ati, Bt = 1 /|C t| X
+
+> i∈C t
+
+Bti , (10) and then updates the global model as W t = W0 + sB tAt. After T rounds, the final model is 
+
+W T = W0 + sB T AT . Here, Ct is the set of participating clients at round t with |C t| = ⌊qN ⌋, q is the client sampling rate and N is the total number of clients. 
+
+## 5 THEORETICAL ANALYSIS 
+
+In the following, we state the necessary theorems. Full theoretical details appear in Appendix E. 
+
+Theorem 1 (Privacy guarantee) . Following the privacy analysis of (Noble et al., 2022), LA-LoRA ensures that after T communication rounds with K local steps per client, the weight matrix W T
+
+satisfies (ϵ, δ )-DP towards any third party: 
+
+ϵ = O
+
+
+
+bpT K log(2 /δ ) log(2 T /δ )/σ 
+
+
+
+. (11) 
+
+With respect to the server, after T rounds, the accumulated privacy budget satisfies (ϵs, δ s)-DP, 
+
+ϵs = ϵpN/q, δs = δ/ 2 (1 /q + 1) . (12) Noise is added to the clipped sample gradients before forming the client update, and the Gaussian low-pass filter is a deterministic linear transform of these noisy updates. By the post-processing in-variance of DP (Dwork et al., 2014), this filtering step does not weaken the guarantees in Theorem 1. 
+
+Theorem 2 (Closed-form projected gradients) . Let Bk ∈ Rm×r and Ak ∈ Rr×n be full rank, i.e., rank( Bk) = rank( Ak) = r, and let s = α/r > 0 denote the LoRA scaling. In LoRA, updates to 
+
+Bk and Ak can be obtained by projecting the full gradient onto the column space of Ak and the 
+
+7Published as a conference paper at ICLR 2026 
+
+row space of Bk, respectively. Within iteration k, we update B first and then A. This projection is formulated as a least-squares problem, whose unique solution yields: 
+
+˜∇Bk L = 1
+
+s2 ∇Bk L (AkA⊤ 
+
+> k
+
+)−1, ˜∇Ak L = 1
+
+s2 (B⊤
+
+> k+1
+
+Bk+1 )−1 ∇Ak L, (13) 
+
+where ∇Bk L, ∇Ak L are the gradients defined in Eq. (3). The projected gradients ˜∇Bk L, ˜∇Ak L
+
+are obtained by solving the least-squares problem. 
+
+Under the full-rank assumption, Theorem 2 yields closed-form projected gradients that use only the local parameter gradients ∇Ak L or ∇Bk L plus an r × r solve. This avoids the full model gradient ∇W L. In practice, the computation reduces to forming the small Gram matrices AkA⊤ 
+
+> k
+
+or 
+
+B⊤
+
+> k+1
+
+Bk+1 and solving a small r × r system, which is lightweight when r ≪ min {m, n }.
+
+Theorem 3 (Stable feature learning) . Assume that, for the input x, BAx has dimension O(n). In LA-LoRA, if we use the learning rate η = O(1) to update B and A, it would achieves stable feature learning. Moreover, the model update achieves stable feature learning as well with 
+
+Wk+1 =Wk − η(∇Wk L)P roj r(Ak ) − ηP roj c(Bk+1 )(∇Wk+ 12
+
+L). (14) 
+
+where P roj r(Ak ) denotes the orthogonal projection onto the row space of Ak, and 
+
+P roj c(Bk+1 ) denotes the orthogonal projection onto the column space of Bk+1 . Besides, 
+
+η(∇Wk L)P roj r(Ak ), ηP roj c(Bk+1 )(∇Wk+ 12
+
+L) ∈ O (1) . However, when doing joint update, the update will introduce additional across term 
+
+η2(B⊤ 
+
+> k
+
+Bk)−1B⊤ 
+
+> k
+
+(∇Wk L)( ∇Wk L)A⊤ 
+
+> k
+
+(AkA⊤ 
+
+> k
+
+)−1 ∈ O (1) .
+
+The across term is indeed the second order term w.r.t η, but it is same magnitude as 
+
+ηP roj c(Bk )(∇Wk L) and η(∇Wk L)P roj r(Ak ) in infinite-width NN setting. 
+
+In Theorem 3, ours achieve stable feature learning. Moreover, as the joint update would introduce the cross term with an unignorable magnitude (especially η is O(1) instead of O(1 /n )), simultaneous update with scaled gradient descent breaks the clean interpretation of projecting the full gradient onto low-rank subspaces and degrade the performance as our experiment studies show later. 
+
+Theorem 4 (Convergence rate) . Assume for any i ∈ [P ] the matrix Ci = DiX satisfies the rank 
+
+r-RIP with constant δr (Assumption 1) and 0 ≤ η ≤ 11+ δr + 1
+
+> P
+
+, then LA-LoRA without momentum solves the over-parameterized problem leads to 
+
+Lc(Bk+1 , Ak+1 ) ≤ (1 − ηc)2Lc(Bk, Ak), (15) 
+
+> P
+
+X
+
+> i
+
+BikAik − X⋆
+
+> 2
+> F
+
+≤ 1 + δr
+
+1 − δr
+
+(1 − ηc)2k
+
+> P
+
+X
+
+> i
+
+Bi
+
+> 0
+
+Ai 
+
+> 0
+
+− X⋆
+
+> 2
+> F
+
+, (16) 
+
+where ηc = 2 P (1 − δr )
+
+
+
+η − η2(1+ δr + 1 
+
+> P)2
+
+
+
+.
+
+Explanation of Theorem 4. If each Ci = DiX satisfies the rank-r RIP with constant δr and the step size obeys 0 ≤ η ≤ (1 + δr + 1 
+
+> P
+
+)−1, then momentum-free LA-LoRA is contractive: the objective decreases geometrically as Lc(Bk+1 , Ak+1 ) ≤ (1 − ηc)2Lc(Bk, Ak), with ηc =2P (1 − δr )
+
+
+
+η − η2(1+ δr + 1 
+
+> P)2
+
+
+
+. Consequently, the reconstruction bXk = PPi=1 BikAik converges linearly to X⋆ in Frobenius norm: ∥ bXk − X⋆∥2 
+
+> F
+
+≤ 1+ δr 
+
+> 1−δr
+
+(1 − ηc)2k∥ bX0 − X⋆∥2 
+
+> F
+
+, where 1+ δr
+
+> 1−δr
+
+reflects the RIP conditioning (smaller δr gives a tighter bound). 
+
+## 6 EXPERIMENTS 
+
+We evaluate LA-LoRA on both vision and language tasks to assess its effectiveness and privacy preservation. All experiments are performed on NVIDIA A6000 GPUs. 8Published as a conference paper at ICLR 2026 6.1 EXPERIMENTAL SETUPS 
+
+Datasets . For image classification , we use CIFAR-100 and Tiny-ImageNet. For language under-standing , we evaluate on four GLUE benchmarks: SST-2, QNLI, QQP, and MNLI. 
+
+Models . In vision tasks, we employ Swin Transformer backbones (Swin-T and Swin-B), initialized from ImageNet-22K pre-trained weights, which are well-suited to federated environments due to their strong generalization. For language tasks, we use RoBERTa-Base as the backbone model. 
+
+Baselines . We compare LA-LoRA with three SOTA approaches: DP-LoRA , a direct application of LoRA under DPFL constraints. FFA-LoRA , which freezes A while updating B. RoLoRA , which alternates the upload of A and B in communication rounds. 
+
+Hyperparameter settings . Image classification : Federated setup with N = 8 clients (sampling rate 
+
+q = 0 .5) and default non-iid Dirichlet β = 0 .1. Training runs for T = 100 rounds, each selected client performing K = 20 with batch size B = 16 . We use LoRA fine-tuning with rank r = 16 ,scaling factor α = 16 , updating both adapter and classification head. Optimization uses SGD with learning rate decay λ = 0 .99 . The learning rate η is selected from {1e − 2, 2e − 2, 1e − 1, 2e − 1}.The privacy budget is fixed to ϵ ∈ { 3, 2, 1}, with δ = 1 e − 5 and noise smoothing σs = 0 .01 .
+
+Language understanding : Federated setup with N = 20 , q = 0 .2, Dirichlet β = 0 .8. Clients run 
+
+K = 20 local steps for T = 100 rounds ( B = 16 ). We use LoRA with r = α = 8 , freezing the classification head. AdamW optimizer with η ∈ { 1e−4, 2e−4, 3e−4, 4e−4, 1e−3, 2e−3, 4e−3}.The privacy budget is also set to ϵ ∈ { 3, 2, 1}, with δ = 1 e − 5 for SST-2 and QNLI, δ = 1 e − 6
+
+for QQP and MNLI, and smoothing σs = 0 .001 . We run 3 trials for vision tasks and 15 trials for language tasks, reporting the mean test accuracy across trials. Full details see Appendix A.2, B.2. 6.2 RESULTS 
+
+Fine-tuning for image classification. Table 3 and Figure 6 show that LA-LoRA consistently outper-forms DP-LoRA, FFA-LoRA, and RoLoRA on CIFAR-100 and Tiny-ImageNet using both Swin-T and Swin-B, under privacy budgets ϵ ∈ { 3, 2, 1}. For Swin-T at ϵ = 3 , LA-LoRA achieves 60 .07% 
+
+(CIFAR-100) and 60 .97% (Tiny-ImageNet), exceeding RoLoRA by 4.88% and 10.10% . Even at 
+
+ϵ = 1 , LA-LoRA remains the top performer with 56 .68% and 60 .01% on the two datasets. A similar trend holds for Swin-B. At ϵ = 1 , LA-LoRA reaches 74 .56% (CIFAR-100) and 60 .68% 
+
+(Tiny-ImageNet), outperforming RoLoRA by 6.68% and 16.83% , respectively, further confirming its consistent superiority over baselines. Further experimental details are provided in Appendix A.3.    
+
+> (a) CIFAR-100, Swin-T (b) ImageNet, Swin-T (c) CIFAR-100, Swin-B (d) ImageNet, Swin-B
+
+Figure 6: Test accuracy of Swin-T and Swin-B on CIFAR-100 and Tiny-ImageNet with ϵ = 1 .
+
+Fine-tuning for language understanding . Table 4 summarizes the results, where LA-LoRA con-sistently outperforms all baselines across datasets and privacy levels. At ϵ = 3 , LA-LoRA achieves 
+
+93 .12% on SST-2 and 89 .83% on QNLI. At ϵ = 1 , it maintains 85 .34% on QQP and 82 .35% on MNLI, surpassing the best baseline RoLoRA in all cases. More results in Appendix B.3. 6.3 ABLATION STUDY 
+
+To better understand the individual contributions of the local alternating update strategy and the low-pass smoothing filter, we fixed ϵ = 3 for ablation studies. 
+
+Effect of local alternating updates. We evaluate DP-LoRA with LA-LoRA(-filter), which uses alternating updates without the filter. Across both language and vision tasks, LA-LoRA(-filter) 9Published as a conference paper at ICLR 2026 Table 3: Test accuracy of Swin-T and Swin-B on CIFAR-100 and Tiny-ImageNet for different ϵ.
+
+Privacy Budget Method Swin-T Model (%) Swin-B Model (%) CIFAR-100 Tiny-ImageNet CIFAR-100 Tiny-ImageNet 
+
+ϵ = 3 
+
+DP-LoRA 45 .40 ±0.40 32 .27 ±0.91 56 .52 ±0.51 30 .64 ±0.30 
+
+FFA-LoRA 52 .09 ±0.36 44 .62 ±0.55 62 .10 ±0.39 39 .84 ±0.19 
+
+RoLoRA 55 .19 ±0.42 50 .87 ±0.56 67 .96 ±0.64 44 .18 ±0.66 
+
+LA-LoRA 60 .07 ±0.41 60 .97 ±0.44 75 .29 ±0.35 61 .97 ±0.56 
+
+ϵ = 2 
+
+DP-LoRA 44 .82 ±0.57 32 .14 ±1.39 56 .31 ±0.28 30 .31 ±0.55 
+
+FFA-LoRA 52 .05 ±0.43 44 .31 ±0.44 62 .02 ±0.33 39 .54 ±0.49 
+
+RoLoRA 55 .02 ±0.35 50 .56 ±0.57 67 .93 ±0.40 43 .97 ±0.38 
+
+LA-LoRA 59 .52 ±0.53 60 .63 ±0.49 74 .93 ±0.32 61 .03 ±0.67 
+
+ϵ = 1 
+
+DP-LoRA 45 .58 ±0.47 31 .00 ±0.47 55 .98 ±0.56 30 .20 ±0.46 
+
+FFA-LoRA 50 .75 ±0.54 44 .38 ±0.38 61 .94 ±0.37 39 .33 ±0.48 
+
+RoLoRA 54 .88 ±0.66 50 .78 ±0.45 67 .88 ±0.32 43 .85 ±0.60 
+
+LA-LoRA 56 .68 ±0.60 60 .01 ±0.51 74 .56 ±0.52 60 .68 ±0.55 
+
+Table 4: Test accuracy (%) of RoBERTa-Base on SST-2, QNLI, QQP and MNLI under different ϵ.
+
+Privacy Budget Method SST-2 QNLI QQP MNLI 
+
+ϵ = 3 
+
+DP-LoRA 92 .36 ±0.75 86 .31 ±0.32 84 .56 ±0.83 80 .98 ±0.44 
+
+FFA-LoRA 92 .32 ±0.49 87 .20 ±0.37 85 .12 ±0.34 81 .71 ±0.69 
+
+RoLoRA 92 .70 ±0.52 88 .23 ±0.49 85 .35 ±0.42 82 .12 ±0.44 
+
+LA-LoRA 93 .12 ±0.67 89 .83 ±0.41 85 .83 ±0.49 82 .99 ±0.42 
+
+ϵ = 2 
+
+DP-LoRA 92 .20 ±0.64 86 .03 ±0.57 84 .26 ±0.57 80 .62 ±0.35 
+
+FFA-LoRA 92 .39 ±0.51 87 .30 ±0.60 84 .73 ±0.47 81 .94 ±0.58 
+
+RoLoRA 92 .55 ±0.40 87 .08 ±0.48 85 .02 ±0.53 82 .01 ±0.44 
+
+LA-LoRA 93 .00 ±0.70 89 .18 ±0.51 85 .64 ±0.58 82 .87 ±0.52 
+
+ϵ = 1 
+
+DP-LoRA 90 .71 ±0.55 84 .07 ±0.55 83 .48 ±0.38 79 .87 ±0.79 
+
+FFA-LoRA 91 .06 ±0.53 85 .08 ±0.53 84 .30 ±0.57 81 .14 ±0.59 
+
+RoLoRA 92 .32 ±0.41 86 .25 ±0.46 84 .49 ±0.57 81 .54 ±0.50 
+
+LA-LoRA 92 .66 ±0.47 88 .73 ±0.42 85 .34 ±0.35 82 .35 ±0.46 
+
+consistently improves performance over DP-LoRA. For example, in Table 5, accuracy on Tiny-ImageNet with Swin-B improves from 30.64% to 53.07%, indicating substantial gains in deep vision models. Similarly, in Table 5, accuracy on QNLI improves from 86.31% to 88.92%. These results demonstrate that alternating updates improve model utility under DP, achieving a better trade-off. 
+
+Effect of low-pass smoothing filter. We compare DP-LoRA vs. DP-LoRA(+filter) and LA-LoRA(-filter) vs. LA-LoRA. In both domains, the filter consistently delivers additional performance gains. For example, on Tiny-ImageNet (Swin-B, Table 5), DP-LoRA(+filter) increases the accuracy from 30.64% to 49.85% over DP-LoRA, while applying the filter to LA-LoRA(-filter) further improves the accuracy from 53.07% to 61.97%. The filter facilitates smoother updates that bias optimization toward flatter global solutions, improving both stability and generalization under DP. Appendix presents supplementary experiments, including analysis of the smoothing hyperparameter 
+
+σs D.1, computational and memory cost A.4, and other ablation studies C. Table 5: Impact of local alternating updates and low-pass smoothing filter on federated LoRA per-formance (%) across GLUE (RoBERTa-Base) and image classification (Swin-B) benchmarks. 
+
+Method GLUE tasks (RoBERTa-Base) Image Classification (Swin-B) SST-2 QNLI QQP MNLI CIFAR-100 Tiny-ImageNet 
+
+DP-LoRA 92 .36 ±0.75 86 .31 ±0.32 84 .56 ±0.83 80 .98 ±0.44 56 .52 ±0.51 30 .64 ±0.30 
+
+DP-LoRA(+filter) 92 .52 ±0.55 87 .06 ±0.66 84 .79 ±0.42 81 .43 ±0.57 69 .08 ±0.52 49 .85 ±0.55 
+
+LA-LoRA(-filter) 92 .74 ±0.67 88 .92 ±0.50 84 .98 ±0.51 82 .40 ±0.53 70 .38 ±0.48 53 .07 ±0.60 
+
+LA-LoRA 93 .12 ±0.67 89 .83 ±0.41 85 .83 ±0.49 82 .99 ±0.42 75 .29 ±0.35 61 .97 ±0.56 
+
+Effect of different local alternating update strategies. We vary the local alternating strategies between the two LoRA factors while keeping the total local steps fixed. Table 6 shows nearly 10 Published as a conference paper at ICLR 2026 identical results across strategies: the best-worst gap is always below 0.7% (typically within 0.3% ). Default 1-step B / 1-step A strategy attains the best accuracy in most cases. These results indicate that LA-LoRA is insensitive to the precise local alternating strategy. Table 6: Effect of different local alternating strategies on CIFAR-100 and Tiny-ImageNet (Swin-B) under ϵ = 3 and different Dirichlet distributions. Strategy “ k-step B / k-step A” denotes performing 
+
+k local gradient steps on B followed by k steps on A in each local round. 
+
+Strategy Dirichlet β = 0 .6 Dirichlet β = 0 .1
+
+CIFAR-100 Tiny-ImageNet CIFAR-100 Tiny-ImageNet 
+
+1-step B / 1-step A (default) 89 .62 ±0.37 80 .77 ±0.50 75 .29 ±0.35 61 .97 ±0.56 
+
+2-step B / 2-step A 89 .29 ±0.47 80 .58 ±0.39 75 .15 ±0.38 61 .36 ±0.42 
+
+5-step B / 5-step A 89 .31 ±0.42 80 .72 ±0.40 75 .47 ±0.46 61 .78 ±0.51 
+
+5-step A / 5-step B 89 .45 ±0.26 80 .70 ±0.42 75 .34 ±0.44 61 .79 ±0.58 
+
+## 7 DISCUSSION AND CONCLUSION 
+
+In this work, we propose LA-LoRA, a privacy-preserving framework for differentially private fed-erated adaptation. By alternating local updates and applying a low-pass smoothing filter, LA-LoRA addresses three key challenges in DPFL: gradient coupling, noise amplification, and sharp aggre-gation bias. Experiments on vision and language tasks show consistent improvements in accuracy, stability, and privacy efficiency. Future work will explore extending LA-LoRA to more heteroge-neous client distributions and scaling to larger and more complex foundation models. 11 Published as a conference paper at ICLR 2026 
+
+## 8 ETHICS STATEMENT 
+
+This work adheres to the ICLR Code of Ethics. In this study, no human subjects or animal experi-mentation was involved. All datasets used, including CIFAR-100, Tiny-ImageNet, SST-2, QNLI, QQP, MNLI , were sourced in compliance with relevant usage guidelines, ensuring no violation of privacy. We have taken care to avoid any biases or discriminatory outcomes in our research process. No personally identifiable information was used, and no experiments were conducted that could raise privacy or security concerns. We are committed to maintaining transparency and integrity throughout the research process. 
+
+## 9 REPRODUCIBILITY STATEMENT 
+
+We have made every effort to ensure that the results presented in this paper are reproducible. All code and datasets have been made publicly available in an anonymous repository ( https: //anonymous.4open.science/status/LA-LORA-50E5/ ) to facilitate replication and verification. The experimental setup, including training steps, model configurations, and hardware details, is described in detail in Section 6, Appendix A.2, and B.2. We believe these measures will enable other researchers to reproduce our work and further advance the field. 12 Published as a conference paper at ICLR 2026 ACKNOWLEDGMENTS 
+
+This work was supported by the National Key R&D Program of China (No.2022ZD0116312), the Postdoctoral Fellowship Program of CPSF under Grant Number GZB20230348, the Young Elite Scientists Sponsorship Program by CAST (2023QNRC001) and Tencent Rhino-Bird Focused Re-search Program. 
+
+## REFERENCES 
+
+Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ahmad, Ilge Akkaya, Florencia Leoni Ale-man, Diogo Almeida, Janko Altenschmidt, Sam Altman, Shyamal Anadkat, et al. Gpt-4 technical report. arXiv preprint arXiv:2303.08774 , 2023. Fabio Bellavia, Zhenjun Zhao, Luca Morelli, and Fabio Remondino. Image matching filtering and refinement by planes and beyond. arXiv preprint arXiv:2411.09484 , 2024. Jieming Bian, Lei Wang, Letian Zhang, and Jie Xu. Fedalt: Federated fine-tuning through adaptive local training with rest-of-world lora. arXiv preprint arXiv:2503.11880 , 2025a. Jieming Bian, Lei Wang, Letian Zhang, and Jie Xu. Lora-fair: Federated lora fine-tuning with aggre-gation and initialization refinement. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pp. 3737–3746, 2025b. Dongqi Cai, Yaozong Wu, Shangguang Wang, Felix Xiaozhu Lin, and Mengwei Xu. Efficient federated learning for modern nlp. In Proceedings of the 29th Annual International Conference on Mobile Computing and Networking , pp. 1–16, 2023. Shuangyi Chen, Yue Ju, Hardik Dalal, Zhongwen Zhu, and Ashish Khisti. Robust federated finetun-ing of foundation models via alternating minimization of lora. arXiv preprint arXiv:2409.02346 ,2024. Yae Jee Cho, Luyang Liu, Zheng Xu, Aldi Fahrezi, and Gauri Joshi. Heterogeneous lora for fed-erated fine-tuning of on-device foundation models. In Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing , pp. 12903–12913, 2024. Lu Dai, Yijie Xu, Jinhui Ye, Hao Liu, and Hui Xiong. Seper: Measure retrieval utility through the lens of semantic perplexity reduction. In International Conference on Learning Representations (ICLR) , 2025. Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, et al. An image is worth 16x16 words: Transformers for image recognition at scale. arXiv preprint arXiv:2010.11929 , 2020. Cynthia Dwork. Differential privacy. In International colloquium on automata, languages, and programming , pp. 1–12. Springer, 2006. Cynthia Dwork, Aaron Roth, et al. The algorithmic foundations of differential privacy. Foundations and trends® in theoretical computer science , 9(3–4):211–407, 2014. Johan Edstedt, Georg B¨ okman, and Zhenjun Zhao. Dedode v2: Analyzing and improving the dedode keypoint detector. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pp. 4245–4253, 2024. Mingyuan Fan, Zhanyi Hu, Fuyi Wang, and Cen Chen. Bad-PFL: Exploiting backdoor attacks against personalized federated learning. In The Thirteenth International Conference on Learning Representations , 2025. URL https://openreview.net/forum?id=79nO2DPjVX .Chen Feng and Ioannis Patras. MaskCon: Masked Contrastive Learning for Coarse-Labelled Dataset. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recogni-tion (CVPR) , 6 2023. doi: 10.1109/CVPR52729.2023.01907. 13 Published as a conference paper at ICLR 2026 Chen Feng, Georgios Tzimiropoulos, and Ioannis Patras. SSR: An Efficient and Robust Framework for Learning with Unknown Label Noise. In 33rd British Machine Vision Conference (BMVC) ,11 2022. URL https://bmvc2022.mpi-inf.mpg.de/372/ .Chen Feng, Georgios Tzimiropoulos, and Ioannis Patras. CLIPCleaner: Cleaning Noisy Labels with CLIP. In The 32nd ACM International Conference on Multimedia (ACM MM) , 10 2024a. doi: 10.1145/3664647.3680664. Chen Feng, Georgios Tzimiropoulos, and Ioannis Patras. NoiseBox: Towards More Efficient and Effective Learning with Noisy Labels. IEEE Transactions on Circuits and Systems for Video Technology , 7 2024b. ISSN 1558-2205. doi: 10.1109/TCSVT.2024.3426994. Chen Feng, Ziquan Liu, Zhuo Zhi, Ilija Bogunovic, Carsten Gerner-Beuerle, and Miguel R. D. Rodrigues. PROSAC: Provably safe certification for machine learning models under adversarial attacks. In The 39th Annual AAAI Conference on Artificial Intelligence (AAAI) [Oral] , 2 2025a. doi: 10.1609/aaai.v39i3.32300. Chen Feng, Nicu Sebe, Georgios Tzimiropoulos, Miguel R. D. Rodrigues, and Ioannis Patras. Un-veiling open-set noise: Theoretical insights into label noise. In The 33rd ACM International Conference on Multimedia (ACM MM) , 10 2025b. doi: 10.1145/3746027.3755040. Chen Feng, Minghe Shen, Ananth Balashankar, Carsten Gerner-Beuerle, and Miguel R. D. Ro-drigues. Noisy but valid: Robust statistical evaluation of LLMs with imperfect judges. In 
+
+The Fourteenth International Conference on Learning Representations (ICLR) , 4 2026a. URL 
+
+https://openreview.net/forum?id=hEhxreaLdU .Chen Feng, Zhuo Zhi, Zhao Huang, Jiawei Ge, Ling Xiao, Nicu Sebe, Georgios Tzimiropoulos, and Ioannis Patras. Deconstructing the failure of ideal noise correction: A three-pillar diagnosis. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) ,6 2026b. Sajjad Ghiasvand, Yifan Yang, Zhiyu Xue, Mahnoosh Alizadeh, Zheng Zhang, and Ramtin Pedarsani. Communication-efficient and tensorized federated fine-tuning of large language mod-els. arXiv preprint arXiv:2410.13097 , 2024. Roger Grosse and James Martens. A kronecker-factored approximate fisher matrix for convolution layers. In International Conference on Machine Learning (ICML) , pp. 573–582, 2016. Pengxin Guo, Shuang Zeng, Yanran Wang, Huijie Fan, Feifei Wang, and Liangqiong Qu. Selec-tive aggregation for low-rank adaptation in federated learning. arXiv preprint arXiv:2410.01463 ,2024. Shanshan Han, Baturalp Buyukates, Zijian Hu, Han Jin, Weizhao Jin, Lichao Sun, Xiaoyang Wang, Wenxuan Wu, Chulin Xie, Yuhang Yao, et al. Fedsecurity: A benchmark for attacks and defenses in federated learning and federated llms. In Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining , pp. 5070–5081, 2024. Sepp Hochreiter and J¨ urgen Schmidhuber. Flat minima. Neural computation , 9(1):1–42, 1997. Neil Houlsby, Andrei Giurgiu, Stanislaw Jastrzebski, Bruna Morrone, Quentin De Laroussilhe, An-drea Gesmundo, Mona Attariyan, and Sylvain Gelly. Parameter-efficient transfer learning for nlp. In International Conference on Machine Learning , pp. 2790–2799. PMLR, 2019. Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. Lora: Low-rank adaptation of large language models. arXiv preprint arXiv:2106.09685 , 2021. Jean Kaddour, Linqing Liu, Ricardo Silva, and Matt J Kusner. When do flat minima optimizers work? Advances in Neural Information Processing Systems , 35:16577–16595, 2022. Zong Ke, Yuqing Cao, Zhenrui Chen, Yuchen Yin, Shouchao He, and Yu Cheng. Early warning of cryptocurrency reversal risks via multi-source data. Finance Research Letters , pp. 107890, 2025. 14 Published as a conference paper at ICLR 2026 Jacob Devlin Ming-Wei Chang Kenton, Lee Kristina Toutanova, et al. Bert: Pre-training of deep bidirectional transformers for language understanding. In Proceedings of naacL-HLT , volume 1. Minneapolis, Minnesota, 2019. Alex Krizhevsky. Learning multiple layers of features from tiny images. Technical report, University of Toronto, 2009. Technical Report. Ya Le and Xuan Yang. Tiny imagenet visual recognition challenge. http://cs231n. stanford.edu/tiny-imagenet-200/ , 2015. Accessed: 2025-08-05. Brian Lester, Rami Al-Rfou, and Noah Constant. The power of scale for parameter-efficient prompt tuning. arXiv preprint arXiv:2104.08691 , 2021. Xiang Lisa Li and Percy Liang. Prefix-tuning: Optimizing continuous prompts for generation. arXiv preprint arXiv:2101.00190 , 2021. Haoyuan Liang, Shilei Cao, Guowen Li, Zhiyu Ye, Haohuan Fu, and Juepeng Zheng. Spfl: Sequen-tial updates with parallel aggregation for enhanced federated learning under category and domain shifts. In The Thirty-ninth Annual Conference on Neural Information Processing Systems .Haoyuan Liang, Xinyu Zhang, Shilei Cao, Guowen Li, and Juepeng Zheng. Tta-feddg: Leveraging test-time adaptation to address federated domain generalization. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 39, pp. 18658–18666, 2025. Junkang Liu, Yuanyuan Liu, Fanhua Shang, Hongying Liu, Jin Liu, and Wei Feng. Improving gen-eralization in federated learning with highly heterogeneous data via momentum-based stochastic controlled weight averaging. In Forty-second International Conference on Machine Learning ,2024a. Junkang Liu, Fanhua Shang, Yuanyuan Liu, Hongying Liu, Yuangang Li, and YunXiang Gong. Fedbcgd: Communication-efficient accelerated block coordinate gradient descent for federated learning. In Proceedings of the 32nd ACM International Conference on Multimedia , pp. 2955– 2963, 2024b. Junkang Liu, Fanhua Shang, Yuxuan Tian, Hongying Liu, and Yuanyuan Liu. Consistency of lo-cal and global flatness for federated learning. In Proceedings of the 33rd ACM International Conference on Multimedia , pp. 3875–3883, 2025a. Junkang Liu, Fanhua Shang, Junchao Zhou, Hongying Liu, Yuanyuan Liu, and Jin Liu. Fedmuon: Accelerating federated learning with matrix orthogonalization. arXiv preprint arXiv:2510.27403 ,2025b. Junkang Liu, Fanhua Shang, Kewen Zhu, Hongying Liu, Yuanyuan Liu, and Jin Liu. Fedadamw: A communication-efficient optimizer with convergence and generalization guarantees for federated large models. arXiv preprint arXiv:2510.27486 , 2025c. Junkang Liu, Yuxuan Tian, Fanhua Shang, Yuanyuan Liu, Hongying Liu, Junchao Zhou, and Daorui Ding. Dp-fedpgn: Finding global flat minima for differentially private federated learning via penalizing gradient norm. arXiv preprint arXiv:2510.27504 , 2025d. Tao Liu, Yuhang Zhang, Zhu Feng, Zhiqin Yang, Chen Xu, Dapeng Man, and Wu Yang. Beyond traditional threats: A persistent backdoor attack on federated learning. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 38, pp. 21359–21367, 2024c. Xiao-Yang Liu, Rongyi Zhu, Daochen Zha, Jiechao Gao, Shan Zhong, Matt White, and Meikang Qiu. Differentially private low-rank adaptation of large language model using federated learning. 
+
+ACM Transactions on Management Information Systems , 16(2):1–24, 2025e. Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettlemoyer, and Veselin Stoyanov. Roberta: A robustly optimized bert pretraining approach. arXiv preprint arXiv:1907.11692 , 2019. 15 Published as a conference paper at ICLR 2026 Ze Liu, Yutong Lin, Yue Cao, Han Hu, Yixuan Wei, Zheng Zhang, Stephen Lin, and Baining Guo. Swin transformer: Hierarchical vision transformer using shifted windows. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) , pp. 10012–10022, 2021. Zhiyu Liu, Zhi Han, Yandong Tang, Hai Zhang, Shaojie Tang, and Yao Wang. Efficient over-parameterized matrix sensing from noisy measurements via alternating preconditioned gradient descent. arXiv preprint arXiv:2502.00463 , 2025f. Brendan McMahan, Eider Moore, Daniel Ramage, Seth Hampson, and Blaise Aguera y Arcas. Communication-efficient learning of deep networks from decentralized data. In Artificial intelli-gence and statistics , pp. 1273–1282. PMLR, 2017. Lei Meng, Zhuang Qi, Lei Wu, Xiaoyu Du, Zhaochuan Li, Lizhen Cui, and Xiangxu Meng. Im-proving global generalization and local personalization for federated learning. IEEE Transac-tions on Neural Networks and Learning Systems , 36(1):76–87, 2025. doi: 10.1109/TNNLS.2024. 3417452. Ilya Mironov. R´ enyi differential privacy. In Proc. IEEE computer security foundations symposium (CSF) , pp. 263–275, 2017. Maxence Noble, Aur´ elien Bellet, and Aymeric Dieuleveut. Differentially private federated learning on heterogeneous data. In International conference on artificial intelligence and statistics , pp. 10110–10145. PMLR, 2022. Kaichen Ouyang, Zong Ke, Shengwei Fu, Lingjie Liu, Puning Zhao, and Dayu Hu. Learn from global correlations: Enhancing evolutionary algorithm via spectral gnn. arXiv preprint arXiv:2412.17629 , 2024. Mert Pilanci and Tolga Ergen. Neural networks are convex regularizers: Exact polynomial-time con-vex optimization formulations for two-layer networks. In International Conference on Machine Learning , pp. 7695–7705. PMLR, 2020. Jiaxing Qi, Zhongzhi Luan, Shaohan Huang, Carol Fung, Hailong Yang, and Depei Qian. Fdlora: Personalized federated learning of large language model via dual lora tuning. arXiv preprint arXiv:2406.07925 , 2024. Luchao Qi, Jiaye Wu, Jun Myeong Choi, Cary Phillips, Roni Sengupta, and Dan B. Goldman. Over++: Generative video compositing for layer interaction effects. 2025a. doi: 10.48550/arXiv. 2512.19661. URL https://arxiv.org/abs/2512.19661 .Xin Qi, Meixuan Li, Sijin Zhou, Wei Feng, and Zhuang Qi. Federated learning for science: A survey on the path to a trustworthy collaboration ecosystem. Authorea Preprints , 2025b. Xin Qi, Tao Xu, Chengrun Dang, Zhuang Qi, Lei Meng, and Han Yu. Federated learning in oncol-ogy: bridging artificial intelligence innovation and privacy protection. Information Fusion , pp. 104154, 2026. Zhuang Qi, Lei Meng, Zitan Chen, Han Hu, Hui Lin, and Xiangxu Meng. Cross-silo prototypical calibration for federated learning with non-iid data. In Proceedings of the 31st ACM international conference on multimedia , pp. 3099–3107, 2023. Chen Qiu, Xingyu Li, Chaithanya Kumar Mummadi, Madan Ravi Ganesh, Zhenzhen Li, Lu Peng, and Wan-Yi Lin. Text-driven prompt generation for vision-language models in federated learning. 
+
+arXiv preprint arXiv:2310.06123 , 2023. Shiqing Qiu, Haoyu Wang, Yuxin Zhang, Zong Ke, and Zichao Li. Convex optimization of markov decision processes based on z transform: A theoretical framework for two-space decomposition and linear programming reconstruction. Mathematics , 13(11):1765, 2025. Benjamin Recht, Maryam Fazel, and Pablo A Parrilo. Guaranteed minimum-rank solutions of linear matrix equations via nuclear norm minimization. SIAM review , 52(3):471–501, 2010. 16 Published as a conference paper at ICLR 2026 Levent Sagun, Utku Evci, V. Ugur Guney, Yann Dauphin, and L´ eon Bottou. Empirical analysis of the hessian of over-parametrized neural networks. In International Conference on Learning Representations (ICLR) , 2018. Jiyun Shin, Jinhyun Ahn, Honggu Kang, and Joonhyuk Kang. Fedsplitx: Federated split learning for computationally-constrained heterogeneous clients. arXiv preprint arXiv:2310.14579 , 2023. Youbang Sun, Zitao Li, Yaliang Li, and Bolin Ding. Improving lora in privacy-preserving federated learning. arXiv preprint arXiv:2403.12313 , 2024a. Zhonglin Sun, Chen Feng, Ioannis Patras, and Georgios Tzimiropoulos. LAFS: Landmark-based Facial Self-supervised Learning for Face Recognition. In Proceedings of the IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition (CVPR) , 6 2024b. doi: 10.1109/CVPR52733. 2024.00162. Idris O Sunmola, Zhenjun Zhao, Samuel Schmidgall, Yumeng Wang, Paul Maria Scheikl, and Axel Krieger. Surgical gaussian surfels: Highly accurate real-time surgical scene rendering. arXiv preprint arXiv:2503.04079 , 2025. Chunlin Tian, Zhan Shi, Zhijiang Guo, Li Li, and Chengzhong Xu. Hydralora: An asymmetric lora architecture for efficient fine-tuning. arXiv preprint arXiv:2404.19245 , 2024. Alex Wang, Amanpreet Singh, Julian Michael, Felix Hill, Omer Levy, and Samuel R Bowman. Glue: A multi-task benchmark and analysis platform for natural language understanding. In 
+
+Proceedings of the 2018 EMNLP Workshop BlackboxNLP: Analyzing and Interpreting Neural Networks for NLP , pp. 353–355, 2018. Jianyu Wang, Yu Wang, Shengjie Zhao, and Sifan Zhou. Point4bit: Post training 4-bit quantization for point cloud 3d detection. In The Thirty-ninth Annual Conference on Neural Information Processing Systems , 2025a. Lei Wang, Jieming Bian, Letian Zhang, and Jie Xu. Adaptive lora experts allocation and selection for federated fine-tuning. arXiv preprint arXiv:2509.15087 , 2025b. Yu-Xiang Wang, Borja Balle, and Shiva Prasad Kasiviswanathan. Subsampled r´ enyi differential privacy and analytical moments accountant. In The 22nd international conference on artificial intelligence and statistics , pp. 1226–1235. PMLR, 2019. Ziyao Wang, Zheyu Shen, Yexiao He, Guoheng Sun, Hongyi Wang, Lingjuan Lyu, and Ang Li. Flora: Federated fine-tuning large language models with heterogeneous low-rank adaptations. 
+
+arXiv preprint arXiv:2409.05976 , 2024. Shuang Wu, Heng Liang, Yong Zhang, Yanlin Chen, and Ziyu Jia. A cross-modal densely guided knowledge distillation based on modality rebalancing strategy for enhanced unimodal emotion recognition. In Proceedings of the Thirty-Fourth International Joint Conference on Artificial Intelligence, IJCAI 2025, Montreal, Canada, August 16–22, 2025 , pp. 4236–4244, 2025. Zequn Xie. Conquer: Context-aware representation with query enhancement for text-based person search. arXiv preprint arXiv:2601.18625 , 2026. Zequn Xie, Chuxin Wang, Yeqiang Wang, Sihang Cai, Shulei Wang, and Tao Jin. Chat-driven text generation and interaction for person retrieval. In Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing , pp. 5259–5270, 2025. Zequn Xie, Xin Liu, Boyun Zhang, Yuxiao Lin, Sihang Cai, and Tao Jin. Hvd: Human vision-driven video representation learning for text-video retrieval. arXiv preprint arXiv:2601.16155 , 2026a. Zequn Xie, Boyun Zhang, Yuxiao Lin, and Tao Jin. Delving deeper: Hierarchical visual perception for robust video-text retrieval. arXiv preprint arXiv:2601.12768 , 2026b. Shaocheng Yan, Pengcheng Shi, Zhenjun Zhao, Kaixin Wang, Kuang Cao, Ji Wu, and Jiayuan Li. Turboreg: Turboclique for robust and efficient point cloud registration. arXiv preprint arXiv:2507.01439 , 2025. 17 Published as a conference paper at ICLR 2026 Rui Ye, Jingyi Chai, Xiangrui Liu, Yaodong Yang, Yanfeng Wang, and Siheng Chen. Emerg-ing safety attack and defense in federated instruction tuning of large language models. In 
+
+The Thirteenth International Conference on Learning Representations , 2025. URL https: //openreview.net/forum?id=sYNWqQYJhz .Sixing Yu, J Pablo Mu˜ noz, and Ali Jannesari. Bridging the gap between foundation models and heterogeneous federated learning. arXiv preprint arXiv:2310.00247 , 2023. Elad Ben Zaken, Shauli Ravfogel, and Yoav Goldberg. Bitfit: Simple parameter-efficient fine-tuning for transformer-based masked language-models. arXiv preprint arXiv:2106.10199 , 2021. Fangzhao Zhang and Mert Pilanci. Riemannian preconditioned lora for fine-tuning foundation mod-els. arXiv preprint arXiv:2402.02347 , 2024. Jianyi Zhang, Saeed Vahidian, Martin Kuo, Chunyuan Li, Ruiyi Zhang, Tong Yu, Guoyin Wang, and Yiran Chen. Towards building the federatedgpt: Federated instruction tuning. In ICASSP 2024-2024 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP) , pp. 6915–6919. IEEE, 2024a. Xinwei Zhang, Zhiqi Bu, Mingyi Hong, and Meisam Razaviyayn. Doppler: Differentially private optimizers with low-pass filter for privacy noise reduction. Advances in neural information pro-cessing systems , 37:41826–41851, 2024b. Haodong Zhao, Wei Du, Fangqi Li, Peixuan Li, and Gongshen Liu. Fedprompt: Communication-efficient and privacy-preserving prompt tuning in federated learning. In ICASSP 2023-2023 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP) , pp. 1–5. IEEE, 2023. Sichen Zhao, Zhiming Xue, Yalun Qi, Xianling Zeng, and Zihan Yu. Non-intrusive graph-based bot detection for e-commerce using inductive graph neural networks. 2026. doi: 10.48550/arXiv. 2601.22579. URL https://arxiv.org/abs/2601.22579 .Sifan Zhou. Comptrack: Information bottleneck-guided low-rank dynamic token compression for point cloud tracking. In The Fortieth AAAI Conference on Artificial Intelligence , 2025. URL 
+
+https://openreview.net/forum?id=nXExYROmVe .Sifan Zhou, Zhi Tian, Xiangxiang Chu, Xinyu Zhang, Bo Zhang, Xiaobo Lu, Chengjian Feng, Zequn Jie, Patrick Yin Chiang, and Lin Ma. Fastpillars: A deployment-friendly pillar-based 3d detector. 
+
+arXiv preprint arXiv:2302.02367 , 2023. Sifan Zhou, Liang Li, Xinyu Zhang, Bo Zhang, Shipeng Bai, Miao Sun, Ziyu Zhao, Xiaobo Lu, and Xiangxiang Chu. LiDAR-PTQ: Post-training quantization for point cloud 3d object detection. 2024a. Sifan Zhou, Zhihang Yuan, Dawei Yang, Ziyu Zhao, Xing Hu, Yuguang Shi, Xiaobo Lu, and Qiang Wu. Information entropy guided height-aware histogram for quantization-friendly pillar feature encoder. arXiv preprint arXiv:2405.18734 , 2024b. Sifan Zhou, Jiahao Nie, Ziyu Zhao, Yichao Cao, and Xiaobo Lu. Focustrack: One-stage focus-and-suppress framework for 3d point cloud object tracking. In Proceedings of the 33rd ACM International Conference on Multimedia , pp. 7366–7375, New York, NY, USA, 2025a. Associ-ation for Computing Machinery. ISBN 9798400720352. doi: 10.1145/3746027.3754781. URL 
+
+https://doi.org/10.1145/3746027.3754781 .Sifan Zhou, Shuo Wang, Zhihang Yuan, Mingjia Shi, Yuzhang Shang, and Dawei Yang. GSQ-tuning: Group-shared exponents integer in fully quantized training for LLMs on-device fine-tuning. In Findings of the Association for Computational Linguistics: ACL 2025 , pp. 22971– 22988, Vienna, Austria, July 2025b. Association for Computational Linguistics. ISBN 979-8-89176-256-5. Sifan Zhou, Zhihang Yuan, Dawei Yang, Xing Hu, Jian Qian, and Ziyu Zhao. Pillarhist: Aquantization-aware pillar feature encoder based on height-aware histogram. In Proceedings of the Computer Vision and Pattern Recognition Conference , pp. 27336–27345, 2025c. 18 Published as a conference paper at ICLR 2026 
+
+## APPENDIX FOR SUBMISSION #5382 
+
+LIST OF APPENDIX 
+
+A: Additional Details for Image Classification A.1 Datasets and models A.2 Experimental setup A.3 Additional experimental results A.4 Computational and memory overhead A.5 Impact of different ranks on performance A.6 Centralized Experiments A.7 Non-Private Federated Experiments B: Additional Details for Language Understanding B.1 Datasets and models B.2 Experimental setup B.3 Additional experimental results B.4 Additional Experiments on Llama-2-7B B.5 Language model results under data heterogeneity β = 0 .3
+
+C: Additional Ablation Studies C.1 Ablation Results for Swin-T on CIFAR-100 and Tiny-ImageNet C.2 Ablation on Smoothing Strategies C.3 Ablation on the three challenges C.4 Effect of local steps K D: More results for Gaussian low-pass smoothing filter D.1 Smoothing parameter σs
+
+D.2 Effect of different kernel widths E: Detailed Theoretical Analysis E.1 Privacy guarantee E.2 Closed-form projected gradients E.3 Stable feature learning E.4 Convergence Analysis E.5 Comparison with FFA-LoRA and RoLoRA F: Table Of Notations G: LLM Usage 19 Published as a conference paper at ICLR 2026 
+
+## A ADDITIONAL DETAILS FOR IMAGE CLASSIFICATION 
+
+Section 6 outlines the main experimental configurations and results. For completeness, we summa-rize only the additional settings not previously described and further results. FedBCGD Liu et al. (2024b) proposes an accelerated block coordinate gradient descent framework for FL. FedSWA Liu et al. (2024a) improves generalization under highly heterogeneous data by stochastic weight aver-aging. FedAdamW Liu et al. (2025c) introduces a communication-efficient AdamW-style optimizer tailored for federated large models. FedNSAM Liu et al. (2025a) studies the consistency relationship between local and global flatness in FL. FedMuon Liu et al. (2025b) accelerates federated optimiza-tion via matrix orthogonalization. DP-FedPGN Liu et al. (2025d) develops a penalizes gradient norms to encourage globally flatter minima in DP-FL Xie et al. (2025; 2026a); Xie (2026); Xie et al. (2026b); Ouyang et al. (2024); Ke et al. (2025); Qiu et al. (2025); Zhou et al. (2023; 2025c; 2024b;a); Zhou. (2025); Zhou et al. (2025a;b); Wang et al. (2025a); Wu et al. (2025); Qi et al. (2025a); Zhao et al. (2026); Dai et al. (2025); Liang et al. (2025); Liang et al.; Bian et al. (2025b;a); Wang et al. (2025b); Bellavia et al. (2024); Sunmola et al. (2025); Yan et al. (2025); Edstedt et al. (2024); Meng et al. (2025); Qi et al. (2026; 2023; 2025b).Feng et al. (2025b); Sun et al. (2024b); Feng et al. (2026b; 2025a; 2026a) A.1 DATASETS AND MODELS 
+
+• CIFAR-100 Krizhevsky (2009) comprises 100 categories organized into 20 broader groups, containing 50,000 training images and 10,000 test images. Each image is a 32×32 pixel RGB color image. Every category includes 600 images, with 500 for training and 100 for testing. Tiny-ImageNet Le & Yang (2015) is a subset of the ImageNet dataset containing 200 object categories, totaling around 100,000 images. Each image is a 64×64 pixel RGB color image. Every category consists of 500 training images, 50 validation images, and 50 test images. • Swin-T Liu et al. (2021) is the smallest variant of the Swin Transformer, using a 4×4 patch embedding with a 96-dimensional embedding size. It has stage depths of [2, 2, 6, 2], about 28M parameters. Swin-B Liu et al. (2021) is a larger variant with a 4×4 patch embedding and a 128-dimensional embedding size. It has stage depths of [2, 2, 18, 2], about 88M parameters. A.2 EXPERIMENTAL SETUP 
+
+In image classification fine-tuning tasks, we apply LoRA with rank r = α = 16 , keeping the classi-fication head trainable so that it can adapt to the target dataset’s label space and feature distribution, and thus remain compatible with the LoRA-updated representations during local training. We fix δ = 1 e − 5 and use an RDP accountant. For each target privacy budget ϵ ∈ { 3, 2, 1},we grid-search the R´ enyi order λ under the subsampled Gaussian mechanism with per-sample ℓ2
+
+clipping, and choose the noise scale σ that satisfies the (ϵ, δ ) constraint after converting from RDP. The resulting σ are: • CIFAR-100 : σ ∈ { 0.195 , 0.29 , 0.56 },• Tiny-ImageNet : σ ∈ { 0.098 , 0.146 , 0.283 }.These correspond to privacy budgets of ϵ ∈ { 3, 2, 1} respectively. Gradient clipping is performed on a per-layer basis using a median clipping strategy, where each layer’s clipping threshold C is set to the median of its gradient norm distribution, enabling balanced sensitivity control and stable training under differential privacy constraints. A.3 ADDITIONAL EXPERIMENTAL RESULTS 
+
+Table 3 in Section 6 presents the final performance comparison between our LA-LoRA and three SOTA baselines across different ϵ values. In this section, we present the complete convergence curves corresponding to these experiments. Figure 7 presents the convergence curves for the Swin-T and Swin-B models under ϵ=2 . In both cases, LA-LoRA consistently outperforms the three SOTA 20 Published as a conference paper at ICLR 2026 baselines. The improvement is particularly pronounced on Tiny-ImageNet with Swin-B, where LA-LoRA surpasses RoLoRA’s 43 .97% by 17 .06% . Figure 8 illustrates the convergence of test accuracy for CIFAR-100 and Tiny-ImageNet using Swin-T and Swin-B under ϵ = 3 . LA-LoRA consistently achieves higher accuracy and faster convergence than the three baselines.    
+
+> (a) CIFAR-100, Swin-T (b) ImageNet, Swin-T (c) CIFAR-100, Swin-B (d) ImageNet, Swin-B
+
+Figure 7: Test accuracy of Swin-T and Swin-B on CIFAR-100 and Tiny-ImageNet with ϵ = 2 .   
+
+> (a) CIFAR-100, Swin-T (b) ImageNet, Swin-T (c) CIFAR-100, Swin-B (d) ImageNet, Swin-B
+
+Figure 8: Test accuracy of Swin-T and Swin-B on CIFAR-100 and Tiny-ImageNet with ϵ = 3 .A.4 COMPUTATIONAL AND MEMORY OVERHEAD 
+
+Table 7 reports the per-round computation cost, memory cost and test accuracy of Swin-B at ϵ = 1 .Compared with standard DP-LoRA, LA-LoRA reduces the per-round time from 30 .35 s to 17 .44 son CIFAR-100 and from 28 .02 s to 17 .23 s on Tiny-ImageNet, and halves the memory cost from 
+
+3524 MB to 1762 MB thanks to the low-rank parameterization. Among LoRA-based DP baselines, LA-LoRA has a per-round time that is comparable to the fastest method: it differs by at most about 1 s, while consistently achieving the best accuracy. Overall, LA-LoRA offers substantial accuracy gains with negligible additional computational overhead compared to other low-rank DP methods. Table 7: Per-round computation cost, memory cost and performance comparison of Swin-B at ϵ = 1 .                                            
+
+> Method Time Cost (s) Memory Cost (MB) Test Accuracy (%)
+> CIFAR-100 Tiny-ImageNet CIFAR-100 Tiny-ImageNet CIFAR-100 Tiny-ImageNet DP-LoRA 30 .35 28 .02 3524 3524 55 .98 30 .20
+> DP-LoRA(+filter) 30 .72 28 .51 3524 3524 67 .95 48 .09
+> FFA-LoRA 17 .85 16 .54 1762 1762 61 .94 39 .33
+> RoLoRA 16 .64 16 .32 1762 1762 67 .88 43 .85
+> LA-LoRA(-filter) 17 .30 17 .16 1762 1762 69 .87 52 .72
+> LA-LoRA 17 .44 17 .23 1762 1762 74 .56 60 .68
+
+A.5 IMPACT OF DIFFERENT RANKS ON PERFORMANCE 
+
+Table 8 summarizes the test accuracy of four methods on the Swin-B model for CIFAR-100 and Tiny-ImageNet under a privacy budget of ϵ=1 with varying rank values ( r=8 , 16 , 32 ). LA-LoRA consistently achieves the highest accuracy in all configurations, attaining 75 .34% on CIFAR-100 and 62 .99% on Tiny-ImageNet when r=32 . In contrast, DP-LoRA exhibits the lowest accuracy and the greatest sensitivity to rank variation, indicating that its performance is more constrained by representational capacity under strict privacy constraints. FFA-LoRA and RoLoRA demonstrate 21 Published as a conference paper at ICLR 2026 Table 8: Impact of rank of Swin-B on CIFAR-100 and Tiny-ImageNet at ϵ = 1 , averaged over 5 runs. 
+
+Rank Method CIFAR-100 Tiny-ImageNet 
+
+r = 8 
+
+DP-LoRA 54 .30 ±0.52 29 .57 ±0.53 
+
+FFA-LoRA 59 .78 ±0.44 36 .58 ±0.35 
+
+RoLoRA 65 .74 ±0.61 40 .89 ±0.56 
+
+LA-LoRA 72 .88 ±0.57 59 .03 ±0.45 
+
+r = 16 
+
+DP-LoRA 55 .98 ±0.56 30 .20 ±0.46 
+
+FFA-LoRA 61 .94 ±0.37 39 .33 ±0.48 
+
+RoLoRA 67 .88 ±0.32 43 .85 ±0.60 
+
+LA-LoRA 74 .56 ±0.52 60 .68 ±0.55 
+
+r = 32 
+
+DP-LoRA 56 .33 ±0.28 31 .57 ±0.55 
+
+FFA-LoRA 62 .64 ±0.33 44 .45 ±0.37 
+
+RoLoRA 67 .97 ±0.40 44 .36 ±0.39 
+
+LA-LoRA 75 .34 ±0.51 62 .99 ±0.42 
+
+intermediate performance, benefiting steadily from increased rank. Furthermore, Tiny-ImageNet is complex, resulting in slower convergence within the limited number of communication rounds. Consequently, its absolute accuracy is substantially lower than that of CIFAR-100, while the relative ranking of the methods remains unchanged. These observations indicate that increasing the rank can enhance representational capacity and miti-gate the adverse effects of differential privacy noise, with LA-LoRA exploiting this advantage most effectively. However, a larger rank also introduces potential drawbacks, including increased commu-nication cost, heavier local computation, and a higher risk of overfitting under limited communica-tion rounds. Balancing these trade-offs, we adopt r = 16 as the baseline setting in our experiments to achieve a favorable compromise between performance and efficiency. A.6 CENTRALIZED EXPERIMENTS 
+
+To verify how the challenges discussed in Section 3 manifest in the centralized setting, we conduct centralized DP experiments using the same model architecture, optimizer, clipping norm, and noise multiplier as in our federated setup. As summarized in Table 9, LA-LoRA(-filter) achieves higher test accuracy and higher “Grad. Cos. (late)” than DP-LoRA in the centralized setting. This confirms that the DP–LoRA issues we iden-tify are not specific to federated training. Moreover, the gain of LA-LoRA(-filter) over DP-LoRA increases from 1.18% in centralized DP training to 11 .22% in federated DP training, and the gradi-ent cosine gap widens from 0.032 to 0.108 , indicating that federated optimization exacerbates the gradient coupling inherent in centralized settings. Table 9: Centralized and federated DP training for Swin-T on CIFAR-100 with ϵ = 3 . “Grad. Cos. (late)” denotes the average cosine similarity between ∇AL and ∇B L over the last 10% of training steps. Federated DP-LoRA has lower test accuracy and gradient cosine than centralized DP-LoRA, while LA-LoRA(-filter) improves both settings. 
+
+Setting Method Test Acc. (%) ∆Acc Grad. Cos. (late) ∆Cos Centralized DP-LoRA 76 .11 ±0.38 - 0.681 -LA-LoRA(-filter) 77 .29 ±0.43 ↑ 1.18 0.713 ↑ 0.032 Federated DP-LoRA 45 .40 ±0.40 - 0.337 -LA-LoRA(-filter) 56 .62 ±0.54 ↑ 11.22 0.445 ↑ 0.108 
+
+A.7 NON -P RIVATE FEDERATED EXPERIMENTS 
+
+To assess whether the observed gradient behavior persists in the absence of DP, we run federated experiments without DP. Table 10 shows that, even without gradient clipping and σ = 0 , LA-LoRA(-22 Published as a conference paper at ICLR 2026 filter) achieves higher test accuracy and higher “Grad. Cos. (late)” than Fed-LoRA, indicating that gradient alignment is beneficial even in the non-private setting. Table 10: Non-private federated training for Swin-T on CIFAR-100. “Grad. Cos. (late)” denotes the average cosine similarity between ∇AL and ∇B L over the last 10% of training steps.               
+
+> Method Test Acc. (%) ∆Acc Grad. Cos. (late) ∆Cos Non-private Fed-LoRA 90 .56 ±0.22 -0.694 -LA-LoRA(-filter) 91 .25 ±0.15 ↑0.69 0.783 ↑0.089
+
+Table 11 shows the performance comparison on Swin-B under a non-private federated architecture. DP-LoRA is the same as Fed-LoRA. On the CIFAR-100, LA-LoRA achieves a test accuracy of 
+
+84 .21% , about 1% higher than DP-LoRA ( 83 .21% ) and RoLoRA ( 83 .25% ). Table 11: Non-private federated training for Swin-B on CIFAR-100 and Tiny-ImageNet.           
+
+> Method CIFAR-100 Tiny-ImageNet
+> Non-private DP-LoRA 83 .21 81 .37
+> FFA-LoRA 81 .65 80 .76
+> RoLoRA 83 .25 81 .03
+> LA-LoRA 84 .21 82 .58
+
+## B ADDITIONAL DETAILS FOR LANGUAGE UNDERSTANDING 
+
+B.1 DATASETS AND MODELS 
+
+• We evaluate our approach on four representative tasks from the GLUE benchmark Wang et al. (2018): SST-2, QNLI, QQP, and MNLI. SST-2 is a binary sentiment classifica-tion dataset derived from the Stanford Sentiment Treebank, containing about 67K train-ing sentences. QNLI is a binary natural language inference dataset converted from the Stanford Question Answering Dataset (SQuAD), with approximately 105K training sen-tence–question pairs. QQP is a binary paraphrase identification dataset from Quora, com-prising around 364K training question pairs. MNLI is a three-way natural language infer-ence dataset with multi-genre coverage, containing roughly 393K training sentence pairs. • RoBERTa-Base Liu et al. (2019) is a transformer-based language model optimized for ro-bust pretraining. It adopts the BERT architecture with 12 transformer encoder layers, 12 self-attention heads per layer, and a hidden size of 768, totaling approximately 125M pa-rameters. Compared to the original BERT, RoBERTa removes the next-sentence prediction objective, uses larger batch sizes, trains on more data, and applies dynamic masking, re-sulting in improved performance across a variety of NLP benchmarks. B.2 EXPERIMENTAL SETUP 
+
+For language understanding tasks, we freeze the classification head to preserve the well-trained label mapping of the language models, reduce the susceptibility of its relatively small parameter space to DP noise, and ensure stable and efficient adaptation via LoRA updates. We apply LoRA with r = α = 8 to match the language models, using a maximum sequence length of lseq = 128 .For privacy parameters, we set δ = 1 e − 5 for SST-2 and QNLI, and δ = 1 e − 6 for QQP and MNLI to account for their larger dataset sizes. The noise multipliers corresponding to privacy budgets 
+
+ϵ ∈ { 3, 2, 1} are: • SST-2 : σ ∈ { 0.36 , 0.53 , 1.0},• QNLI : σ ∈ { 0.23 , 0.34 , 0.67 },• QQP : σ ∈ { 0.073 , 0.11 , 0.21 },• MNLI : σ ∈ { 0.067 , 0.10 , 0.195 }.23 Published as a conference paper at ICLR 2026 Gradient clipping follows the same strategy as in the image classification setup. B.3 ADDITIONAL EXPERIMENTAL RESULTS            
+
+> (a) SST2, ϵ= 1 (b) QNLI, ϵ= 1 (c) QQP, ϵ= 1 (d) MNLI, ϵ= 1
+
+Figure 9: Test accuracy of RoBERTa-Base on SST-2, QNLI, QQP, and MNLI with ϵ = 1 .           
+
+> (a) SST2, ϵ= 2 (b) QNLI, ϵ= 2 (c) QQP, ϵ= 2 (d) MNLI, ϵ= 2
+
+Figure 10: Test accuracy of RoBERTa-Base on SST-2, QNLI, QQP, and MNLI with ϵ = 2 .           
+
+> (a) SST2, ϵ= 3 (b) QNLI, ϵ= 3 (c) QQP, ϵ= 3 (d) MNLI, ϵ= 3
+
+Figure 11: Test accuracy of RoBERTa-Base on SST-2, QNLI, QQP, and MNLI with ϵ = 3 .Figure 9, Figure 10, and Figure 11 present the convergence curves of LA-LoRA and three SOTA baselines (DP-LoRA, FFA-LoRA, RoLoRA) on SST-2, QNLI, QQP, and MNLI using RoBERTa-Base under different privacy budgets ( ϵ ∈ { 1, 2, 3}). Table 4 summarizes the corresponding final test accuracies. Across all settings, LA-LoRA consistently achieves the highest accuracy while maintaining fast convergence. When ϵ = 1 (Figure 9), where the privacy is the strongest, the performance gap between LA-LoRA and the baselines is the most pronounced. For instance, on QNLI, LA-LoRA reaches 88 .73% 
+
+compared with 86 .25% for RoLoRA and 85 .08% for FFA-LoRA, showing improvements of 2.48% 
+
+and 3.65% , respectively. Similar gains are observed for QQP ( 1.15% over RoLoRA, 1.34% over FFA-LoRA) and MNLI ( 0.84% over RoLoRA, 1.34% over FFA-LoRA). At ϵ = 2 (Figure 10), the accuracy gap narrows, but LA-LoRA still leads in all datasets. For example, on QNLI, LA-LoRA obtains 89 .18% , exceeding RoLoRA ( 87 .08% ) and FFA-LoRA ( 87 .30% ) by roughly 2.10% and 1.88% .At ϵ = 3 (Figure 11), where privacy constraints are weakest, all methods perform more closely, yet LA-LoRA maintains the highest accuracy across all datasets. 24 Published as a conference paper at ICLR 2026 B.4 ADDITIONAL EXPERIMENTS ON LLAMA -2-7B We evaluate our method on the Llama-2-7B model on a subset of the GLUE benchmark (MNLI, QNLI, QQP, SST-2). We follow exactly the same fine-tuning hyperparameters and training pipeline as in our main experiments, changing only the underlying backbone model. Table 12 shows that, compared to baseline DP-LoRA, FFA-LoRA, RoLoRA, and LA-LoRA yield consistent gains in the four GLUE tasks. Among them, LA-LoRA achieves the best average per-formance, improving the DP-LoRA baseline by 1.31% . Moreover, LA-LoRA further outperforms the strongest baseline variant, RoLoRA, by 0.7% . The improvements are noticeable on QQP and MNLI, indicating that our approach may also transfer to a larger, more recent LLM backbone. Table 12: Test accuracy of Llama-2-7B on SST-2, QNLI, QQP and MNLI with ϵ = 1 .                          
+
+> Model Method SST-2 QNLI QQP MNLI Avg Llama-2-7B DP-LoRA 91 .56 88 .22 85 .56 86 .86 88 .05
+> FFA-LoRA 92 .53 89 .23 85 .56 86 .98 88 .58
+> RoLoRA 92 .12 89 .34 85 .98 87 .21 88 .66
+> LA-LoRA 93 .36 89 .78 86 .75 87 .56 89 .36
+
+B.5 LANGUAGE MODEL RESULTS UNDER DATA HETEROGENEITY β = 0 .3
+
+We report additional results of language tasks under Dirichlet β = 0 .3. Table 13 summarizes the performance of all baselines and LA-LoRA variants on GLUE tasks. Table 13: Test accuracy(%) of RoBERTa-Base on SST-2, QNLI, QQP and MNLI, Dirichlet β = 0 .3.                                               
+
+> Privacy Method SST-2 QNLI QQP MNLI Avg.
+> Non-private DP-LoRA 92.07 86.25 84.02 81.22 85.89 FFA-LoRA 92.56 87.53 85.36 81.54 86.75 RoLoRA 93.65 88.65 85.52 82.22 87.51
+> LA-LoRA 93.94 89.96 86.41 83.32 88.41
+> ϵ= 1
+> DP-LoRA 90.13 83.79 83.28 79.80 84.25 FFA-LoRA 90.62 84.63 84.10 80.98 85.08 RoLoRA 91.74 85.86 84.21 81.35 85.78
+> LA-LoRA 92.11 87.13 85.04 82.27 86.64
+
+When ϵ = 1 , LA-LoRA achieves the best average score on GLUE, improving over DP-LoRA by 
+
+2.39% and over the best alternating baseline RoLoRA by 0.86% . In the non-private setting, LA-LoRA improves average accuracy by 2.52% over DP-LoRA and by 0.90% over the best alternating baseline, showing that LA-LoRA is beneficial even without DP noise. 
+
+## C ADDITIONAL ABLATION STUDIES 
+
+C.1 ABLATION RESULTS FOR SWIN -T ON CIFAR-100 AND TINY -I MAGE NET 
+
+Table 14 reports the ablation results for Swin-T on CIFAR-100 and Tiny-ImageNet, examining the individual contributions of the local alternating update strategy and the low-pass smoothing filter. Consistent with the findings in the main text for Swin-B (Table 5), applying local alternating updates (DP-LoRA → LA-LoRA(-filter)) substantially improves accuracy over the baseline DP-LoRA, with gains of 11.22% on CIFAR-100 and 19.91% on Tiny-ImageNet. Furthermore, incorporating the low-pass smoothing filter (LA-LoRA(-filter) → LA-LoRA) delivers additional performance boosts, reaching 60.07% and 60.97% on CIFAR-100 and Tiny-ImageNet, respectively. These results con-firm that both components contribute positively and complementarily to performance, with the com-bination yielding the highest accuracy across datasets. 25 Published as a conference paper at ICLR 2026 Table 14: Effect of local alternating updates and low-pass smoothing filter for Swin-T. 
+
+Method CIFAR-100 Tiny-ImageNet 
+
+DP-LoRA 45 .40 ±0.40 32 .27 ±0.91 
+
+DP-LoRA(+filter) 55 .75 ±0.63 50 .69 ±0.67 
+
+LA-LoRA(-filter) 56 .62 ±0.54 52 .18 ±0.37 
+
+LA-LoRA 60 .07 ±0.41 60 .97 ±0.44 
+
+C.2 ABLATION ON SMOOTHING STRATEGIES 
+
+Recent work has proposed Doppler (Zhang et al., 2024b) as a generic low-pass filtering module for differentially private optimizers, post-processing privatized gradients in standard (non-federated) DP training to improve their signal-to-noise ratio. To place our simple Gaussian filter in context, we instantiate Doppler in our DPFL setting with LoRA and treat it as a baseline. Specifically, for both DP-LoRA and LA-LoRA we compare three variants under exactly the same DPFL hyperparameters: no smoothing, Doppler, and our Gaussian filter, all applied on top of the same privatized local LoRA updates. All other optimizer, model, and privacy parameters are kept fixed. For Doppler, we evaluate every configuration reported in Table 2 of Zhang et al. (2024b) and find bτ = {1, 1}/11 and aτ = −9/11 to perform best in our setting. Table 16 reports the results. On GLUE with RoBERTa-Base, both low-pass filters bring small but consistent gains over DP-LoRA: LA-LoRA improves QQP and MNLI from 84 .56% /80 .98% 
+
+to 85 .83% /82 .99% (+ 1.27% / + 2.01% ), slightly outperforming Doppler 85 .45% /82 .13% . On the more challenging vision benchmarks, the effect is substantially larger. For Swin-B, our Gaussian low-pass filter raises DP-LoRA accuracy from 56 .52% to 69 .08% on CIFAR-100 (+ 12 .56% ) and from 30 .64% to 49 .85% on Tiny-ImageNet (+ 19 .21% ), whereas Doppler reaches 66 .12% (+ 9.60% )and 48 .53% (+ 17 .89% ), respectively. Combining the filter with local alternating updates, LA-LoRA further improves CIFAR-100 and Tiny-ImageNet to 75 .29% and 61 .97% , outperforming the corre-sponding LA-LoRA(+Doppler) variant by 2.41% and 4.61% .Table 15: Impact of different low-pass filters on federated LoRA performance (%) across GLUE and image classification benchmarks, ϵ = 3 .
+
+Method GLUE tasks (RoBERTa-Base) Image Classification (Swin-B) QQP MNLI CIFAR-100 Tiny-ImageNet 
+
+DP-LoRA 84 .56 ±0.83 80 .98 ±0.44 56 .52 ±0.51 30 .64 ±0.30 
+
+DP-LoRA(+filter) 84 .79 ±0.42 81 .43 ±0.57 69 .08 ±0.52 49 .85 ±0.55 
+
+DP-LoRA(+Doppler) 84 .82 ±0.49 81 .04 ±0.57 66 .12 ±0.71 48 .53 ±0.57 
+
+LA-LoRA(-filter) 84 .98 ±0.51 82 .40 ±0.53 70 .38 ±0.48 53 .07 ±0.60 
+
+LA-LoRA 85 .83 ±0.49 82 .99 ±0.42 75 .29 ±0.35 61 .97 ±0.56 
+
+LA-LoRA(+Doppler) 85 .45 ±0.50 82 .13 ±0.58 72 .88 ±0.56 57 .36 ±0.66 
+
+Overall, our ablations indicate that both Doppler and our Gaussian filter improve DPFL with LoRA by smoothing privatized updates, but in different ways. Doppler uses a recursive filter that depends on past outputs and tuned coefficients, whereas our Gaussian filter is a short window weighted average with fixed weights. In our setting, the privatized low rank updates exhibit substantial high frequency noise across local steps and clients. This simple Gaussian kernel helps suppress these high frequency fluctuations and, on our benchmarks, yields larger gains than Doppler, especially on the more challenging vision tasks. C.3 ABLATION ON THE THREE CHALLENGES 
+
+In this subsection, we empirically decompose how the two components of LA-LoRA ( locally alter-nating updates and the low-pass filter ) relate to the three challenges identified in Sec. 3: gradient coupling, noise amplification, and loss sharpness. We report the Maximum Hessian eigenvalue 
+
+λmax (H) restricted to LoRA parameters. 26 Published as a conference paper at ICLR 2026 Table 16: Ablation of LA-LoRA components and the three challenges (noise amplification, gradient coupling, and loss sharpness) on GLUE ( β = 0 .3) and image classification ( β = 0 .1), ϵ = 1 . We report test accuracy (%) and the maximum Hessian eigenvalue λmax (H) on LoRA parameters.                      
+
+> Method GLUE tasks (RoBERTa-Base) Image Classification (Swin-B) QQP λmax (H)CIFAR-100 λmax (H)
+> DP-LoRA 84 .02 43 .74 55 .98 101 .62
+> DP-LoRA(+filter) 85 .63 41 .36 (↓2.38) 67 .95 80 .33 (↓21 .29)
+> LA-LoRA(-filter) 85 .95 40 .82 (↓2.92) 69 .87 64 .77 (↓36 .85)
+> LA-LoRA 86 .41 40 .22 (↓3.52) 74 .56 55 .76 (↓45 .86)
+
+Comparing DP-LoRA with DP-LoRA(+filter) isolates the effect of the low-pass filter. The accuracy gains ( 55 .98% to 67 .95% on CIFAR-100) and the drop in ( λmax (H) from 101 .62 to 80 .33 ) show that suppressing noise amplification already improves utility and smooths the loss landscape. Comparing DP-LoRA with LA-LoRA(-filter) instead isolates the effect of locally alternating B and 
+
+A at the same noise level. The larger improvement in both accuracy ( 55 .98% to 69 .87% , λmax (H)
+
+from 101 .62 to 64 .77 ), indicating that mitigating gradient coupling is particularly important for deep vision backbones and contributes strongly to reducing loss sharpness. LA-LoRA combines both components. Relative to all ablated variants, it achieves the highest accu-racy on both QQP and CIFAR-100 and the smallest Maximum Hessian eigenvalue (e.g., λmax (H)
+
+from 101 .62 to 55 .76 ), showing that jointly addressing noise amplification and gradient coupling drives the model towards significantly flatter minima. C.4 EFFECT OF LOCAL STEPS KWe study how the local step number K affects LA-LoRA under a fixed clipping norm, noise multi-plier, and number of communication rounds. In this setting, increasing K makes each client perform more noisy local updates, so by standard DP composition the overall privacy loss ϵ grows with K.As shown in Table 17, larger K generally leads to higher test accuracy on both CIFAR-100 and Tiny-ImageNet. At the same time, larger K also incurs higher client computation and a larger pri-vacy budget. To balance model quality, privacy, and training cost, we therefore set K = 20 as the default choice in all main experiments. Table 17: LA-LoRA test accuracy (%) with different local steps K (Swin-B).                  
+
+> Kσ10 20 30 50 CIFAR-100(%) σ= 0 .56 72 .13 74 .56 75 .21 75 .26
+> Tiny-ImageNet(%) σ= 0 .283 58 .54 60 .68 61 .24 61 .32
+
+## D MORE RESULTS FOR GAUSSIAN LOW -PASS SMOOTHING FILTER 
+
+D.1 SMOOTHING PARAMETER σs
+
+Table 18 presents the performance of federated LoRA under different smoothing parameters σs on GLUE (RoBERTa-Base) language understanding tasks and Swin-B image classification benchmarks (ϵ = 1 ). For language tasks, relatively small values of σs (e.g., σs=0 .001 ) yield consistently strong and stable performance across datasets, suggesting that mild smoothing effectively suppresses local update noise while preserving task-relevant information. In contrast, for image classification tasks, moderately larger values (e.g., σs=0 .01 ) tend to produce more robust results, indicating that stronger smoothing can better mitigate the impact of data heterogeneity and noisy updates in vision settings. The results further indicate that the optimal range of σs is task-dependent. Values between 0.001 and 
+
+0.005 are generally favorable for language tasks, whereas values between 0.01 and 0.05 are more suitable for vision tasks, offering a better balance between stability and accuracy in each domain. 27 Published as a conference paper at ICLR 2026 Table 18: Impact of the smoothing parameter σs on federated LoRA performance (%) across GLUE (RoBERTa-Base) language tasks and image classification (Swin-B) benchmarks ( ϵ = 1 ). 
+
+Smoothing parameter σs
+
+GLUE tasks (RoBERTa-Base) Image Classification (Swin-B) SST-2 QNLI QQP MNLI CIFAR-100 Tiny-ImageNet 
+
+σs = 0 .000 92 .51 ±0.45 87 .95 ±0.56 84 .72 ±0.49 81 .83 ±0.55 70 .34 ±0.32 54 .05 ±0.52 
+
+σs = 0 .001 92 .66 ±0.47 88 .73 ±0.42 85 .34 ±0.35 82 .35 ±0.46 71 .80 ±0.26 56 .14 ±0.45 
+
+σs = 0 .005 92 .60 ±0.44 88 .75 ±0.53 85 .26 ±0.42 82 .42 ±0.55 72 .67 ±0.49 58 .75 ±0.38 
+
+σs = 0 .010 92 .62 ±0.47 87 .97 ±0.42 85 .03 ±0.48 82 .03 ±0.32 74 .56 ±0.52 60 .68 ±0.55 
+
+σs = 0 .050 92 .50 ±0.49 88 .02 ±0.54 84 .96 ±0.36 82 .03 ±0.57 74 .33 ±0.40 61 .27 ±0.56 
+
+D.2 EFFECT OF DIFFERENT KERNEL WIDTHS 
+
+As described in Section 4.2, LA-LoRA employs a simple 1D low-pass filter to smooth the LoRA gradients before aggregation. In the main experiments, we use a 5-tap binomial Gaussian kernel as the default choice. To assess the robustness of LA-LoRA, we conduct a sensitivity study on different kernel widths. We consider three 1D binomial Gaussian kernels with different sizes: 
+
+G(3)  
+
+> s
+
+= 14 [1 , 2, 1] , G(5)  
+
+> s
+
+= 116 [1 , 4, 6, 4, 1] , G(7)  
+
+> s
+
+= 164 [1 , 6, 15 , 20 , 15 , 6, 1] .
+
+These correspond to 3-, 5-, and 7-tap binomial filters, respectively, obtained from the binomial coefficients of (1 + 1) 2, (1 + 1) 4, and (1 + 1) 6 and normalized to sum to 1. Intuitively, larger kernels apply stronger smoothing, whereas smaller kernels apply milder smoothing. Table 19: Sensitivity of LA-LoRA to the choice of 1D binomial kernel size. Results are reported for Swin-B on CIFAR-100 and Tiny-ImageNet at ϵ = 1 .
+
+Kernel Size Coefficients CIFAR-100 Tiny-ImageNet 
+
+G(3)  
+
+> s
+
+3 14 [1 , 2, 1] 73 .59 ±0.60 59 .92 ±0.51 
+
+G(5)  
+
+> s
+
+5 116 [1 , 4, 6, 4, 1] 74 .56 ±0.52 60 .68 ±0.55 
+
+G(7)  
+
+> S
+
+7 164 [1 , 6, 15 , 20 , 15 , 6, 1] 73 .88 ±0.46 60 .74 ±0.63 
+
+Table 19 summarizes the results for Swin-B on CIFAR-100 and Tiny-ImageNet at ϵ = 1 . The performance of LA-LoRA remains stable across these configurations: the test accuracy varies within at most 0.97% . All kernel choices provide a large gain over the DP-LoRA baseline (Table 3). Among the three variants, the 5-tap kernel G(5)  
+
+> s
+
+achieves the best overall trade-off between accuracy and efficiency, and thus is used as the default in all main experiments. 
+
+## E DETAILED THEORETICAL ANALYSIS 
+
+E.1 PRIVACY GUARANTEE 
+
+We report standard (ϵ, δ )-DP guarantees using the R´ enyi DP (RDP) accountant. Below we present the RDP definition, composition, and the conversion from RDP to (ϵ, δ )-DP. Further implementation details are available in our code and Noble et al. (2022). 
+
+Definition 2 (R´ enyi DP) . For any λ ∈ (1 , ∞) and privacy parameter ρ > 0, a randomized mech-anism M : X n → Y is said to be (λ, ρ )-RDP, if for any two neighboring datasets D and D′,
+
+Dλ [M(D)∥M (D′)] := 1
+
+λ−1 log EW ∼M (D′)
+
+" pM(D)(W )
+
+pM(D′)(W )
+
+λ#
+
+≤ ρ. (17) 
+
+Composition (additivity) in RDP. RDP composes additively: if mechanisms M1, . . . , MS are applied on the same dataset (possibly adaptively), then for any fixed order λ > 1,
+
+ρtotal (λ) = 
+
+> S
+
+X
+
+> s=1
+
+ρs(λ). (18) 28 Published as a conference paper at ICLR 2026 
+
+Conversion from RDP to (ϵ, δ )-DP. If a mechanism is (λ, ρ (λ)) -RDP for all λ > 1, then for any 
+
+δ ∈ (0 , 1) it satisfies 
+
+(ϵ, δ )-DP with ϵ(δ) = min 
+
+> λ> 1
+
+
+
+ρ(λ) + log(1 /δ )
+
+λ − 1
+
+
+
+. (19) 
+
+Post-processing. If M is (ϵ, δ )-DP (or (λ, ρ )-RDP) and f is any (possibly randomized) mapping independent of the private data, then f◦M enjoys the same privacy parameters (Dwork et al., 2014). In LA-LoRA, the Gaussian low-pass filter is such an f applied to the noisy updates, which justifies the post-processing argument following Theorem 1. E.2 CLOSED -FORM PROJECTED GRADIENTS 
+
+We present a projection-based view to explain why the proposed local alternating update improves optimization stability compared to standard LoRA. As discussed in Section 3, simultaneous updates of A and B suffer from gradient coupling (Eq. 3), amplified noise (Eq. 4), and sharper aggregated solutions. In contrast, LA-LoRA alternately updates 
+
+A and B (Eq. 5), effectively decomposing the optimization into two sequential low-rank projections. Let Ak ∈ Rr×n and Bk ∈ Rm×r denote the low-rank factors at step k, and s = α/r the LoRA scaling factor. The update to B is based on solving a least-squares problem that projects the full gradient onto the column space of Ak:
+
+min  
+
+> ˜∇BkL
+
+∥s( ˜∇Bk L)Ak − ∇ Wk L∥ 2 
+
+> F
+
+. (20) Here, || · || 2 
+
+> F
+
+refers to the squared Frobenius norm. ˜∇AL and ˜∇B L are corresponding approximated gradients. Once the optimal direction is obtained, the update then proceeds as: 
+
+Bk+1 ← Bk −η ˜∇Bk L,Wk+ 12 ← Wk −η( ˜∇Bk L)Ak, (21) To maintain consistency with the simultaneous update strategy, we apply the model update to an intermediate state (k + 12 ). In our implementation, we treat each individual update to A or B as a distinct optimization step, which simplifies the analysis without ambiguity. After performing backpropagation with respect to B, the gradient computed for A no longer ac-curately reflects the full gradient at step k, since the model parameters have already been partially updated. Consequently, to ensure that the update to A remains faithful to the full gradient, we min-imize the discrepancy between the actual gradient at the intermediate model state Wk+ 12 and the low-rank approximation derived from Ak, formulated as: 
+
+min  
+
+> ˜∇AkL
+
+∥sB k+1 ( ˜∇Ak L) − ∇ Wk+ 12
+
+L∥ 2 
+
+> F
+
+. (22) Then, by gradient descent, we can update A and the full model as 
+
+Ak+1 ← Ak − η ˜∇Ak L, Wk+1 ← Wk+ 12 − ηB k+1 ( ˜∇Ak L). (23) After solving the least-squares projection problems (20) and (22), we obtain their optimal solutions in closed form. Specifically, Theorem 2 states that the projected gradients can be expressed as 
+
+˜∇Bk L = 1
+
+s2 ∇Bk L (AkA⊤ 
+
+> k
+
+)−1, ˜∇Ak L = 1
+
+s2 (B⊤
+
+> k+1
+
+Bk+1 )−1 ∇Ak L,
+
+where the (AkA⊤ 
+
+> k
+
+)−1 and B⊤
+
+> k+1
+
+(Bk+1 )−1 terms arise from the Gram matrix inverses in the least-squares solutions, and the 1 
+
+> s2
+
+factor accounts for the LoRA scaling in both A and B directions. 
+
+Proof. For (20), differentiating the least-squares objective w.r.t. ˜∇Bk L and setting the derivative to zero gives 
+
+s2 ˜∇Bk L AkA⊤ 
+
+> k
+
+= s ∇Wk L A⊤ 
+
+> k
+
+.
+
+29 Published as a conference paper at ICLR 2026 Assuming AkA⊤ 
+
+> k
+
+is invertible, we have 
+
+˜∇Bk L = 1
+
+s ∇Wk L A⊤ 
+
+> k
+
+(AkA⊤ 
+
+> k
+
+)−1.
+
+Using the LoRA gradient relation ∇Bk L = s ∇Wk L A⊤ 
+
+> k
+
+, we substitute: 
+
+˜∇Bk L = 1
+
+s2 ∇Bk L (AkA⊤ 
+
+> k
+
+)−1.
+
+The derivation for (22) is analogous, yielding 
+
+s2 B⊤
+
+> k+1
+
+Bk+1 ˜∇Ak L = s B ⊤
+
+> k+1
+
+∇Wk L,
+
+and hence 
+
+˜∇Ak L = 1
+
+s (B⊤
+
+> k+1
+
+Bk+1 )−1B⊤
+
+> k+1
+
+∇Wk L = 1
+
+s2 (B⊤
+
+> k+1
+
+Bk+1 )−1 ∇Ak L.
+
+E.3 STABLE FEATURE LEARNING 
+
+Proof. Under the regularized gradient formulation in Eq. 13, the update to the full model can be written as two half-steps. 
+
+First half-step (updating B). Using the least-squares solution for ˜∇Bk L,
+
+Wk+ 12 = Wk − η s ˜∇Bk L Ak
+
+= Wk − η s   1 
+
+> s
+
+∇Wk L A⊤ 
+
+> k
+
+(AkA⊤ 
+
+> k
+
+)−1Ak
+
+= Wk − η ∇Wk L A⊤ 
+
+> k
+
+(AkA⊤ 
+
+> k
+
+)−1Ak
+
+= Wk − η ∇Wk L P roj r(Ak ). (24) 
+
+Second half-step (updating A). Using the least-squares solution for ˜∇Ak L,
+
+Wk+1 = Wk+ 12 − η s B k+1 ˜∇Ak L
+
+= Wk+ 12 − η s B k+1 
+
+ 1 
+
+> s
+
+(B⊤
+
+> k+1
+
+Bk+1 )−1B⊤ 
+
+> k+1
+
+∇Wk+ 12
+
+L
+
+
+
+= Wk+ 12 − η B k+1 (B⊤
+
+> k+1
+
+Bk+1 )−1B⊤
+
+> k+1
+
+| {z }
+
+> P roj c( Bk+1 )
+
+∇Wk+ 12
+
+L. (25) Combining the two half-steps yields 
+
+Wk+1 = Wk − η(∇Wk L)P roj r(Ak ) − ηP roj c(Bk+1 )(∇Wk+ 12
+
+L). (26) Here, 
+
+P roj r(Ak ) := A⊤ 
+
+> k
+
+(AkA⊤ 
+
+> k
+
+)−1Ak, P roj c(Bk+1 ) := Bk+1 (B⊤
+
+> k+1
+
+Bk+1 )−1B⊤
+
+> k+1
+
+,
+
+denote the orthogonal projections onto the row space of Ak (right-multiplication) and the column space of Bk+1 (left-multiplication), respectively. E.4 CONVERGENCE ANALYSIS 
+
+E.4.1 SET UP
+
+Following the previous work Zhang & Pilanci (2024), we provide a convergence analysis of the proposed algorithm within the over-parameterized two-layer ReLU neural network tuning problem. For a data matrix X ∈ Rn×d and any arbitrary vector u ∈ Rd, we consider the set of diagonal matrices {diag([ Xu ≥ 0]) | u ∈ Rd}, which take values 1 or 0 along the diagonal and indicate the possible activation patterns of the ReLU units. Let the distinct elements of this set be denoted 30 Published as a conference paper at ICLR 2026 as D1, . . . , D P (see Zhang & Pilanci (2024) for more details). The constant P corresponds to the total number of partitions of Rd by hyperplanes passing through the origin that are perpendicular to the rows of X Pilanci & Ergen (2020). Intuitively, P can be regarded as the number of possible ReLU activation patterns associated with X. Pilanci & Ergen (2020) explains that a two-layer ReLU problem shares the same optimal objective with a convex problem. 
+
+min   
+
+> Wii∈[P]
+
+12
+
+> P
+
+X
+
+> i=1
+
+DiXW i − Y
+
+> 2
+> F
+
+. (27) As we focus on fine-tuning, given a pretrained model with weights {Wi}Pi=1 , we perform a low-rank adaptation and express the problem in equation 27 as 
+
+min 
+
+> Ai,B i,i =1 ,··· P
+
+12
+
+> P
+
+X
+
+> i=1
+
+DiX(Wi + BiAi) − Y
+
+> 2
+> F
+
+, (28) Let X ∈ Rn×d, Ai ∈ Rr×c, Bi ∈ Rd×r , and Y ∈ Rn×c. We consider the response model 
+
+Y =
+
+> P
+
+X
+
+> i=1
+
+DiX Wi + B⋆i A⋆i
+
+.
+
+Define 
+
+X⋆ := 
+
+> P
+
+X
+
+> i=1
+
+B⋆i A⋆i ,
+
+where the matrices B⋆i and A⋆i (and hence X⋆) are fixed but unknown. We use σr (·) to denote the r-th largest singular value of a matrix. Before proceeding, we first introduce the notion of the Restricted Isometry Property (RIP). 
+
+Definition 3. (Restricted Isometry Property, Recht et al. (2010)) The matric C ∈ Rn×d is said to satisfy Restricted Isometry Property(RIP) with parameters ( r, δ r ) if there exists constants 0 ≤ δr ≤
+
+1, for any matrices M ∈ Rd×c with rank r, the below holds 
+
+(1 − δr )∥M ∥2 
+
+> F
+
+≤ ∥ CM ∥2 
+
+> F
+
+≤ (1 + δr )∥M ∥2 
+
+> F
+
+. (29) RIP is a widely used condition in the filed of compressed sensing (Recht et al. (2010)), which states that the operator C approximately preserves distances between low-rank matrices. In the absence of noise, we can establish a direct relationship between the loss function and the recovery error. If we denote Ci := DiX, Problem (28) is equivalent to the problem below up to a change of labels 
+
+min  
+
+> Ai,B i,i =1 ,··· P
+
+Lc(B, A) := 12
+
+> P
+
+X
+
+> i
+
+Ci(BiAi − X⋆)
+
+> 2
+> F
+
+, (30) where B = {B1, · · · , B P } and A = {A1, · · · , A P }.
+
+Notation Inspired by the previous work Liu et al. (2025f), we introduce two local norms and their corresponding dual norms for a matrix W ∈ Rk×r
+
+PAik := Aik(Aik)⊤, ∥W ∥PAik
+
+:= ∥W P 12
+
+> Aik
+
+∥F , ∥W ∥P ⋆Aik
+
+:= ∥W P − 12
+
+> Aik
+
+∥F ,PBik := ( Bik)⊤Bik, ∥W ∥PBik
+
+:= ∥W P 12
+
+> Bik
+
+∥F , ∥W ∥P ⋆Bik
+
+:= ∥W P − 12
+
+> Bik
+
+∥F .
+
+(31) Here, we assume Aik and Bik are of full rank r for any i. If they aren’t of full rank, we can replace them with the Moore-Penrose inverse. Now we are ready to establish the convergence analysis. 31 Published as a conference paper at ICLR 2026 E.4.2 USEFUL LEMMA 
+
+For the k-th iteration, let’s denote Bk = {B1 
+
+> k
+
+, · · · , B Pk } and Ak = {A1
+
+> k
+
+, · · · , A Pk }. If we apply LA-LoRA or LA-LoRA+ without momentum for Problem (30), for any i ∈ [P ], the alternating update rule as we proposed can be written as 
+
+Aik+1 ← Aik − η(Bik(Bik)⊤)−1∇Aik Lc(Bk, Ak)
+
+Bik+1 ← Bik − η∇Bik Lc(Bk, Ak+1 )(( Aik+1 )⊤Aik+1 )−1. (32) First, we will list some assumptions used in our analysis. 
+
+Assumption 1. Suppose that Ci = DiX obeys the r-RIP with a constant δr for each i.
+
+Assumption 2. Suppose that ∥CTi Cj ∥2 := ∥XT DTi Dj X∥2 ≤ 1+ δr   
+
+> P(P−1)
+
+.
+
+Assumption 1 and 2 also adopt in Zhang & Pilanci (2024) to analyze their optimizer for LoRA. For matrix X with i.i.d Gaussian entries N (0 , 1/d ∥Di∥0), DiX satisfies RIP for a constant δr
+
+when ∥Di∥0 is on the order of r(d + c)/(dδ 2 
+
+> r
+
+). Note ∥X⊤D⊤ 
+
+> i
+
+Dj X∥2 ≤ ∥ X⊤X∥2 for all (i, j )′s.Thus bounding ∥X⊤D⊤ 
+
+> i
+
+Dj X∥2 amounts to bounding the largest singular value of the empirical covariance. 
+
+Lemma 1. For a given i ∈ [P ], the gradient of Problem (30) are 
+
+∇Aik L(B, A) = 
+
+> P
+
+X
+
+> j
+
+(Bik)⊤(Ci)⊤Cj (BjkAjk − X⋆),
+
+∇Bik L(B, A) = 
+
+> P
+
+X
+
+> j
+
+(Ci)⊤Cj (BjkAjk+1 − X⋆)( Ajk+1 )⊤.
+
+(33) 
+
+Proof. For any given i and t, it yields 
+
+∇Aik L(B, A) = ∂∂A ik
+
+
+
+12
+
+> P
+
+X
+
+> j
+
+Cj (Bj Aj − X⋆)
+
+> 2
+> F
+
+ =
+
+> P
+
+X
+
+> j
+
+(Bik)⊤(Ci)⊤Cj (BjkAjk − X⋆).
+
+(34) Similarly, we can derive the ∇Bik L(B, A) as shown in (33). 
+
+Lemma 2. Suppose Assumption 1 and 2 holds, then we have 
+
+Lc(Bk, Ak+1 ) ≤ L c(Bk, Ak) − c1 max  
+
+> i
+
+∇Aik Lc(Bk, Ak) 2 
+
+> P⋆Bik
+
+,
+
+Lc(Bk+1 , Ak+1 ) ≤ L c(Bk, Ak+1 ) − c1 max  
+
+> i
+
+∇Bik Lc(Bk, Ak+1 ) 2 
+
+> P⋆Aik+1
+
+,
+
+(35) 
+
+where c1 = P (η − η2(1+ δr + 1  
+
+> P)2
+
+).
+
+32 Published as a conference paper at ICLR 2026 
+
+Proof. Using the update rule in (32), we have 
+
+Lc(Bk, Ak+1 ) = 12
+
+> P
+
+X
+
+> i
+
+Ci(BikAik+1 − X⋆)
+
+> 2
+> F
+
+= 12
+
+> P
+
+X
+
+> i
+
+Ci
+
+
+
+Bik
+
+
+
+Aik − η(( Bik)⊤Bik)−1∇Aik Lc(Bk, Ak)
+
+
+
+− X⋆
+
+ 2
+
+> F
+
+= 12
+
+> P
+
+X
+
+> i
+
+Ci(BikAik − X⋆)
+
+> 2
+> F
+
++ η2
+
+2
+
+> P
+
+X
+
+> i
+
+CiBik(( Bik)⊤Bik)−1∇Aik Lc(Bk, Ak)
+
+> 22
+
+| {z }
+
+> T1
+
+− η
+
+* PX
+
+> i
+
+Ci(BikAik − X⋆),
+
+> P
+
+X
+
+> i
+
+CiBik(( Bik)⊤Bik)−1∇Aik Lc(Bk, Ak)
+
++| {z }
+
+> T2
+
+(36) For T1, recalling Lemma 1, then we have 
+
+T1 ≤ η2
+
+2
+
+> P
+
+X
+
+> i
+
+∥CiBik(( Bik)⊤Bik)−1∇Aik Lc(Bk, Ak)∥2
+
+> F
+
++ η2
+
+2
+
+X
+
+> i̸=j
+
+D
+
+CiBik(( Bik)⊤Bik)−1∇Aik Lc(Bk, Ak), C j Bjk(( Bjk)⊤Bjk)−1∇Ajk
+
+Lc(Bk, Ak)
+
+E
+
+> (a)
+
+≤ η2(1 + δr )2 P max  
+
+> i
+
+∥∇ Aik Lc(Bk, Ak)∥2 
+
+> P⋆Bik
+
++ η2
+
+2 max  
+
+> i̸=j
+
+∥C⊤ 
+
+> i
+
+Cj ∥2P (P − 1) max  
+
+> i
+
+∥∇ Aik Lc(Bk, Ak)∥2
+
+> PBik
+> (b)
+
+≤ η2(1 + δr + 1 
+
+> P
+
+)2 P max  
+
+> i
+
+∥∇ Aik Lc(Bk, Ak)∥2
+
+> PBik
+
+,
+
+(37) where (a) uses Cauchy Inequality, Assumption 1 and the fact that ∥Bik(( Bik)⊤Bik)− 12 ∥22 = 1 , (b) uses the assumption that max i̸=j ∥C⊤ 
+
+> j
+
+Cj ∥2 ≤ (1+ δr )   
+
+> P(P−1)
+
+.For T2, using Lemma 1 again, we have 
+
+T2 = η
+
+* PX
+
+> j
+
+Cj (BjkAjk − X⋆),
+
+> P
+
+X
+
+> j
+
+Cj Bjk(( Bjk)⊤Bjk)−1∇Ajk
+
+Lc(Bk, Ak)
+
++
+
+= η
+
+> P
+
+X
+
+> j
+
+* PX
+
+> i
+
+Ci(BikAik − X⋆), C j Bjk(( Bjk)⊤Bjk)−1∇Ajk
+
+Lc(Bk, Ak)
+
++
+
+= η
+
+> P
+
+X
+
+> i
+
+∇Aik Lc(Bk, Ak) 2 
+
+> P⋆Bik
+
+≤ ηP max  
+
+> i
+
+∥∇ Aik Lc(Bk, Ak)∥2
+
+> PBik
+
+.
+
+(38) To sum up, it yields 
+
+Lc(Bk, Ak+1 ) ≤ L c(Bk, Ak) −
+
+
+
+η − η2(1 + δr + 1 
+
+> P
+
+)2
+
+
+
+P max  
+
+> i
+
+∇Aik Lc(Bk, Ak) 2 
+
+> P⋆Bik
+
+. (39) 33 Published as a conference paper at ICLR 2026 Similarly, we can induce 
+
+Lc(Bk+1 , Ak+1 ) ≤ L c(Bk, Ak+1 ) −
+
+
+
+η − η2(1 + δr + 1 
+
+> P
+
+)2
+
+
+
+P max  
+
+> i
+
+∇Bik Lc(Bk, Ak+1 ) 2 
+
+> P⋆Aik+1
+
+.
+
+(40) 
+
+Lemma 3. Suppose Assumption 1 holds, then, for any i ∈ [P ], we have 
+
+∥∇ Aik Lc(Bk, Ak)∥2 
+
+> P⋆Bik
+
+≥ 2(1 − δr )Lc(Bk, Ak),
+
+∥∇ Bik Lc(Bt, Ak+1 )∥2 
+
+> P⋆Aik+1
+
+≥ 2(1 − δr )Lc(Bk, Ak+1 ). (41) 
+
+Proof. See Lemma 6 in Liu et al. (2025f) for the detailed proof. 
+
+Theorem 5. Assume for any i ∈ [p] the matrix Ci = DiX satisfies the rank r-RIP with constant 
+
+δr (Assumption 1) and 0 ≤ η ≤ 11+ δr + 1
+
+> P
+
+, then LA-LoRA without momentum solves the over-parameterized problem leads to 
+
+Lc(Bk+1 , Ak+1 ) ≤ (1 − ηc)2Lc(Bk, Ak), (42) 
+
+and 
+
+> P
+
+X
+
+> i
+
+BikAik − X⋆
+
+> 2
+> F
+
+≤ 1 + δr
+
+1 − δr
+
+(1 − ηc)2t
+
+> P
+
+X
+
+> i
+
+Bi
+
+> 0
+
+Ai 
+
+> 0
+
+− X⋆
+
+> 2
+> F
+
+, (43) 
+
+where ηc = 2 P (1 − δr )
+
+
+
+η − η2(1+ δr + 1 
+
+> P)2
+
+
+
+.Proof. 
+
+Lc(Bk+1 , Ak+1 ) ≤ L c(Bk, Ak+1 ) −
+
+
+
+η − η2(1 + δr + 1 
+
+> P
+
+)2
+
+
+
+P max  
+
+> i
+
+∇Bik Lc(Bk, Ak+1 ) 2 
+
+> P⋆Aik+1
+
+≤ L c(Bk, Ak+1 ) −
+
+
+
+η − η2(1 + δr + 1 
+
+> P
+
+)2
+
+
+
+2P (1 − δr )Lc(Bk, Ak+1 )
+
+≤
+
+
+
+1 − 2P (1 − δr )
+
+
+
+η − η2(1 + δr + 1 
+
+> P
+
+)2
+
+ 
+
+Lc(Bk, Ak+1 )
+
+≤ (1 − ηc)2 Lc(Bk, Ak),
+
+(44) where we apply Lemma 2 and 3 and ηc = 2 P (1 − δr )
+
+
+
+η − η2(1+ δr + 1 
+
+> P)2
+
+
+
+. Moreover, under As-sumption 1, we have 
+
+> P
+
+X
+
+> i
+
+BikAik − X⋆
+
+> 2
+> F
+
+≤ 1 + δr
+
+1 − δr
+
+(1 − ηc)2t
+
+> P
+
+X
+
+> i
+
+Bi
+
+> 0
+
+Ai 
+
+> 0
+
+− X⋆
+
+> 2
+> F
+
+. (45) E.5 COMPARISON WITH FFA-L ORA AND ROLORA 
+
+Corollary 1 (Comparison with FFA-LoRA and RoLoRA) . Under the same setting as Theorem 3, consider the following two baselines. 
+
+FFA-LoRA (frozen A). Let Ak ≡ A0 and define the fixed row-space subspace S0 = {∆W ∈
+
+Rm×n : row(∆ W ) ⊆ r(A0)}. Then Wk − W0 ∈ S 0 for all k. Hence, for any target rank-r solution 
+
+W ⋆ with W ⋆ − W0 /∈ S 0, inf k ∥Wk − W ⋆∥F ≥ dist( W ⋆ − W0, S0) > 0.
+
+34 Published as a conference paper at ICLR 2026 
+
+RoLoRA (round-wise alternation). For one round updating B with A fixed, followed by one round updating A with B fixed, we show 
+
+Wk+2 = Wk − η (∇Wk L)P roj r(Ak+1 ) − η P roj c(Bk+1 )
+
+ ∇Wk+ 12
+
+L + Ek,
+
+where the first two terms coincide with the LA-LoRA update in Eq. (26) and the stale-block remainder satisfies ∥E k∥F = O(η2∥∇ Wk L∥ F ).In contrast, LA-LoRA alternates B and A within each local iteration and exactly matches Eq. (26), i.e., it imposes no fixed-row-space constraint as in FFA-LoRA and has Ek = 0 .
+
+Next, We provide the details underlying Corollary 1. 
+
+FFA-LoRA: fixed row-space subspace. FFA-LoRA freezes A at some initialization A0 and only updates B. At iteration k we can write 
+
+Wk = W0 + sB kA0,
+
+so 
+
+Wk − W0 ∈ S 0 with S0 = {∆W ∈ Rm×n : row(∆ W ) ⊆ r(A0)}.
+
+Let W ⋆ be a target (e.g., optimal) rank-r solution. If W ⋆ − W0 /∈ S 0, then by projection geometry 
+
+inf  
+
+> k
+
+∥Wk − W ⋆∥F ≥ inf  
+
+> ∆W∈S 0
+
+∥∆W − (W ⋆ − W0)∥F = dist( W ⋆ − W0, S0) > 0,
+
+which is exactly the irreducible approximation gap stated for FFA-LoRA. 
+
+RoLoRA: stale-block remainder Ek. RoLoRA alternates between updating B and A at the level of communication rounds. Consider two consecutive local steps forming one full “ B-then-A” cycle. Let Wk+1 /2 denote the intermediate weight after updating B but before updating A. Using the projected-gradient view of Theorem 2, we have 
+
+Wk+1 /2 = Wk − η P roj c(Bk+1 )
+
+ ∇Wk L, W k+2 = Wk+1 /2 − η  ∇Wk+1 /2 LP roj r(Ak+1 ).
+
+Adding these relations gives 
+
+Wk+2 = Wk − η P roj c(Bk+1 )
+
+ ∇Wk L − η  ∇Wk+1 /2 LP roj r(Ak+1 ).
+
+We add and subtract the LA-LoRA update in Eq. (26) and define the remainder 
+
+Ek = −η
+
+
+
+P roj c(Bk+1 )
+
+ ∇Wk L − ∇ Wk+ 12
+
+L +  ∇Wk+1 /2 L − ∇ Wk LP roj r(Ak+1 )
+
+
+
+,
+
+which yields the decomposition 
+
+Wk+2 = Wk − η (∇Wk L)P roj r(Ak+1 ) − η P roj c(Bk+1 )
+
+ ∇Wk+ 12
+
+L + Ek.
+
+Assuming that L is L-smooth, we have 
+
+∥∇ Wk+1 /2 L − ∇ Wk L∥ F ≤ L∥ Wk+1 /2 − Wk∥F .
+
+From the first update, Wk+1 /2 − Wk = −η P roj c(Bk+1 )(∇Wk L), and the projector has operator norm at most 1, so ∥Wk+1 /2 − Wk∥F ≤ η∥∇ Wk L∥ F . Using again that the projectors have norm at most 1, we obtain 
+
+∥E k∥F ≤ 2η ∥∇ Wk+1 /2 L − ∇ Wk L∥ F
+
+≤ 2ηL∥ Wk+1 /2 − Wk∥F
+
+≤ 2η2L∥∇ Wk L∥ F .
+
+(46) Under the infinite-width scaling used in Theorem 3, the Frobenius norm ∥∇ Wk L∥ F itself scales with width, so the effective contribution of Ek to the feature dynamics is of order O(η2∥∇ Wk L∥ F )
+
+when η = O(1) .
+
+## F TABLE OF NOTATIONS 
+
+Table 20 summarizes the main notations used throughout the paper. 35 Published as a conference paper at ICLR 2026 Table 20: Summary of the main notations. 
+
+Notation Description 
+
+W0 ∈ Rm×n Pre-trained backbone weight matrix 
+
+A, B LoRA down-projection/up-projection matrices 
+
+r LoRA rank, r ≪ min {m, n }
+
+α LoRA scaling hyperparameter 
+
+s = α/r LoRA scaling factor 
+
+∇AL, ∇B L Gradients of loss w.r.t. A and B
+
+∇W L Gradient of loss w.r.t. full weight W
+
+L(·) Local loss function 
+
+Di Local dataset of client iN Total number of clients 
+
+q Client sampling rate per round 
+
+Ct Set of selected clients in round tT Number of communication rounds 
+
+K Number of local update steps per round 
+
+b Local data sampling rate 
+
+R = |D i| Size of local dataset on client i
+
+Bi Mini-batch sampled from Di
+
+C Per-sample ℓ2 clipping norm 
+
+σ Gaussian noise multiplier for DP 
+
+gij Clipped gradient for sample j on client igi Noisy averaged gradient on client i
+
+N (0 , C 2σ2) Gaussian DP noise with variance C2σ2
+
+bgi Smoothed gradient after applying Gs
+
+ϵ, δ (ϵ, δ )-differential privacy parameters 
+
+X⋆ Target low-rank matrix in theory 
+
+P roj r(A), P roj c(B) Projection onto row space of A, Projection onto column space of BH, λ max (H) Hessian of the loss and its maximum eigenvalue (sharpness) 
+
+δr Rank-r RIP constant of matrices Ci
+
+## G LLM U SAGE 
+
+Large Language Models (LLMs) were used to aid in the writing and polishing of the manuscript. Specifically, we used an LLM to assist in refining the language, improving readability, and ensuring clarity in various sections of the paper. The model helped with tasks such as sentence rephrasing, grammar checking, and enhancing the overall flow of the text. It is important to note that the LLM was not involved in the ideation, research methodology, or experimental design. All research concepts, ideas, and analyses were developed and conducted by the authors. The contributions of the LLM were solely focused on improving the linguistic quality of the paper, with no involvement in the scientific content or data analysis. The authors take full responsibility for the content of the manuscript, including any text generated or polished by the LLM. We have ensured that the LLM-generated text adheres to ethical guidelines and does not contribute to plagiarism or scientific misconduct. 36

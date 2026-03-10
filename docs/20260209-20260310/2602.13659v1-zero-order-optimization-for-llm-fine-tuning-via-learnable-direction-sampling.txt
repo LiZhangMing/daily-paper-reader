@@ -1,0 +1,2432 @@
+Title: Zero-Order Optimization for LLM Fine-Tuning via Learnable Direction Sampling
+
+URL Source: https://arxiv.org/pdf/2602.13659v1
+
+Published Time: Tue, 17 Feb 2026 01:35:46 GMT
+
+Number of Pages: 29
+
+Markdown Content:
+# BRAIn Lab 
+
+# Zero-Order Optimization for LLM Fine-Tuning via Learnable Direction Sampling 
+
+Valery Parfenov † 1,2 , Grigoriy Evseev † 1, Andrey Veprikov 1,3 , Nikolay Bushkov 4, Stanislav Moiseev 4, Aleksandr Beznosikov 1,3,4 
+
+> †
+
+Equal contribution 
+
+> 1
+
+Basic Research of Artificial Intelligence Laboratory (BRAIn Lab) 
+
+> 2
+
+HSE University 
+
+> 3
+
+Federated Learning Problems Laboratory 
+
+> 4
+
+T-Technologies 
+
+> 5
+
+Innopolis University Fine-tuning large pretrained language models (LLMs) is a cornerstone of modern NLP, yet its growing memory demands (driven by backpropagation and large optimizer States) limit deployment in resource-constrained settings. Zero-order (ZO) methods bypass backpropagation by estimating directional derivatives from forward evaluations, offering substantial memory savings. However, classical ZO estimators suffer from high variance and an adverse dependence on the parameter dimensionality d, which has constrained their use to low-dimensional problems. In this work, we propose a policy-driven ZO framework that treats the sampling distribution over perturbation directions as a learnable policy and updates it to reduce the variance of directional estimates. We develop a practical algorithm implementing this idea and provide a theoretical analysis, showing that learned sampling distributions improve the quality of gradient information and relax the explicit dependence on d in convergence bounds. Empirically, we validate the approach on challenging LLM fine-tuning benchmarks, demonstrating substantially improved performance compared to standard ZO baselines. Our results suggest that adaptive direction sampling is a promising route to make ZO fine-tuning viable at scale. The source code is available at https://github.com/brain-lab-research/zo_ldsd .
+
+1 Introduction 
+
+Fine-tuning pre-trained Large Language Models (LLMs) has become the dominant paradigm in contemporary natural language processing [Howard and Ruder, 2018], allowing large pretrained networks to be efficiently adapted to diverse downstream tasks with limited labelled data [Howard and Ruder, 2018; Zhang et al., 2019; Lester et al., 2021]. The fine-tuning objective is commonly cast as an unconstrained optimization problem 
+
+min  
+
+> x∈Rd
+
+f (x), (1) where x denotes the model parameters, d is the dimension of x (number of trainable parameters) and f (x) is the loss. Algorithms that rely on access to gradients remain the prevailing tools for solving the problem (1) . Classical first-order optimizers such as Stochastic Gradient Descent [Robbins and Monro, 1951; Amari, 1993] and Adam [Kingma and Ba, 2014] are widely used because they integrate naturally with backpropagation and offer strong empirical performance [Semenov et al., 2025; Wen et al., 2025]. Despite these advances in stability and the practical convenience afforded by backpropagation, its memory footprint poses a growing practical barrier as model sizes increase [Rajbhandari et al., 2020]. Storing activations and optimizer 1
+
+> arXiv:2602.13659v1 [cs.LG] 14 Feb 2026
+
+States for gradient computation can dominate the memory budget: reported measurements indicate that gradient computation for models at the tens-of-billions parameter scale may require approximately 12 times more memory than inference [Zhu et al., 2023b]. This constraint restricts accessible fine-tuning workflows on resource-limited hardware (for example, edge devices and consumer GPUs) and complicates large-scale distributed training [Zhu et al., 2023a; Gao et al., 2024; Liao et al., 2024]. To mitigate memory pressure, a range of strategies has been explored. One family comprises coordinate-wise or block-coordinate schemes which can reduce the number of gradient parameters from d to 1 [Richt´ arik and Tak´ aˇ c, 2014]. However, this comes at the cost of an asymptotic slowdown in convergence by a factor of d [Li et al., 2018] (see Section 3 for details). One of the most prominent representatives of coordinate methods is BAdam [Luo et al., 2024], which reduces memory consumption by performing block-wise adaptive updates. While this lowers the storage requirements for optimizer States, as is typical for coordinate-wise optimization methods, it introduces a trade-off in the form of slower convergence, with the iteration complexity increasing proportionally to the number of blocks and, in the worst case, to the dimension d.Motivated by these memory–convergence trade-offs in first-order schemes, Zero-order (ZO) methods offer a principled alternative. Rather than computing exact gradients via backpropagation, ZO approaches reconstruct directional derivatives (or gradient projections) from function evaluations by perturbing the objective along randomized directions. As a consequence, ZO methods require substantially less memory than coordinate-wise first-order methods such as BAdam [Malladi et al., 2023], since they avoid storing intermediate activations and optimizer States associated with gradient computation. By estimating descent directions using only such finite-difference information, ZO methods eliminate the need for backward passes and the associated storage of intermediate activations. This black-box viewpoint decouples optimization from the internal implementation of the model and enables fine-tuning with substantially smaller memory budgets. Recent work has demonstrated that applying classical ZO updates to LLM fine-tuning can reduce memory consumption by several times compared to standard first-order pipelines [Zhang et al., 2024]. The first recognition of this idea in the context of LLM fine-tuning came with the MeZO [Malladi et al., 2023] method, where the authors employed a ZO SGD [Ghadimi and Lan, 2013] update based on the following gradient estimator: 
+
+v · ⟨∇ f (x), v ⟩ ≈ v · f (x + τ v ) − f (x − τ v )2τ , (2) where random direction v ∈ Rd typically sampled from N (0 , 1) [Nesterov and Spokoiny, 2017], and τ > 0 is the smoothing parameter. At a high level, ZO-SGD as well as other ZO methods share a similar design philosophy with coordinate approaches, however, rely exclusively on forward-only information to approximate gradients. Estimators of the form (2) constitute a standard design choice for ZO schemes and are widely used in the modern literature [Chen et al., 2017; Malladi et al., 2023; Petrov et al., 2025]. Moreover, in the limit τ → 0 the method recovers coordinate SGD. Therefore ZO approaches suffer from inherent limitation: gradient estimates based on random directional derivatives exhibit high variance, similar to coordinate methods. Moreover, as the dimensionality d increases, the probability that a random direction forms a large angle with the true gradient grows, leading to a further deterioration in the accuracy of the estimated descent direction. In essence, ZO methods obtain information only along a limited set of directions, behaving analogously to coordinate- or block-wise schemes. Consequently, they inherit a principal drawback: the effective convergence rate degrades by a factor of d [Zhan et al., 2024]. Consequently, until recently, the use of ZO methods were mostly restricted to low-dimensional settings [Wang et al., 2018]. However, in light of modern applications in LLM fine-tuning, where the dimensionality d reaches 10 10 [Seung et al., 2025], this limitation has become even more pronounced. This work aims to mitigate the restrictive role of variance in ZO schemes. We view the ZO optimization process through the lens of Reinforcement Learning (RL), interpreting the distribution mean of the direction v as a policy. By introducing a plug-and-play extension to the ZO framework, we enable a memory-efficient exploitation of information from previous iterations to improve the quality of gradient approximation. Our goal is both to provide theoretical insight and to empirically validate the proposed approach in real-world application settings. Our contributions are as follow: 2• We introduce a novel ZO method, based on optimization of distribution to avoid uninformative directions. 
+
+• We provide theoretical guarantees for the proposed method under the smooth non-convex setup. Novel design leads to non-standard challenges, theoretical analysis and bounds. The resulting convergence guarantees exhibit no dependence on the dimension d.
+
+• We empirically evaluate the proposed ZO method on challenging LLM fine-tuning benchmarks, demonstrating their effectiveness and practical relevance. 
+
+2 Related Work 2.1 Memory efficient approaches 
+
+We note that, beyond ZO approaches, the memory-efficient optimization literature includes several orthogonal techniques, such as gradient quantization to lower precision [Novikov et al., 2023], compression of optimizer statistics [Dettmers et al., 2021; Li et al., 2023], forward gradient learning [Baydin et al., 2022; Silver et al., 2021], greedy layer-wise strategy [N økland and Eidnes, 2019], synthetic gradients [Jaderberg et al., 2017] and others [Lv et al., 2024; Boopathy and Fiete, 2022; Hinton, 2022; Singhal et al., 2023]. Nevertheless, ZO methods have emerged as the most effective solutions for memory-efficient LLM fine-tuning [Malladi et al., 2023]. The most apparent distinction among existing ZO approaches lies in the choice of the sampling distribution for the random direction v. Commonly used options include the uniform distribution over the unit sphere RS (1) d 
+
+> ∥·∥
+
+[Flaxman et al., 2004], the standard multivariate Gaussian distribution N (0 , I ) [Ghadimi and Lan, 2013; Nesterov and Spokoiny, 2017], and a uniform discrete distribution over the vectors of the canonical (one-hot) basis [Duchi et al., 2015]. These choices yield unbiased gradient estimators of the smoothed function f , which form the foundation of the theoretical analyses of the ZO methods. Recent works have explored complementary strategies for making ZO optimization more practical and memory-efficient. ZO-AdaMM [Chen et al., 2019] generalizes adaptive-moment methods to the gradient-free regime, combining momentum with per-coordinate adaptive step-sizes using only function evaluations. JAGUAR [Veprikov et al., 2024; Petrov et al., 2025] implements a momentum-focused ZO design and related matrix-aware extensions, emphasizing minimal per-iteration oracle cost and memory-efficient updates for large-model fine-tuning. 
+
+2.2 ZO optimization with adaptive direction sampling 
+
+Recent advances have aimed to inject richer curvature information into ZO procedures to improve stability and convergence. One of the first approaches in this direction was proposed in HiZOO [Zhao et al., 2024]: it augments zero-order gradient (2) with precondition matrix, using a Hessian-informed strategy to mitigate heterogeneous curvature across parameters. Another recent perspective casts ZO finite-difference procedures as instances of policy optimization. In the work [Qiu et al., 2025], authors show that standard ZO finite-difference estimators are mathematically equivalent to a single-step policy optimization objective and, equivalently, to a REINForCE-style gradient estimator [Williams, 1992] with a particular baseline. Building on this insight, they propose ZoAR method, which incorporates policy-optimization–inspired variance reduction through an averaged baseline and query reuse. A further contribution is presented in [Seung et al., 2025], which introduces LOREN: a curvature-aware ZO method that formulates gradient preconditioning as adaptive estimation of an anisotropic perturbation distribution, employs a low-rank block-diagonal preconditioner within a natural evolution strategies framework, and uses a REINForCE leave-one-out estimator to improve convergence and search efficiency. In contrast to these approaches, our method focuses on adaptively learning the mean of the sampling distribution rather than estimating or approximating second-order curvature information. Unlike HiZOO and LOREN, which rely on explicit or implicit Hessian-related preconditioning and therefore introduce additional structural assumptions and memory overhead, our framework remains lightweight and preserves the simplicity of first-order ZO updates. At the same time, compared to policy-optimization–based ZO methods such as ZoAR, which primarily target variance 3reduction through baselines and query reuse, we directly bias the sampling distribution toward empirically useful directions by learning the distribution mean. This allows us to improve directional alignment without modifying the underlying ZO estimator or increasing algorithmic complexity, making the proposed framework a modular plug-in that can be seamlessly combined with a wide range of existing ZO optimizers. 
+
+3 Algorithm and Theoretical Analysis under Directional Setup 3.1 Notation and Assumptions 
+
+For any vector x ∈ Rd we denote by ∥x∥ =
+
+qPdi=1 x2 
+
+> i
+
+the Euclidean l2 norm. For any non-zero x̸ = 0 we define its normalized version as x = x 
+
+> ∥x∥
+
+. We conduct the theoretical analysis in non-convex setting under the standard assumptions [Bertsekas, 1997; Ghadimi and Lan, 2013; Richt´ arik et al., 2021; Li et al., 2021]. 
+
+Assumption 1 
+
+Let f be L-smooth, i.e., for all x1, x 2 ∈ Rd it holds that: ∥∇ f (x1) − ∇ f (x2)∥ ≤ L∥x1 − x2∥.
+
+Assumption 2 
+
+Let there exist a minimizer of f i.e., an x∗ that f (x) ≥ f (x∗) holds for all x ∈ Rd.
+
+3.2 Motivation 
+
+We consider solving the problem (1) using optimization along random directions, i.e., via a Directional Gradient Descent (DGD) [Silver et al., 2021]: 
+
+xt+1 = xt − γtx · vt⟨vt, ∇f (xt)⟩, (3) where the sampling distribution of vt is arbitrary. We note that ZO oracle (2) reduces to DGD estimator under the 
+
+τ → 0 condition. It makes the role of the direction sampling distribution identical in both formulations and allows us to focus on the DGD setup in the theoretical analysis. Intuitively, the quality of the estimator improves as the sampled direction becomes better aligned with the gradient, and it attains its maximum accuracy in the case of a deterministic choice of vt collinear with ∇f (xt). To formalize this intuition, we introduce the notion of gradient alignment :
+
+Ct := 
+
+D
+
+vt, ∇f (xt)
+
+E2
+
+, (4) and use it in Lemma 1, inspired by [Cheng et al., 2021]. 
+
+Lemma 1 
+
+Under Assumptions 1 and 2 for iterations of DGD (3) the following inequality holds:  
+
+> T−1
+
+X
+
+> t=0
+
+1
+
+T E
+
+"
+
+γtx − Lγ tx
+
+> 2
+
+2
+
+!
+
+E Ct|F t−1 ∥∇ f (xt)∥2
+
+#
+
+≤ f (x0) − f (x∗)
+
+T ,
+
+where Ft is a σ-algebra generated by {x0, x 1, . . . , x t}.One of its key features is that Lemma 1 applies to an arbitrary sampling distribution. Crucially for our analysis, it does not rely on the unbiasedness of the oracle, in contrast to commonly used approaches [Nesterov and Spokoiny, 2017]. This significantly broadens the range of settings that can be analysed within this framework. 4The simplest choice of the sampling distribution is vt ∼ N (μt ≡ 0, ε 2I): a Gaussian distribution with zero mean, which yields an unbiased estimator in the DGD setting. After normalizing the sampled vector, this yields a uniform distribution over the unit sphere vt∼RS (1) d
+
+> ∥·∥
+
+. Notably, by leveraging Lemma 1, we recover the convergence rate for DGD with vt i.i.d. 
+
+∼ N (0 , ε 2I) established in [Nesterov and Spokoiny, 2017], as Stated in Corollary 1. 
+
+Corollary 1 
+
+Let in the setting of Lemma 1 vt i.i.d. 
+
+∼ N (μt ≡ 0, ε 2I) and γtx ≤ 12L . Then the following bound holds: 
+
+E∥∇ f (xT )∥2 ≤ 2dγtxT (f (x0) − f (x∗)) ,
+
+where xT is chosen uniformly from {x0, x 1, . . . , x t−1}.The proof of Corollary 1 is provided in Appendix B and directly reveals that the d factor arises from E Ct|F t−1 ∼ 1/d 
+
+for vt i.i.d. 
+
+∼ N (0 , ε 2I).The above intuition shows that, on the one hand, Lemma 1 indeed captures the variance effect induced by the randomness of the direction, and on the other hand, its application yields tight bounds. This makes expected gradient alignment E Ct|F t−1 a key concept in the analysis of the DGD setup. To obtain theoretical acceleration, it is necessary to maintain this quantity at an O(1) level, in contrast to the baseline O(1 /d ) regime. To this end, we propose to leverage information about the objective function obtained during previous iterations by learning the parameters of the sampling distribution and introducing control over them to increase the value of E Ct|F t−1.Using a Gaussian distribution gives rise to two design choices: adapting the mean vector μt or the covariance matrix 
+
+Σt. We focus on learning μt and fix Σt ≡ ε2I, since in the context of memory-efficient optimization storing a full covariance matrix is infeasible, whereas learning the mean vector incurs only an additional O(d) memory overhead, which is acceptable in the ZO setting. 
+
+3.3 Theoretical Algorithm 
+
+The above mentioned intuition, along with Lemma 1, motivates the design of Algorithm 1: LDSD (Learnable 
+
+Direction Sampling Descent). 
+
+Algorithm 1: LDSD  
+
+> 1:
+
+Input: Initial points x0 and μ0, number of iterations T , variance scale ε. 
+
+> 2:
+
+for t = 0 , 1, 2, . . . , T − 1 do  
+
+> 3:
+
+Sample vt ∼ N (μt, ε 2I) and set vt = vt/∥vt∥ 
+
+> 4:
+
+gtx = vt
+
+D
+
+vt, ∇f (xt)
+
+E 
+
+> 5:
+
+gtμ = ∇μE Ct|F t−1 
+
+> μ=μt
+> 6:
+
+μt+1 = μt + γtμgtμ 
+
+> 7:
+
+xt+1 = xt − γtxgtx 
+
+> 8:
+
+end for 
+
+Lines 3, 4, 7 of Algorithm 1 reflect the classical use of DGD estimator. In contrast, Lines 5 and 6 incorporate the proposed mechanism for learning the sampling direction. Specifically, to attain the values E Ct Ft−1] of expected gradient alignment as large as possible, we adopt a reinforcement learning perspective by interpreting the mean vector μt as a policy and E Ct Ft−1] as the reward signal. Accordingly, at Line 3 of Algorithm 1, a direction vt is sampled from the current policy, while at Lines 5 and 6 the policy is updated via a gradient ascent step. Importantly, in practice the derivative of the expected gradient alignment ∇μE Ct|F t−1 
+
+> μ=μt
+
+is not accessible. 5Consequently, while the analysis employs the update in Line 5, for practical implementation we propose using a well-established policy gradient approach [Williams, 1992] from reinforcement learning. We refer to Sections 3.6 and 4 for further details on this implementation. 
+
+3.4 The dynamics of gradient alignment 
+
+Now we present Theorem 1, which characterizes the evolution of the expected gradient alignment E Ct|F t−1 over a single iteration of Algorithm 1 and constitutes the core of the theoretical analysis of the proposed approach. 
+
+Theorem 1 
+
+Let Assumption 1 hold and d ≥ 16 . Then for iterations of Algorithm 1 with ε ≤O
+
+
+
+d− 32 cos( βt)(1 − cos( βt)) ∥μt∥
+
+
+
+, γ tμ ≤ O  ∥μt∥2 , γ tx ≤ O 
+
+ cos 2(βt)(1 −cos( βt)) 2
+
+> L
+
+
+
+the following inequality holds: 
+
+E Ct+1 Ft] = E Ct Ft−1] + γtμ
+
+ cos( βt)(1 − cos( βt)) 24 ∥μt∥
+
+2
+
+,
+
+where βt is the angle between μt and ∇f (xt).Under the assumptions of Theorem 1, the values of E Ct Ft−1] increase monotonically. This leads to acceleration in convergence guarantees in Lemma 1 and corresponds to an improvement of the policy μt. At the same time, the theorem does not provide guarantees for a naive initialization μ0 = 0 (Figure 1 illustrates that this point corresponds to a saddle point of the function E Ct|F t−1). It is consistent with the observation that ∇μE Ct|F t−1 
+
+> μ=0
+
+= 0 ,together with the update rule in Line 6 of Algorithm 1, results in unchanged values of the policy: μt+1 = μt and, consequently, expected gradient alignment E Ct+1 |F t = E Ct|F t−1. We also note that growth of the gradient alignment is not guaranteed in the cases of collinearity or orthogonality between μt and ∇f (xt), since the gradient of the alignment objective vanishes in these configurations. However, Algorithm 1 almost surely avoids these degenerate configurations when initialized at random, as they form a measure-zero set in the parameter space. 
+
+Intuition. We now provide further intuition for the concepts underlying Theorem 1. Figure 1 depicts the landscape of the function E[Ct | F t−1] as a function of μt in dimension d = 2 .3 2 1 0 1 2 3
+
+> x
+> 3
+> 2
+> 1
+> 0
+> 1
+> 2
+> 3
+> y
+> [C]
+> 0.09
+> 0.18
+> 0.27
+> 0.36
+> 0.45
+> 0.54
+> 0.63
+> 0.72
+> 0.81
+> 0.90
+> [C]
+
+Figure 1: Landscape of the function E Ct | F t−1 with respect to μt, for ∇f (xt) = (1 , 0) ⊤ and d = 2 .
+
+The figure clearly reveals the intuitive saddle-like structure of the objective: increasing orthogonality of μt and ∇f (xt) leads to sampling vectors vt that form large angles with ∇f (xt)
+
+and therefore yield small values of Ct. In contrast, alignment between μt and ∇f (xt) results in larger values of both Ct
+
+and its conditional expectation. This landscape additionally exhibits symmetry with respect to the transformation μt 7 →−μt, reflecting the fact that Ct depends only on the squared cosine of the angle βt.Each iteration of Algorithm 1 performs a gradient ascent step on the function E[Ct | F t−1] with respect to μt. From the RL perspective, it corresponds to a policy update driven by the observed reward signal E[Ct | F t−1]. Subsequently, a model parameter update is performed in Line 7, which in turn changes the direction of the true gradient ∇f (xt). Ge-ometrically, this corresponds to a rotation of the saddle while keeping μt fixed. Assumption 1 on the Lipschitz continuity of f , together with the explicit form of the update in Line 7, 6allows to bound the angle of this rotation in terms of the step size γtx. This bounded rotation may also be interpreted as a bounded change of the environment, which may reduce the relevance of the policy obtained at the previous iteration. The analysis in Theorem 1 is built upon carefully balancing these two competing effects: the gradient ascent step in μt and the change in the direction of ∇f (xt) induced by the update of the model parameters xt.The saddle structure of E[Ct | F t−1] immediately implies non-concavity. It prevents us from directly deriving its increase in Theorem 1 using standard results from gradient ascent theory, thereby significantly complicating the theoretical analysis. Due to the non-standard challenges and the resulting proof technique, we provide both a high-level sketch and a complete proof in Appendix B. To characterize the full dynamics of E Ct Ft−1] across the iterations of Algorithm 1 we prove the following result. 
+
+Lemma 2 
+
+Let in the setting of Theorem 1 δ ≤ cos (β0) ≤ 1 − δ with δ ∈  0; 12
+
+, ∥μt∥ ≤ M for all t and ε =
+
+O
+
+
+
+d− 32 δM 
+
+
+
+, γ tx = O
+
+ δ2
+
+> L
+
+
+
+. Then E Ct|F t−1 increase monotonically to the value 
+
+cos 
+
+ δ
+
+32 d + Lγ tx + arccos(1 − δ)
+
+2
+
+(1 − e−1) = O(1) 
+
+and then never decrease below. Lemma 2 establishes once the policy is initialized such that δ ≤ cos (β0) ≤ 1 − δ, for an appropriate choice of 
+
+γtx, γ tμ, ε the expected gradient alignment E Ct Ft−1] increases monotonically up to a certain level and subsequently oscillates within a neighbourhood of 1. This stands in contrast to the O(1 /d ) behaviour established in Corollary 1. 
+
+3.5 Convergence Guaranties 
+
+Lemma 2 naturally leads to two complementary settings for policy initialization μ0. The first corresponds to choosing μ0 randomly without any prior knowledge of the target function f . This setup is analysed in Appendix B.1 and can be interpreted as a sequential growth of gradient alignment up to a saturation level. In particular, it leads to a non-standard convergence criterion formulated in terms of a weighted average of squared gradient norms evaluated along the iterates of the algorithm. The second regime for μ0 initialization corresponds to leveraging prior information about the target function f (the direction of the true gradient ∇f (x0) at the initial point) to immediately operate in the phase of Lemma 2 where 
+
+E Ct Ft−1] oscillates in a neighbourhood of 1.
+
+Lemma 3 
+
+Let Assumptions 1, 2 be satisfied, d ≥ 16 and μ0 collinear to ∇f (x0). Then for iterations of Algorithm 1 with δ ≤ cos (β0) ≤ 1 − δ, δ ∈  0; 12
+
+ and ε = O
+
+
+
+d− 32 δM 
+
+
+
+, M = min t{∥ μt∥} , γ tx = O
+
+ δ2
+
+> L
+
+
+
+, γ tμ = O  ∥μt∥2,the following bound holds: 
+
+E[∥∇ f (xT )∥2] ≤ O 
+
+ 1
+
+T γ x
+
+
+
+(f (x0) − f (x∗)) .
+
+Discussion. We note that the dimension d does not appear explicitly in the theoretical bounds of Lemma 3. In contrast, classical directional, coordinate or ZO methods incur the polynomial dependence on d in their convergence guarantees [Nesterov and Spokoiny, 2017; Veprikov et al., 2024; Hanzely et al., 2018]. This slowdown is in fact unavoidable for uniformly random directions from the perspective of lower bounds [Lee and Sidford, 2013], which establish an inherent O(d) factor for standard ZO methods. Our approach overcomes this barrier by learning the parameters of the sampling distribution, effectively steering the sampled directions to better align with the gradient and thereby removing the explicit dependence on d in the convergence rate. 7It is worth noting that, in theory, the quality of the Monte-Carlo approximation gtμ obtained with a fixed number of samples vt per iteration depends on the dimension d. However, in practice a small number of samples, often O(1) ,is sufficient to obtain a stable Monte-Carlo estimate [Schulman et al., 2017]. Finally, we observe that after normalization the sampling distribution is invariant under simultaneous rescaling of the mean vector μ and the variance ε2. This invariance also appears in choice of ε ∼ d− 32 δM ≤ d− 32 δ∥μt∥ in the analysis. This suggests that constraining ∥μ∥ = 1 may be a natural design choice and a direction for future work. 
+
+3.6 Toy Experiment 
+
+To validate the theoretical results, we conduct a toy experiment consisting of training a linear regression model on the a9a [Chang and Lin, 2011] dataset with access to directional derivatives. As a baseline, we consider an algorithm that employs the estimator with K Monte Carlo samples: 
+
+gtx = 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+vtk⟨vtk, ∇f (xt)⟩, (5) with vtk ∼ N (0 , I ). For LDSD , we use the same approximation (5) with the choice vtk ∼ N (μt, ε 2I). For pro-posed learning mechanism we apply a log-derivative trick [Williams, 1992] to derive a Monte Carlo estimator of 
+
+∇μE Ct|F t−1 
+
+> μ=μt
+
+from the Line 5 of Algorithm 1. We denote the density of a Gaussian distribution by πμ(·)
+
+and introduce Ctk = ⟨vtk, ∇f (xt)⟩2 for each sampled direction vtk. Accordingly, 
+
+∇μE Ct|F t−1 
+
+> μ=μt
+
+=
+
+Z
+
+Ct  ∇μ log πμt
+
+ dπμt ≈ 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+Ctk
+
+ ∇μ log πμt (vtk) .
+
+Since πμt (·) is a Gaussian distribution density, we have ∇μ log πμt (vtk) = vtk −μt 
+
+> ε2
+
+. For policy updates we utilize 
+
+gtμ = 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+ Ctk − bt vtk − μt
+
+ε2 ,
+
+where bt = 1
+
+> K
+
+PKk=1 Ctk is a mean-baseline, introduced to reduce the estimator variance [Williams, 1992]. We set K = 5 both for the baseline and LDSD and compare them in terms of the alignment between the true gradient and its estimator cos (gtx, ∇f (xt)) , as well as the norm of the gradient ∥∇ f (xt)∥: the quantity involved in convergence guaranties. The results are reported in Figure 2.   
+
+> Figure 2: Comparison of LDSD and the baseline on the a9a regression task.
+
+The first plot in Figure 2 reveals learning the sampling direction in LDSD indeed leads to strong alignment between the estimator gtμ and the true gradient ∇f (xt). This behaviour fully agrees with Lemma 2 and the intuition discussed in Section 3: the alignment initially increases monotonically and subsequently oscillates in a neighbourhood of O(1) .84 Zero-order Framework 
+
+Building on Algorithm 1, which presented the first-order instantiation of our update rules, we now develop the corresponding ZO formulation in Algorithm 2 by replacing the directional derivative gtx with a zero-order oracle (2), and the gradient gtμ with its REINForCE estimation [Williams, 1992]. Both substitutions yield unbiased estimators of the corresponding first-order gradients [Feng and Wang, 2023], thereby preserving the theoretical structure of the original algorithm in a purely zero-order setting. 
+
+Algorithm 2: ZO-LDSD  
+
+> 1:
+
+Input: Initial points x0, μ 0, number of iterations T , number of oracle calls K, variance ε, stepsizes γx, γ μ 
+
+> 2:
+
+for t = 0 , 1, 2, . . . , T − 1 do  
+
+> 3:
+
+Sample {vi}Ki=1 ∼ N (μt, ε 2I) 
+
+> 4:
+
+Set vt 
+
+> ∗
+
+= arg min 
+
+> v∈{ vi}Ki=1
+
+f (xt + τ v ) 
+
+> 5:
+
+gtx = f (xt+τ v t  
+
+> ∗)−f(xt−τ v t
+> ∗)2τ
+
+· vt 
+
+> ∗
+> 6:
+
+gtμ = 1
+
+> KK
+
+P     
+
+> i=1
+> K·f(xt+τ v i)−KP
+> j=1
+> f(xt+τ v j)
+> K−1
+
+· vi−μt 
+
+> ε2
+> 7:
+
+xt+1 = xt − γx · gtx 
+
+> 8:
+
+μt+1 = μt + γμ · gtμ 
+
+> 9:
+
+end for 
+
+The selection of vt 
+
+> ∗
+
+in Line 4 of Algorithm 2 implements a lightweight, direction-wise greedy search among the K
+
+sampled candidates: by choosing the perturbation that empirically yields the smallest objective after a forward evaluation, the method biases the subsequent x-update (Line 7 of Algorithm 2) toward directions that have demonstrated the strongest instantaneous decrease in f . This selection improves the practical utility of a limited number of oracle queries and typically reduces the variance of the chosen search direction, at the cost of introducing an intentional selection bias in the sampled direction for the x-update. Aside from those mechanics and the replacement of true gradients by zero-order estimates, Algorithm 2 preserves the structural update logic of Algorithm 1. The procedure preserves the forward-only nature of ZO methods, requires K + 1 forward evaluations per iteration, and concentrates sampling mass on empirically useful directions through online updates of μt. While classical ZO schemes typically use K = 1 , we set K = 5 in our experiments as an empirically chosen compromise between selection quality and oracle cost. An ablation over K is provided in Section 5.3. It is important to note that this framework is not a standalone optimizer but a plug-in module: any existing ZO estimator for the parameter update can be combined with the adaptive sampling routine to improve empirical convergence. In particular, the update at line 7 of Algorithm 2 is modular and may be replaced by the parameter-update rule of any other ZO optimizer. This enables straightforward integration of the adaptive sampling mechanism, while leaving the base optimizer’s update logic intact. 
+
+5 Experiments 
+
+In this section, we present an empirical evaluation of the proposed zero-order optimization framework for large language model fine-tuning. 
+
+5.1 Experimental setup 
+
+Fine-Tuning Task and Schemes. We evaluate the proposed zero-order methods on the SST-2 sentiment classification benchmark [Socher et al., 2013], following the experimental protocol of [Zhang et al., 2024]. SST-2 is a 9standard supervised benchmark for sentence-level binary sentiment classification and is commonly used to assess fine-tuning procedures for language models. 
+
+Models. Experiments are performed on two representative models: RoBERTa-Large [Liu et al., 2019] and OPT-1.3B [Zhang et al., 2022]. These models span different architectures and parameter counts, allowing us to examine the behavior of ZO algorithms across realistic fine-tuning settings while keeping the experimental scope focused. 
+
+Baselines. We use our framework on established zero-order baselines reported in [Zhang et al., 2024]: ZO-SGD [Ghadimi and Lan, 2013], ZO-AdaMM [Chen et al., 2019], JAGUAR SignSGD [Petrov et al., 2025]. All experiments follow the evaluation of [Zhang et al., 2024] to ensure a fair comparison. Training details are deferred to Appendix A.2. 
+
+Comparison procedure. For a fair and controlled evaluation we compare each baseline in two variants: (i) the original baseline implementation, and (ii) the same baseline augmented with our zero-order adaptive sampling framework (Algorithm 2). Crucially, in (ii) we do not change any of the original optimizer hyperparameters from (i) (e.g., learning rate, momentum), those remain exactly as in the base method. The only hyperparameters we tune are those introduced by our framework. Since Algorithm 2 performs 6 ZO oracle calls (forward passes) when K = 5 , we compare baseline methods under a fixed budget of oracle calls rather than a fixed number of iterations to ensure fair evaluation. This leads to two natural comparison strategies for the baselines: either perform 6 oracle calls per iteration (using K = 5 samples), or perform more iterations with 2 oracle calls per iteration (using K = 1 ). Both variants are presented in Table 1. This design ensures that performance differences arise from the adaptive sampling module itself rather than from differences in computational budget. 
+
+5.2 Results 
+
+Table 1 reports SST2 test accuracy for OPT-1.3B and RoBERTa-Large under different fine-tuning schemes.                                             
+
+> Table 1: Test accuracy on SST2 for OPT-1.3B and RoBERTa-Large. Best performance among ZO methods is in bold .
+> Method Sampling OPT-1.3B RoBERTa-Large FT LoRA FT LoRA ZO-SGD Gaussian, 0.928 0.854 0.899 0.913 2 forwards, more iterations Gaussian, 0.919 0.850 0.869 0.905 6 forwards, same iterations
+> Algorithm 2 0.935 0.916 0.909 0.928
+> ZO-AdaMM Gaussian, 0.925 0.912 0.909 0.812 2 forwards, more iterations Gaussian, 0.917 0.905 0.899 0.801 6 forwards, same iterations
+> Algorithm 2 0.930 0.929 0.917 0.900
+> JAGUAR Gaussian, 0.925 0.921 0.906 0.905 2 forwards, more iterations Gaussian, 0.914 0.911 0.896 0.893 6 forwards, same iterations
+> Algorithm 2 0.930 0.928 0.922 0.927
+
+Discussion. The results show that replacing Gaussian sampling with our adaptive direction sampling produces 10 consistent improvements across models, optimizers, and fine-tuning modalities. Notably, merely increasing the number of probes with Gaussian sampling does not yield the same benefit: performance gains arise from the combination of multiple candidates and adaptive selection. These findings indicate that our sampling scheme yields more informative finite-difference probes and reduces variance in the resulting ZO gradient proxies. Because the framework is plug-and-play, it improves practical convergence of existing ZO methods without altering their core update rules. 
+
+5.3 Ablation Studies 
+
+In this section, we provide several ablation studies on hyperparameters from Algorithm 2. In all experiments we use SST-2 dataset with the RoBERTa-large model. Figure 3(a) shows accuracy rising with K up to K = 5 and then slightly falling; (b) exhibits improvement as γμ increases until an intermediate optimum after which performance degrades; and (c) displays a U-shaped dependence on ε with a clear peak where our method outperforms the Gaussian baseline. These results motivate the default hyperparameter choices used in our experiments. 1 2 3 4 5 6
+
+> K
+> 0.85
+> 0.86
+> 0.87
+> 0.88
+> 0.89
+> 0.90
+> 0.91
+> 0.92
+> 0.93
+> 0.94
+> Accuracy
+> ZO-SGD (Gaussian sampling)
+> ZO-SGD (Algorithm 2 sampling)
+
+(a) K0.001 0.005 0.006 0.007 0.008 0.009  
+
+> 0.85
+> 0.86
+> 0.87
+> 0.88
+> 0.89
+> 0.90
+> 0.91
+> 0.92
+> 0.93
+> 0.94
+> Accuracy
+> ZO-SGD (Gaussian sampling)
+> ZO-SGD (Algorithm 2 sampling)
+
+(b) γμ0.5  
+
+> 0.8
+> 0.9
+> 1
+> 1.1
+> 1.2
+> 1.5
+> 0.910
+> 0.915
+> 0.920
+> 0.925
+> Accuracy
+> ZO-SGD (Gaussian sampling)
+> ZO-SGD (Algorithm 2 sampling)
+
+(c) ε
+
+Figure 3: Test accuracy of ZO-SGD (Algorithm 2 sampling) on SST-2 RoBERTa-large with LoRA for different hyperparameters. 
+
+6 Conclusion 
+
+In this work, we introduce a novel zero-order optimization framework that treats the sampling distribution over perturbation directions as a learnable policy. Theoretically, we provide convergence guarantees with no explicit dependence on dimension d, in stark contrast to the O(d) degradation inherent in classical zero-order methods. This represents a significant advancement for ZO optimization, achieved by adaptively learning the mean of the sampling distribution to maintain high gradient alignment throughout training. Empirically, we validate our framework on LLM fine-tuning benchmarks, demonstrating consistent improvements over established ZO baselines including ZO-SGD, ZO-AdaMM, and JAGUAR SignSGD. Our framework operates as a plug-and-play module that enhances existing ZO optimizers without modifying their core hyperparameters. Extensive ablation studies confirm the robustness and practical applicability of our approach. 
+
+References 
+
+Shun-ichi Amari. Backpropagation and stochastic gradient descent method. Neurocomputing , 5(4):185–196, 1993. Atılım G¨ une¸ s Baydin, Barak A Pearlmutter, Don Syme, Frank Wood, and Philip Torr. Gradients without backpropagation. arXiv preprint arXiv:2202.08587 , 2022. Dimitri P Bertsekas. Nonlinear programming. Journal of the Operational Research Society , 48(3):334–334, 1997. Akhilan Boopathy and Ila Fiete. How to train your wide neural network without backprop: An input-weight alignment perspective. In International Conference on Machine Learning , pages 2178–2205. PMLR, 2022. 11 St´ ephane Boucheron, G´ abor Lugosi, and Pascal Massart. Concentration Inequalities: A Nonasymptotic Theory of Independence . Oxford University Press, 02 2013. ISBN 9780199535255. doi: 10.1093/acprof:oso/9780199535255. 001.0001. URL https://doi.org/10.1093/acprof:oso/9780199535255.001.0001 .Venkat Chandrasekaran, Benjamin Recht, Pablo A Parrilo, and Alan S Willsky. The convex geometry of linear inverse problems. Foundations of Computational mathematics , 12(6):805–849, 2012. Chih-Chung Chang and Chih-Jen Lin. Libsvm: A library for support vector machines. ACM transactions on intelligent systems and technology (TIST) , 2(3):1–27, 2011. Pin-Yu Chen, Huan Zhang, Yash Sharma, Jinfeng Yi, and Cho-Jui Hsieh. Zoo: Zeroth order optimization based black-box attacks to deep neural networks without training substitute models. In Proceedings of the 10th ACM workshop on artificial intelligence and security , pages 15–26, 2017. Xiangyi Chen, Sijia Liu, Kaidi Xu, Xingguo Li, Xue Lin, Mingyi Hong, and David Cox. Zo-adamm: Zeroth-order adaptive momentum method for black-box optimization. Advances in neural information processing systems , 32, 2019. Shuyu Cheng, Guoqiang Wu, and Jun Zhu. On the convergence of prior-guided zeroth-order optimization algorithms. 
+
+Advances in Neural Information Processing Systems , 34:14620–14631, 2021. Tim Dettmers, Mike Lewis, Sam Shleifer, and Luke Zettlemoyer. 8-bit optimizers via block-wise quantization. arXiv preprint arXiv:2110.02861 , 2021. John C Duchi, Michael I Jordan, Martin J Wainwright, and Andre Wibisono. Optimal rates for zero-order convex optimization: The power of two function evaluations. IEEE Transactions on Information Theory , 61(5):2788–2806, 2015. Yasong Feng and Tianyu Wang. Stochastic zeroth-order gradient and hessian estimators: variance reduction and refined bias bounds. Information and Inference: A Journal of the IMA , 12(3):1514–1545, 2023. Abraham D Flaxman, Adam Tauman Kalai, and H Brendan McMahan. Online convex optimization in the bandit setting: gradient descent without a gradient. arXiv preprint cs/0408007 , 2004. Lei Gao, Amir Ziashahabi, Yue Niu, Salman Avestimehr, and Murali Annavaram. Enabling efficient on-device fine-tuning of llms using only inference engines. arXiv preprint arXiv:2409.15520 , 2024. Saeed Ghadimi and Guanghui Lan. Stochastic first-and zeroth-order methods for nonconvex stochastic programming. 
+
+SIAM journal on optimization , 23(4):2341–2368, 2013. Filip Hanzely, Konstantin Mishchenko, and Peter Richt´ arik. Sega: Variance reduction via gradient sketching. 
+
+Advances in Neural Information Processing Systems , 31, 2018. Geoffrey Hinton. The forward-forward algorithm: Some preliminary investigations. arXiv preprint arXiv:2212.13345 ,2(3):5, 2022. Jeremy Howard and Sebastian Ruder. Universal language model fine-tuning for text classification. arXiv preprint arXiv:1801.06146 , 2018. Max Jaderberg, Wojciech Marian Czarnecki, Simon Osindero, Oriol Vinyals, Alex Graves, David Silver, and Koray Kavukcuoglu. Decoupled neural interfaces using synthetic gradients. In International conference on machine learning , pages 1627–1635. PMLR, 2017. Diederik P Kingma and Jimmy Ba. Adam: A method for stochastic optimization. arXiv preprint arXiv:1412.6980 ,2014. 12 Beatrice Laurent and Pascal Massart. Adaptive estimation of a quadratic functional by model selection. Annals of statistics , pages 1302–1338, 2000. Yin Tat Lee and Aaron Sidford. Efficient accelerated coordinate descent methods and faster algorithms for solving linear systems. In 2013 ieee 54th annual symposium on foundations of computer science , pages 147–156. IEEE, 2013. Brian Lester, Rami Al-Rfou, and Noah Constant. The power of scale for parameter-efficient prompt tuning. arXiv preprint arXiv:2104.08691 , 2021. Bingrui Li, Jianfei Chen, and Jun Zhu. Memory efficient optimizers with 4-bit states. Advances in Neural Information Processing Systems , 36:15136–15171, 2023. Xingguo Li, Tuo Zhao, Raman Arora, Han Liu, and Mingyi Hong. On faster convergence of cyclic block coordinate descent-type methods for strongly convex minimization. Journal of Machine Learning Research , 18(184):1–24, 2018. Zhize Li, Hongyan Bao, Xiangliang Zhang, and Peter Richt´ arik. Page: A simple and optimal probabilistic gradient estimator for nonconvex optimization. In International conference on machine learning , pages 6286–6295. PMLR, 2021. Changyue Liao, Mo Sun, Zihan Yang, Jun Xie, Kaiqi Chen, Binhang Yuan, Fei Wu, and Zeke Wang. Lohan: Low-cost high-performance framework to fine-tune 100b model on a consumer gpu. arXiv preprint arXiv:2403.06504 , 2024. Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettlemoyer, and Veselin Stoyanov. Roberta: A robustly optimized bert pretraining approach, 2019. URL 
+
+https://arxiv.org/abs/1907.11692 .Qijun Luo, Hengxu Yu, and Xiao Li. Badam: A memory efficient full parameter optimization method for large language models. Advances in Neural Information Processing Systems , 37:24926–24958, 2024. Kai Lv, Yuqing Yang, Tengxiao Liu, Qipeng Guo, and Xipeng Qiu. Full parameter fine-tuning for large language models with limited resources. In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pages 8187–8198, 2024. Sadhika Malladi, Tianyu Gao, Eshaan Nichani, Alex Damian, Jason D Lee, Danqi Chen, and Sanjeev Arora. Fine-tuning language models with just forward passes. Advances in Neural Information Processing Systems , 36: 53038–53075, 2023. Yurii Nesterov and Vladimir Spokoiny. Random gradient-free minimization of convex functions. Foundations of Computational Mathematics , 17(2):527–566, 2017. Arild N økland and Lars Hiller Eidnes. Training neural networks with local error signals. In International conference on machine learning , pages 4839–4850. PMLR, 2019. Georgii Sergeevich Novikov, Daniel Bershatsky, Julia Gusak, Alex Shonenkov, Denis Valerievich Dimitrov, and Ivan Oseledets. Few-bit backward: Quantized gradients of activation functions for memory footprint reduction. In 
+
+International Conference on Machine Learning , pages 26363–26381. PMLR, 2023. Egor Petrov, Grigoriy Evseev, Aleksey Antonov, Andrey Veprikov, Nikolay Bushkov, Stanislav Moiseev, and Aleksandr Beznosikov. Leveraging coordinate momentum in signsgd and muon: Memory-optimized zero-order. 
+
+arXiv preprint arXiv:2506.04430 , 2025. Junbin Qiu, Zhengpeng Xie, Xiangda Yan, Yongjie Yang, and Yao Shu. Zeroth-order optimization is secretly single-step policy optimization. arXiv preprint arXiv:2506.14460 , 2025. 13 Samyam Rajbhandari, Jeff Rasley, Olatunji Ruwase, and Yuxiong He. Zero: Memory optimizations toward training trillion parameter models. In SC20: International Conference for High Performance Computing, Networking, Storage and Analysis , pages 1–16. IEEE, 2020. Peter Richt´ arik and Martin Tak´ aˇ c. Iteration complexity of randomized block-coordinate descent methods for minimizing a composite function. Mathematical Programming , 144(1):1–38, 2014. Peter Richt´ arik, Igor Sokolov, and Ilyas Fatkhullin. Ef21: A new, simpler, theoretically better, and practically faster error feedback. Advances in Neural Information Processing Systems , 34:4384–4396, 2021. Herbert Robbins and Sutton Monro. A stochastic approximation method. The annals of mathematical statistics ,pages 400–407, 1951. John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms. arXiv preprint arXiv:1707.06347 , 2017. Andrei Semenov, Matteo Pagliardini, and Martin Jaggi. Benchmarking optimizers for large language model pretraining. arXiv preprint arXiv:2509.01440 , 2025. Hyunseok Seung, Jaewoo Lee, and Hyunsuk Ko. Low-rank curvature for zeroth-order optimization in llm fine-tuning. 
+
+arXiv preprint arXiv:2511.07971 , 2025. David Silver, Anirudh Goyal, Ivo Danihelka, Matteo Hessel, and Hado van Hasselt. Learning by directional gradient descent. In International Conference on Learning Representations , 2021. Utkarsh Singhal, Brian Cheung, Kartik Chandra, Jonathan Ragan-Kelley, Joshua B Tenenbaum, Tomaso A Poggio, and Stella X Yu. How to guess a gradient. arXiv preprint arXiv:2312.04709 , 2023. Richard Socher, Alex Perelygin, Jean Wu, Jason Chuang, Christopher D. Manning, Andrew Y. Ng, and Christopher Potts. Recursive deep models for semantic compositionality over a sentiment treebank. Proceedings of the 2013 Conference on Empirical Methods in Natural Language Processing , pages 1631–1642, 2013. Andrey Veprikov, Alexander Bogdanov, Vladislav Minashkin, and Aleksandr Beznosikov. New aspects of black box conditional gradient: Variance reduction and one point feedback. Chaos, Solitons & Fractals , 189:115654, 2024. Yining Wang, Simon Du, Sivaraman Balakrishnan, and Aarti Singh. Stochastic zeroth-order optimization in high dimensions. In Amos Storkey and Fernando Perez-Cruz, editors, Proceedings of the Twenty-First International Conference on Artificial Intelligence and Statistics , volume 84 of Proceedings of Machine Learning Research , pages 1356–1365. PMLR, 09–11 Apr 2018. URL https://proceedings.mlr.press/v84/wang18e.html .Kaiyue Wen, David Hall, Tengyu Ma, and Percy Liang. Fantastic pretraining optimizers and where to find them. 
+
+arXiv preprint arXiv:2509.02046 , 2025. Ronald J Williams. Simple statistical gradient-following algorithms for connectionist reinforcement learning. Machine learning , 8(3):229–256, 1992. Heshen Zhan, Congliang Chen, Tian Ding, Ziniu Li, and Ruoyu Sun. Unlocking black-box prompt tuning efficiency via zeroth-order optimization. In Findings of the Association for Computational Linguistics: EMNLP 2024 , pages 14825–14838, 2024. Susan Zhang, Stephen Roller, Naman Goyal, Mikel Artetxe, Moya Chen, Shuohui Dewan, Mona Diab, Xian Li, Xi Victoria Lin, Todor Mihaylov, et al. Opt: Open pre-trained transformer language models, 2022. URL 
+
+https://arxiv.org/abs/2205.01068 .14 Yihua Zhang, Pingzhi Li, Junyuan Hong, Jiaxiang Li, Yimeng Zhang, Wenqing Zheng, Pin-Yu Chen, Jason D. Lee, Wotao Yin, Mingyi Hong, Zhangyang Wang, Sijia Liu, and Tianlong Chen. Revisiting zeroth-order optimization for memory-efficient llm fine-tuning: A benchmark, 2024. URL https://arxiv.org/abs/2402.11592 .Yizhe Zhang, Siqi Sun, Michel Galley, Yen-Chun Chen, Chris Brockett, Xiang Gao, Jianfeng Gao, Jingjing Liu, and Bill Dolan. Dialogpt: Large-scale generative pre-training for conversational response generation. arXiv preprint arXiv:1911.00536 , 2019. Yanjun Zhao, Sizhe Dang, Haishan Ye, Guang Dai, Yi Qian, and Ivor W Tsang. Second-order fine-tuning without pain for llms: A hessian informed zeroth-order optimizer. arXiv preprint arXiv:2402.15173 , 2024. Ligeng Zhu, Lanxiang Hu, Ji Lin, Wei-Ming Chen, Wei-Chen Wang, Chuang Gan, and Song Han. Pockengine: Sparse and efficient fine-tuning in a pocket. In Proceedings of the 56th Annual IEEE/ACM International Symposium on Microarchitecture , pages 1381–1394, 2023a. Yujia Zhu, Yujing Zhang, Ziwei Zhang, et al. Efficient fine-tuning of language models via zeroth-order optimization. 
+
+arXiv preprint , abs/2305.14395, 2023b. 15 Appendix 
+
+Supplementary Materials for Zero-Order Optimization for LLM Fine-Tuning via Learnable Direction Sampling 
+
+A Additional Experimental Details A.1 Toy experiment 
+
+The tuned hyperparameters used in toy experiment are as follows: 
+
+• Baseline DGD: – γtx = 200 .
+
+• LDSD: – γtx = 5 ,
+
+– γtμ = 1 .4 · 10 −5,
+
+– ε = 1 .2 · 10 −2.
+
+A.2 Experiments on LLM fine-tuning 
+
+All experiments in Section 5 used the same core sampling hyperparameters: ε = 1 and γμ = 10 −3. For ZO-SGD setups we fixed momentum = 0 .9. For ZO-Adamm setups we fixed (β1, β 2) = (0 .9, 0.999) . For ZO-Adamm setups we fixed JAGUAR momentum β = 0 .9. All methods employed a cosine learning-rate schedule for γx. Table 2 reports the base learning rates γx used for each method and experimental condition. 
+
+Table 2: Base learning rates γx used for OPT-1.3B and RoBERTa-Large experiments with FT and LoRA. 
+
+Method OPT-1.3B RoBERTa-Large FT LoRA FT LoRA ZO-SGD (Gaussian sampling, 2 forwards, more iterations) 4.0 × 10 −8 1.0 × 10 −6 4.0 × 10 −8 5.0 × 10 −4
+
+ZO-SGD (Gaussian sampling, 6 forwards, same iterations) 4.0 × 10 −8 1.0 × 10 −6 4.0 × 10 −8 5.0 × 10 −4
+
+ZO-SGD (Algorithm 2 sampling) 4.0 × 10 −8 1.0 × 10 −6 4.0 × 10 −8 5.0 × 10 −4
+
+ZO-AdaMM (Gaussian sampling, 2 forwards, more iterations) 1.0 × 10 −5 6.0 × 10 −5 3.0 × 10 −5 3.0 × 10 −3
+
+ZO-AdaMM (Gaussian sampling, 6 forwards, same iterations) 1.0 × 10 −5 6.0 × 10 −5 3.0 × 10 −5 3.0 × 10 −3
+
+ZO-AdaMM (Algorithm 2 sampling) 1.0 × 10 −5 6.0 × 10 −5 3.0 × 10 −5 3.0 × 10 −3
+
+JAGUAR SignSGD (Gaussian sampling, 2 forwards, more iterations) 2.0 × 10 −6 1.0 × 10 −5 4.0 × 10 −6 3.0 × 10 −4
+
+JAGUAR SignSGD (Gaussian sampling, 6 forwards, same iterations) 2.0 × 10 −6 1.0 × 10 −5 4.0 × 10 −6 3.0 × 10 −4
+
+JAGUAR SignSGD (Algorithm 2 sampling) 2.0 × 10 −6 1.0 × 10 −5 4.0 × 10 −6 3.0 × 10 −4
+
+16 B Missing proofs 
+
+Lemma 1 
+
+Under Assumptions 1 and 2 for iterations of the form 
+
+xt+1 = xt − γtxvt⟨vt, ∇f (xt)⟩,
+
+the following inequality holds.  
+
+> T−1
+
+X
+
+> t=0
+
+1
+
+T E
+
+"
+
+γtx − Lγ tx
+
+> 2
+
+2
+
+!
+
+E Ct|F t−1 ∥∇ f (xt)∥2
+
+#
+
+≤ f (x0) − f (x∗)
+
+T .
+
+Proof. We consider the algorithm step and utilize Assumption 1. 
+
+f (xt+1 ) − f (xt) = f (xt − γtxvt⟨∇ f (xt), v t⟩) − f (xt)
+
+> 1
+
+≤ −γtx⟨∇ f (xt), v t⟩2 + L
+
+2 ∥γtxvt⟨∇ f (xt), v t⟩∥ 2
+
+= Lγ tx
+
+> 2
+
+2 − γtx
+
+!
+
+⟨∇ f (xt), v t⟩2
+
+= Lγ tx
+
+> 2
+
+2 − γtx
+
+!
+
+⟨∇ f (xt), v t⟩2∥∇ f (xt)∥2.
+
+Conditioning on Ft and using the Ft−1-measurability of ∇f (xt) and γtx, we obtain 
+
+E f (xt+1 )|F t−1 − f (xt) ≤ Lγ tx
+
+> 2
+
+2 − γtx
+
+!
+
+E Ct|F t−1 ∥∇ f (xt)∥2.
+
+Summing over t = 0 , . . . , T − 1 and considering full expectation we derive  
+
+> T−1
+
+X
+
+> t=0
+
+1
+
+T E
+
+"
+
+γtx − Lγ tx
+
+> 2
+
+2
+
+!
+
+E Ct|F t−1 ∥∇ f (xt)∥2
+
+#
+
+≤ f (x0) − E[f (xt−1)] 
+
+T .
+
+Applying Assumption 2 finishes the proof. 
+
+Corollary 1 
+
+Let in the setting of Lemma 1 vt i.i.d. 
+
+∼ RS (1) d 
+
+> ∥·∥
+
+be distributed uniformly on the unit sphere and γtx ≤ 12L .Then the following bound holds: 
+
+E∥∇ f (xT )∥2 ≤ 2dγtxT (f (x0) − f (x∗)) ,
+
+where xT is chosen uniformly from {x0, x 1, . . . , x t−1}.
+
+Proof. The choice γtx ≤ 12L guarantees: 
+
+γtx − Lγ tx
+
+> 2
+
+2 ≥ γtx
+
+2 (6) 17 Then we need to evaluate E Ct|F t−1. We consider coordinate system where e1 ∥ ∇ f (xt):
+
+E Ct|F t−1 = Evt∼N (0 ,I )
+
+ v21
+
+∥v∥2
+
+
+
+.
+
+Due to the distribution symmetry we conclude: 
+
+Evt∼N (0 ,I )
+
+ v21
+
+∥v∥2
+
+
+
+= Evt∼N (0 ,I )
+
+ v22
+
+∥v∥2
+
+
+
+= · · · = Evt∼N (0 ,I )
+
+ v2
+
+> d
+
+∥v∥2
+
+
+
+.
+
+Then, 
+
+d · Evt∼N (0 ,I )
+
+ v21
+
+∥v∥2
+
+
+
+= Evt∼N (0 ,I )
+
+ v21 + v22 + · · · + v2
+
+> d
+
+∥v∥2
+
+
+
+= Evt∼N (0 ,I ) [1] = 1 .
+
+And we reach: 
+
+Evt∼N (0 ,I )
+
+ v21
+
+∥v∥2
+
+
+
+= 1
+
+d (7) Substitution of (7), (6) into Lemma 1 and rearranging the terms finishes the proof. 
+
+Lemma 4 
+
+Let function f is L-smooth, i.e. 
+
+∥f (x) − f (y)∥ ≤ ∥ x − y∥, ∀x, y ∈ Rd,
+
+then it holds 
+
+f (y) ≥ f (x) + ⟨∇ f (x), y − x⟩ − L
+
+2 ∥x − y∥2, ∀x, y ∈ Rd.
+
+Proof. The claim follows from integrating the directional derivative of f along the segment connecting x and y and then applying the Lipschitz continuity of the gradient. 
+
+f (y) = f (x) + 
+
+Z 10
+
+⟨∇ f (x + τ (y − x)) , y − x⟩dτ 
+
+= f (x) + ⟨∇ f (x), y − x⟩
+
++
+
+Z 10
+
+⟨∇ f (x + τ (y − x)) − ∇ f (x), y − x⟩dτ 
+
+≥ f (x) + ⟨∇ f (x), y − x⟩−
+
+Z 10
+
+∥∇ f (x + τ (y − x)) − ∇ f (x)∥∥ y − x∥dτ 
+
+≥ f (x) + ⟨∇ f (x), y − x⟩ − 
+
+Z 10
+
+Lτ ∥y − x∥2dτ 
+
+= f (x) + ⟨∇ f (x), y − x⟩ − L
+
+2 ∥y − x∥2.
+
+18 Theorem 1 
+
+Let Assumption 1 hold and d ≥ 16 . Then for iterations of the Algorithm 1 with ε ≤ d− 32 cos( βt)(1 −cos( βt)) ∥μt∥ 
+
+> 480
+
+,
+
+γtμ ≤ ∥μt∥2 
+
+> 640
+
+, γ tx ≤ cos 2(βt)(1 −cos( βt)) 2 
+
+> 3·212 ·52L
+
+the following inequality holds: 
+
+E Ct+1 Ft] = E Ct Ft−1] + γtμ
+
+ cos( βt)(1 − cos( βt)) 24 ∥μt∥
+
+2
+
+, (8) 
+
+where βt is the angle between μt and ∇f (xt).
+
+Due to the non-standard challenges and the resulting proof technique, we provide high-level sketch before the proof. 
+
+Proof Sketch of Theorem 1. The proof of Theorem 1 is deferred to Section B. It tracks the joint evolution of two quantities: the gradient ∇f (xt) and the mean vector μt. The main steps are as follows: 
+
+(i) We first reduce the gradient dynamics using Assumption 1, which yields a relation of the form 
+
+E Ct+1 Ft] ≥ − 2at + F∇f (xt)(μt+1 ), (9) with Fz (μ) = Eu∼N (μ,ε 2I)[⟨z, u ⟩2] and at = 4 Lγ tx
+
+> 2
+
+r
+
+1 −
+
+ Lγ tx
+
+> 2
+
+2
+
+. We note that E Ct Ft−1] = F∇f (xt)(μt). Then, we need to reduce μt+1 to μt in the RHS of (9) to obtain a recursion on expected gradient alignment. 
+
+(ii) The core objective is to prove strict monotonic growth of expected gradient alignment E Ct+1 Ft]. Achieving this requires carefully isolating a positive contribution that dominates the drift at induced by changes in ∇f (xt).Then, to enable a quantitative analysis, we establish smoothness of the function Fz (μ) with respect to μt via a uniform bound on the Hessian norm. This yields an inequality of the form 
+
+F∇f (xt)(μt+1 ) ≥ F∇f (xt)(μt) + γtμ −
+
+˜Lγ tμ
+
+> 2
+
+2
+
+!
+
+∥∇ F∇f (xt)(μt)∥2. (10) 
+
+(iii) Combining the above relations (9) and (10) yields a recursive inequality for E Ct+1 Ft]. To ensure a positive increment, it suffices to lower bound the contribution of the last term in (10) . To this end, we decompose the expectation over u in Fz (μ) definition into integrals over an inner region u ≤ ∥μt∥ 
+
+> 2ε
+
+and its complement. The integral over the outer region is controlled by choosing ε ≲ ∥μ∥d− 12 , allowing us to apply Gaussian concentration inequalities for Lipschitz functions [Boucheron et al., 2013]. The inner-region contribution is analysed via a Taylor expansion with a Lagrange remainder. Each term is treated separately. First, symmetry considerations eliminate zero order term. Second, the second-order term is controlled using the previously established Hessian bound. Third, the Laurent-Massart inequalities [Laurent and Massart, 2000] serve as a core ingredient for extracting the required positive increment from the first order term. Putting these estimates together with (9), (10) and balancing the competing effects yields the final bound. We present the complete proof below. 
+
+Proof of Theorem 1 . The evolution of Et[Ct] depends on the dynamics of two quantities: the gradient ∇f (xt)
+
+itself and the mean vector μt. We begin with STEP I by examining the contribution of the gradient dynamics. Using Assumption 1 we bound the ∥∇ f (xt+1 ) − ∇ f (xt)∥ in the following way. By the xt+1 update rule ∥xt+1 − xt∥ = ∥γtxgtx∥ = γtx vt
+
+D
+
+vt, ∇f (xt)
+
+E
+
+≤ γtx∥∇ f (xt)∥. Therefore, ∥∇ f (xt+1 ) −∇f (xt)∥ ≤ Lγ tx∥∇ f (xt)∥, which implies that the angle between ∇f (xt) and ∇f (xt+1 ) less or equal then 
+
+2 arcsin 
+
+ ∥∇ f (xt+1 ) − ∇ f (xt)∥
+
+2∥∇ f (xt)∥
+
+
+
+≤ 2 arcsin 
+
+ Lγ tx∥∇ f (xt)∥
+
+2∥∇ f (xt)∥
+
+
+
+= 2 arcsin 
+
+ Lγ tx
+
+2
+
+
+
+.
+
+19 The angle between ∇f (xt) and ∇f (xt+1 ) is the same. It justifies 
+
+∥∇ f (xt+1 ) − ∇ f (xt)∥ ≤ 2 sin 
+
+
+
+2 arcsin 
+
+ Lγ tx
+
+2
+
+ 
+
+= 4 Lγ tx
+
+2
+
+s
+
+1 −
+
+ Lγ tx
+
+2
+
+2
+
+=: at (11) And now we proceed with the definition of Ct.
+
+Evt+1 ∼N (μt+1 ,ε 2I)
+
+Ct+1 Ft]= 1(2 πε 2)d/ 2
+
+Z
+
+> Rd
+
+D
+
+∇f (xt+1 ), u 
+
+E2
+
+e− ∥u−μt+1 ∥22ε2 du
+
+= 1(2 πε 2)d/ 2
+
+Z
+
+> Rd
+
+D
+
+∇f (xt) + ( ∇f (xt+1 ) − ∇ f (xt)) , u 
+
+E2
+
+e− ∥u−μt+1 ∥22ε2 du
+
+= 1(2 πε 2)d/ 2
+
+Z
+
+> Rd
+
+ D
+
+∇f (xt), u 
+
+E2
+
++
+
+D
+
+∇f (xt+1 ) − ∇ f (xt), u 
+
+E2
+
++ 2 
+
+D
+
+∇f (xt+1 ) − ∇ f (xt), u 
+
+E D 
+
+∇f (xt), u 
+
+E 
+
+e− ∥u−μt+1 ∥22ε2 du
+
+≥ 1(2 πε 2)d/ 2
+
+Z
+
+> Rd
+
+ D
+
+∇f (xt), u 
+
+E2
+
++ 2 
+
+D
+
+∇f (xt+1 ) − ∇ f (xt), u 
+
+E D 
+
+∇f (xt), u 
+
+E 
+
+e− ∥u−μt+1 ∥22ε2 du (12) Using Cauchy–Schwarz inequality and the bound (11) we derive 
+
+D
+
+∇f (xt+1 ) − ∇ f (xt), u 
+
+E D 
+
+∇f (xt), u 
+
+E
+
+≤ at. (13) Utilizing (13) , we continue with derivation (12) by introducing a constraint on the integral of the last term with respect to the probability measure. 
+
+Evt+1 ∼N (μt+1 ,ε 2I)
+
+Ct+1 Ft] ≥ − 2at + 1(2 πε 2)d/ 2
+
+Z
+
+> Rd
+
+D
+
+∇f (xt), u 
+
+E2
+
+e− ∥u−μt+1 ∥22ε2 du. 
+
+(14) Thus, the gradient dynamics have been eliminated. The next STEP II dedicated to the mean vector dynamics. We start by introducing the function Fz (μ) = Eu∼N (μ,ε 2I)[⟨z, u ⟩2] for every pair μ, z ∈ Rd. With this notation (14) and the definition of Eu∼N (μt+1 ,ε 2I)
+
+Ct+1 Ft] can be reformulated as 
+
+Evt+1 ∼N (μt+1 ,ε 2I)
+
+Ct+1 Ft] ≥ − 2at + F∇f (xt)(μt+1 ), (15) 
+
+Evt∼N (μt,ε 2I)
+
+Ct Ft−1] = F∇f (xt)(μt). (16) Next, we observe that Lines 5 and 6 of Algorithm 1 correspond to performing a step of gradient ascent with respect to μ on the function F∇f (xt)(μ). Along with (15) and (16) it defines the Et
+
+Ct dynamics. Firstly, we introduce the kernel and change Ct notation to reflect implicit dependence on arguments: 
+
+φ(x) = 1(2 πε 2)d/ 2 exp 
+
+ −∥ x∥2
+
+2ε2
+
+
+
+, (17) 20 ψa(x) = ( a, x )2 = (a, x )2
+
+∥x∥2 . (18) Then we can reformulate F∇f (xt)(μ) as follows 
+
+Fa(μ) = 
+
+Z
+
+> Rd
+
+ψa(u)φ(μ − u)d u. (19) After that we start the Hessian computation using the general Stokes’ theorem. 
+
+∇μFa(μ) =
+
+Z
+
+> Rd
+
+ψa(u)∇μφ(μ − u)d u
+
+=
+
+Z
+
+> Rd
+
+ψa(u)( −∇ uφ(μ − u))d u
+
+= −
+
+Z
+
+> Rd
+
+∇u(ψa(u)φ(μ − u))d u +
+
+Z
+
+> Rd
+
+∇u(ψa(u)) φ(μ − u)d u
+
+=
+
+Z
+
+> Rd
+
+∇u(ψa(u)) φ(μ − u)d u. (20) Following same reasoning we can derive 
+
+∇2
+
+> μ
+
+Fa(μ) = 
+
+Z
+
+> Rd
+
+∇2
+
+> u
+
+ψa(u)φ(μ − u)d u = Eu∼N (μ,ε 2I)
+
+∇2
+
+> u
+
+ψa(u) . (21) Straightforward computation provides 
+
+∇2
+
+> u
+
+ψa(u) = 1
+
+∥u∥8
+
+ ∥u∥4(2 aa ⊤∥u∥2 + 4 au ⊤⟨a, u ⟩ − 2⟨a, u ⟩2I
+
+−4ua ⊤⟨a, u ⟩) − 4∥u∥2  2a∥u∥2⟨a, u ⟩ − 2⟨a, u ⟩2u u⊤. (22) It implies for arbitrary a so that ∥a∥ = 1 the following bound holds. 
+
+∥∇ 2
+
+> u
+
+ψa(u)∥ ≤ 20 ∥a∥2
+
+∥u∥2 = 20 
+
+∥u∥2 . (23) Using (21), (23) and convexity of ∥ · ∥ we reach the bound 
+
+∥∇ 2
+
+> μ
+
+Fa(μ)∥ ≤ 20 Eu∼N (μ,ε 2I)
+
+ 1
+
+∥u∥2
+
+
+
+. (24) Assumption d > 3 ensures the convergence of the integral in (24) and provides the bound of the Hessian norm, thereby asserting the ˜L-smoothness of the objective function Fa(μ) with ˜L ≤ AEu∼N (μ,ε 2I)
+
+h 1
+
+> ∥u∥2
+
+i
+
+.
+
+Eu∼N (μt,ε 2I)
+
+ 1
+
+∥u∥2
+
+
+
+= 1(2 πε 2) d
+
+> 2
+
+Z
+
+> Rd
+
+1
+
+∥u∥2 e− ∥u−μt∥22ε2 du
+
+= 1(2 πε 2) d
+
+> 2
+
+"Z 
+
+> ∥u∥≤ ∥μt∥
+> 4
+
+1
+
+∥u∥2 e− ∥u−μt∥22ε2 du +
+
+Z 
+
+> ∥u∥>∥μt∥
+> 4
+
+1
+
+∥u∥2 e− ∥u−μt∥22ε2 du
+
+#
+
+≤ 1(2 πε 2) d
+
+> 2
+
+Z 
+
+> ∥u∥≤ ∥μt∥
+> 4
+
+1
+
+∥u∥2 e− ∥u∥2+∥μt∥2−2⟨u,μ t⟩ 
+
+> 2ε2
+
+du + 16 
+
+∥μt∥2
+
+≤ 1(2 πε 2) d
+
+> 2
+
+Z 
+
+> ∥u∥≤ ∥μt∥
+> 4
+
+1
+
+∥u∥2 e− ∥u∥2+ ∥μt∥222ε2 du + 16 
+
+∥μt∥2
+
+21 ≤ e− ∥μt∥24ε2 1(2 πε 2) d
+
+> 2
+
+Z
+
+> Rd
+
+1
+
+∥u∥2 e− ∥u∥22ε2 du + 16 
+
+∥μt∥2
+
+= e− ∥μt∥24ε2
+
+ε2(d − 2) + 16 
+
+∥μt∥2 .
+
+In the last transition we used classical result for χ2 distribution r moment 2r Γ( d 
+
+> 2+r
+
+)
+
+> Γ
+
+( d 
+
+> 2
+
+) . Then, ˜L ≤ 20 e− ∥μt∥24ε2 
+
+> ε2(d−2)
+
++ 16 ·20  
+
+> ∥μt∥2
+
+.Applying Lemma 4 to function F taking into account implicit step formulation μt+1 = μt + γtμ∇F∇f (xt)(μt) we get 
+
+F∇f (xt)(μt+1 ) ≥ F∇f (xt)(μt) + ( ∇F∇f (xt)(μt), μ t+1 − μt) − ˜L
+
+2 ∥μt+1 − μt∥2
+
+= F∇f (xt)(μt) + γtμ −
+
+˜Lγ tμ
+
+> 2
+
+2
+
+!
+
+∥∇ F∇f (xt)(μt)∥2 (25) By combining (15), (16) and (25) we derive 
+
+Evt+1 ∼N (μt+1 ,ε 2I)
+
+Ct+1 Ft] ≥ −2at + F∇f (xt)(μt) + γtμ −
+
+˜Lγ tμ
+
+> 2
+
+2
+
+!
+
+∥∇ F∇f (xt)(μt)∥2
+
+> (16)
+
+= Evt∼N (μt,ε 2I)
+
+Ct Ft−1]
+
+− 2at + γtμ −
+
+˜Lγ tμ
+
+> 2
+
+2
+
+!
+
+∥∇ F∇f (xt)(μt)∥2 (26) At the next step we work on the lower bound of ∥∇ Fa(μ)∥ in particular μ-space regions. 
+
+∇Fa(μ) = 1(2 πε 2)d/ 2
+
+Z
+
+> Rd
+
+⟨a, u ⟩2
+
+∥u∥2
+
+u − με2 e− ∥u−μ∥22ε2 du
+
+= 1
+
+ε(2 π)d/ 2
+
+Z
+
+> Rd
+
+⟨a, εv + μ⟩2
+
+∥εv + μ∥2 ve − ∥v∥22 dv
+
+= 1
+
+ε(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+⟨a, εv + μ⟩2
+
+∥εv + μ∥2 ve − ∥v∥22 dv
+
++ 1
+
+ε(2 π)d/ 2
+
+Z 
+
+> ∥v∥>∥μ∥
+> 2ε
+
+⟨a, εv + μ⟩2
+
+∥εv + μ∥2 ve − ∥v∥22 dv. (27) We proceed with evaluation of the second term of 27. 
+
+1(2 π)d/ 2
+
+Z 
+
+> ∥v∥>∥μ∥
+> 2ε
+
+⟨a, εv + μ⟩2
+
+∥εv + μ∥2 ve − ∥v∥22 dv
+
+≤ 1(2 π)d/ 2
+
+Z 
+
+> ∥v∥>∥μ∥
+> 2ε
+
+⟨a, εv + μ⟩2
+
+∥εv + μ∥2 ∥v∥e− ∥v∥22 dv
+
+≤ 1(2 π)d/ 2
+
+Z 
+
+> ∥v∥>∥μ∥
+> 2ε
+
+∥v∥e− ∥v∥22 dv (28) Then we use the fact that for d-dimensional ξ ∼ N (0 , I ) holds the further bound [Chandrasekaran et al., 2012]: 
+
+E [∥ξ∥] = √2 Γ   d+1 2
+
+
+
+Γ   d
+
+> 2
+
+ ≤ √d. (29) 22 After that we use Cauchy–Schwarz inequality in L2(Rd) space with Gaussian measure to derive 
+
+E I{∥ ξ∥>t }∥ξ∥ ≤  E ∥ξ∥2 12
+
+
+
+E
+
+h
+
+I2
+
+> {∥ ξ∥>t }
+
+i 12
+
+= √d (Pr ( ∥ξ∥ > t )) 12 . (30) Gaussian measure concentration inequality [Boucheron et al., 2013] for L = 1 Lipchitz function ∥ · ∥ yields 
+
+Pr ( ∥ξ∥ − E[∥ξ∥] > t ) ≤ e− t22 .
+
+Combining it with (29) we get Pr 
+
+
+
+∥ξ∥ − √d > t 
+
+
+
+≤ e− t22 or 
+
+Pr ( ∥ξ∥ > τ ) ≤ e− (τ −√d)22 , τ > √d. (31) Substitution of (31) into (30) provides 
+
+E I{∥ ξ∥>τ }∥ξ∥ = √de − (τ −√d)24 , τ > √d. (32) Finally, using (32) we transform (28) into 
+
+1
+
+ε(2 π)d/ 2
+
+Z 
+
+> ∥v∥>∥μ∥
+> 2ε
+
+⟨a, εv + μ⟩2
+
+∥εv + μ∥2 ve − v22 dv ≤ 1
+
+ε
+
+√de −   
+
+> ∥μ∥
+> 2ε−√d
+> 24
+
+, ∥μ∥
+
+2ε > √d. (33) Then we turn to the evaluation of the first term in (27). 
+
+1
+
+ε(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+⟨a, εv + μ⟩2
+
+∥εv + μ∥2 ve − ∥v∥22 dv
+
+= 1
+
+ε(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+⟨a, εv + μ⟩2
+
+∥εv + μ∥2 ve − ∥v∥22 dv
+
+= 1
+
+ε(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+ψ(εv + μ)ve − ∥v∥22 dv (34) We proceed by using the Taylor expansion with the remainder term in Lagrange form. 
+
+ψa(εv + μ)v = ψa(μ)v + ⟨∇ ψa(μ), εv ⟩v + 12
+
+h 
+
+εv ⊤
+
+Hψ(μ + εv ′) ( εv )
+
+i
+
+v, (35) for v′ = αv, 0 ≤ α ≤ 1.Symmetry considerations provides first term vanishing after integration over 
+
+n
+
+∥v∥ < ∥μ∥
+
+> 2ε
+
+o
+
+. Symmetry also simplifies the second term of (35) the in following way 
+
+1
+
+ε(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+⟨∇ ψa(μ), εv ⟩ve − ∥v∥22 dv
+
+!
+
+> i
+
+= 1(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+> d
+
+X
+
+> j=1
+
+∇ψa(μ)j vj vie− ∥v∥22 dv
+
+= 1(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+∇ψa(μ)ivivie− ∥v∥22 dv
+
+23 = ∇ψa(μ)i
+
+(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+v21 e− ∥v∥22 dv
+
+= ∇ψa(μ)i
+
+(2 π)d/ 2
+
+1
+
+d
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+∥v∥2e− ∥v∥22 dv. (36) We apply Laurent-Massart inequalities [Laurent and Massart, 2000] to construct the lower bound of the integral in (36). 
+
+Pr 
+
+
+
+∥v∥2 − d ≤ 2√dx + 2 x
+
+
+
+≤ e−x,
+
+Pr 
+
+
+
+d − ∥ v∥2 ≥ 2√dx 
+
+
+
+≤ e−x. (37) Assuming x = 1 and ∥μ∥ 
+
+> 2ε
+
+≥
+
+p
+
+d + 2 √d + 2 we get 
+
+1(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+∥v∥2e− ∥v∥22 dv
+
+≥ 1(2 π)d/ 2
+
+Z
+
+> d−2√d< ∥v∥2<d +2 √d+2
+
+∥v∥2e− ∥v∥22 dv
+
+≥ (d − 2√d) Pr 
+
+
+
+d − 2√d < ∥v∥2 < d + 2 √d + 2 
+
+
+
+≥ (d − 2√d)(1 − 2e−1)
+
+≥ (d − 2√d)4 (38) Combining (38) and (36) we derive 
+
+1(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+⟨∇ ψa(μ), v ⟩ve − v22 dv ≥ ∥∇ ψa(μ)∥
+
+d
+
+(d − 2√d)4= ∥∇ ψa(μ)∥
+
+ 14 − 12√d
+
+
+
+≥ ∥∇ ψa(μ)∥
+
+8 (39) To justify the last transition we narrow our analysis to the case d ≥ 16 .Then we examine the last term of Taylor Expansion (36) using (23). 
+
+12
+
+h 
+
+εv ⊤
+
+Hψ(μ + εv ′) ( εv )
+
+i
+
+v ≤ ε2
+
+2 ∥v∥3 Hψ(μ + εv ′)
+
+> (23)
+
+≤ ε2
+
+2 ∥v∥3 20 
+
+∥μ + εv ′∥2 .
+
+Using norm convexity we conclude 
+
+1
+
+ε(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+12
+
+h 
+
+εv ⊤
+
+Hψ(μ + εv ′) ( εv )
+
+i
+
+ve − ∥v∥22 dv
+
+≤ 1
+
+ε(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+12
+
+h 
+
+εv ⊤
+
+Hψ(μ + εv ′) ( εv )
+
+i
+
+v e− ∥v∥22 dv
+
+24 ≤ 1
+
+ε(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+ε2
+
+2 ∥v∥3 ∥ 20 
+
+∥μ + εv ′∥2 e− ∥v∥22 dv
+
+≤ 1
+
+ε(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+ε2
+
+2 ∥v∥3 ∥ 80 
+
+∥μ∥2 e− ∥v∥22 dv
+
+≤ 40 ε
+
+∥μ∥2(2 π)d/ 2
+
+Z 
+
+> ∥v∥<∥μ∥
+> 2ε
+
+∥v∥3 e− ∥v∥22 dv
+
+≤ 40 ε
+
+∥μ∥2(2 π)d/ 2
+
+Z
+
+> Rd
+
+∥v∥3 e− ∥v∥22 dv
+
+≤ 40 ε
+
+∥μ∥2 d 32 . (40) The last transition utilizes Cauchy-Schwarz inequality and already mentioned values of E[∥v∥] ≤ √d and E[∥v∥2] = d.Finally, using triangle inequality as ∥a + b∥ ≥ ∥ a∥ − ∥ b∥ we combine (27), (33), (39) and (40) to reach 
+
+∥∇ Fa(μ)∥ ≥ ∥∇ ψa(μ)∥
+
+8 − 40 ε
+
+∥μ∥2 d 32 −√dε e−   
+
+> ∥μ∥
+> 2ε−√d
+> 24
+
+. (41) After that we can continue the recursion (26) applying (41). 
+
+Evt+1 ∼N (μt+1 ,εI )
+
+Ct+1 Ft] ≥ Evt∼N (μt,εI )
+
+Ct Ft−1] − 2at
+
++ γtμ −
+
+˜Lγ tμ
+
+> 2
+
+2
+
+! 
+
+∥∇ ψ∇f (xt)(μt)∥
+
+8 − 40 ε
+
+∥μt∥2 d 32 −√dε e− 
+
+> ∥μt∥
+> 2ε−√d
+> !24
+
+
+
+> 2
+
+. (42) We beginning the evaluation of (42) by requiring 
+
+  
+
+> ∥∇ ψ∇f(xt)(μt)∥
+> 24
+
+≥ 40 ε 
+
+> ∥μt∥2
+
+d 32 ,  
+
+> ∥∇ ψ∇f(xt)(μt)∥
+> 24
+
+≥ 
+
+> √dε
+
+e−  
+
+> ∥μt∥
+> 2ε−√d
+> !24
+
+,γtμ ≥ ˜Lγ tμ
+
+> 2
+
+.
+
+(43) To start the evaluation of conditions (43) we introduce the angle βt between the μt and ∇f (xt).
+
+∥∇ ψ∇f (xt)(μ)∥ = 2⟨∇ f (xt), μ ⟩
+
+μ4 {∇ f (xt)∥μ∥2 − μ⟨∇ f (xt), μ ⟩} 
+
+≥ 2
+
+∥μ∥3 cos( βt)  ∥μ∥2 − ∥ μ∥2 cos( βt)
+
+≥ 2
+
+∥μ∥ cos( βt)(1 − cos( βt)) 
+
+(44) Hence, choosing ε ≤ d− 32 cos( βt)(1 −cos( βt)) ∥μt∥ 
+
+> 480
+
+we satisfy the first condition. This choice of ε also justifies second restriction in (43). To satisfy the last inequality of (43) we choose γtμ ≤ ∥μt∥2 
+
+> 640
+
+≤ 1˜L . Then, (42) transforms into 25 Evt+1 ∼N (μt+1 ,εI )
+
+Ct+1 Ft] ≥ Evt∼N (μt,εI )
+
+Ct Ft−1] − 2at + γtμ
+
+2
+
+∥∇ ψ(μt)∥2
+
+24 2
+
+= Evt∼N (μt,εI )
+
+Ct Ft−1] − 2at + γtμ
+
+2 cos 2(βt)(1 − cos( βt)) 2
+
+24 2∥μt∥2 . (45) After that we require 4at ≤ cos 2(βt)(1 −cos( βt)) 2 
+
+> 3·29·52
+
+. Recalling definition of at = 4 Lγ tx
+
+> 2
+
+r
+
+1 −
+
+ Lγ tx
+
+> 2
+
+2
+
+we pick γtx ≤ 
+
+> cos 2(βt)(1 −cos( βt)) 2
+> 3·212 ·52L
+
+to satisfy Stated restriction. Finally we reach 
+
+Evt+1 ∼N (μt+1 ,εI )
+
+Ct+1 Ft] = Evt∼N (μt,εI )
+
+Ct Ft−1] + γtμ
+
+ cos( βt)(1 − cos( βt)) 24 ∥μt∥
+
+2
+
+. (46) 
+
+Corollary 2 
+
+In the setting of Theorem 1 for iterations of the Algorithm 1 with ε = d− 32 cos( βt)(1 −cos( βt)) M 
+
+> 480
+
+, γ tμ = ∥μt∥2 
+
+> 640
+
+, γ tx = 
+
+> cos 2(βt)(1 −cos( βt)) 2
+> 3·212 ·52L
+
+the following inequality holds: 
+
+E Ct+1 Ft] ≥ E Ct Ft−1] + cos 2(βt)(1 − cos( βt)) 2
+
+3 · 210 · 52 . (47) If additionally δ ≤ cos( βt) ≤ 1 − δ with δ ∈  0; 12
+
+ and ε = d− 32 δM  
+
+> 960
+
+, γ tx = δ2 
+
+> 3·214 ·52L
+
+, then 
+
+E Ct+1 Ft] ≥ E Ct Ft−1] + δ2
+
+3 · 212 · 52 . (48) 
+
+Proof. The proof follows by direct substitution into the result of Theorem 1. 
+
+Lemma 2 
+
+Let in the setting of Theorem 1 δ ≤ cos (β0) ≤ 1 − δ with δ ∈  0; 12
+
+ and ε = d− 32 δM  
+
+> 960
+
+, γ tx = δ2 
+
+> 3·214 ·52L
+
+. Then 
+
+E Ct|F t−1 increase monotonically to the value cos   δ 
+
+> 32 d
+
++ Lγ tx + arccos(1 − δ)2 (1 − e−1) and then never decrease below. 
+
+Proof. To justify the first part of Statement related to E Ct|F t−1 monotonically growth it sufficient to show, that the angle βt will decrease until cos (βt) reaches 1 − δ. We note that Ct dynamic analysis closely related to the evaluation of the angle βt. We proceed by assuming δ ≤ cos( βt) ≤ q − δ considering 
+
+∥μt+1 − ∇ f (xt+1 )∥ (11) 
+
+≤ ∥μt+1 − ∇ f (xt)∥ + at
+
+= ∥μt + γtμ∇μEt [Ct] μ=μt − ∇ f (xt)∥ + at
+
+= ∥μt + γtμF∇f (xt)(μt) − ∇ f (xt)∥ + at. (49) Then we recall decomposition (27) and that one integral there contains (36) . We remind that ∇ψ(μ) =  
+
+> 2⟨∇ f(xt),μ ⟩
+> μ4
+
+{∇ f (xt)∥μ∥2 − μ⟨∇ f (xt), μ ⟩} which implies its collinearity to μt − ∇ f (xt). Using the same bounds 26 as in (41) we continue derivation. 
+
+∥μt+1 − ∇ f (xt+1 )∥ ≤ ∥μt − ∇ f (xt)∥ − 12∥μt∥ γtμ
+
+ ∥∇ ψ(μt)∥
+
+8 − 40 ε
+
+∥μt∥2 d 32 −√dε e− 
+
+> ∥μt∥
+> 2ε−√d
+> !24
+
+ + at. (50) After that we note δ ≤ cos (βt) ≤ 1 − δ with δ ∈  0; 12
+
+ implies both cos (βt) and 1 − cos (βt) greater than or equal to 
+
+δ and one of them greater then 12 , which yields cos (βt)(1 − cos (β0)) ≥ δ 
+
+> 2
+
+. Using it along with a choice of parameters in Theorem 1 (see transitions (42) to (46)) we conclude 
+
+∥μt+1 − ∇ f (xt+1 )∥ ≤ ∥μt − ∇ f (xt)∥, (51) Which means that once the condition δ ≤ cos (βt) ≤ 1−δ holds βt ≥ βt+1 . Hence, E Ct|F t−1 growth monotonically until cos (βt) exceeds (1 − δ). After that βt can not exceed δ0 := Lγ tx + arccos (1 − δ), since the direction of the gradient changes less then 2 arcsin 
+
+ Lγ tx
+
+> 2
+
+
+
+per step, as was shown in the beginning of the Theorem 1 proof, and βt
+
+can not increase further if δ ≤ cos( βt) ≤ 1 − δ as shown above. Finally, we evaluate 
+
+E Ct|F t−1 = 1(2 πε 2)d/ 2
+
+Z
+
+> Rd
+
+D
+
+∇f (xt), u 
+
+E2
+
+e− ∥u−μt∥22ε2 du
+
+= 1(2 πε 2)d/ 2
+
+Z
+
+> Rd
+
+D
+
+∇f (xt), s − μt
+
+E2
+
+e− ∥s∥22ε2 ds
+
+= 1(2 π)d/ 2
+
+Z
+
+> Rd
+
+D
+
+∇f (xt), εv − μt
+
+E2
+
+e− ∥v∥22 dv. (52) We apply Laurent-Massart inequality [Laurent and Massart, 2000] (37) with x = 1 to justify Pr 
+
+
+
+d − ∥ v∥2 ≥ 2√d
+
+
+
+≤
+
+e−1. Then we can bound the integral in (52). 
+
+1(2 π)d/ 2
+
+Z
+
+> Rd
+
+D
+
+∇f (xt), εv − μt
+
+E2
+
+e− ∥v∥22 du ≥ 1(2 π)d/ 2
+
+Z
+
+> ∥v∥2≤2√d
+
+D
+
+∇f (xt), εv − μt
+
+E2
+
+e− ∥v∥22 du
+
+≥ 1(2 π)d/ 2
+
+Z
+
+> ∥v∥2≤2√d
+
+cos 
+
+ δ
+
+32 d + Lγ tx + arccos(1 − δ)
+
+2
+
+e− ∥v∥22 du
+
+≥ cos 
+
+ δ
+
+32 d + Lγ tx + arccos(1 − δ)
+
+2
+
+(1 − e−1). (53) It concludes the proof. 
+
+B.1 Initialization with no prior information 
+
+Lemma 2 naturally leads to two complementary settings. The first is formalized in Lemma 5 and corresponds to initializing the policy without any prior knowledge of the target function f .27 Lemma 5 
+
+Let Assumptions 1, 2 be satisfied and d ≥ 16 . Then for iterations of Algorithm 1 with δ ≤ cos (β0) ≤ 1 − δ,
+
+δ ∈  0; 12
+
+ and ε = d− 32 δM  
+
+> 960
+
+, γ tx = δ2 
+
+> 3·214 ·52L
+
+, γ tμ = ∥μt∥2 
+
+> 640
+
+the following bound holds:  
+
+> T−1
+
+X
+
+> t=0
+
+1
+
+T E Bt∥∇ f (xt)∥2 ≤ 2 f (x0) − f (x∗)
+
+T γ tx
+
+, (54) where M = min t{∥ μt∥} and Bt = min 
+
+n
+
+E[C0] + t · δ2 
+
+> 3·212 ·52
+
+; cos   δ 
+
+> 32 d
+
++ Lγ tx + arccos(1 − δ)2 (1 − e−1)
+
+o
+
+.
+
+Proof. We start from the result of Lemma 1. The choice of γtx = δ2 
+
+> 3·214 ·52L
+
+guarantees 
+
+γtx − Lγ tx
+
+> 2
+
+2 ≥ γtx
+
+2 . (55) Subsequently, Theorem 1 and Lemma 2 justifies 
+
+E Ct|F t−1 ≥ Bt. (56) Substitution (55), (56) into Lemma 1 and rearranging the terms finish the proof. Notably, in this setting, substituting E Ct Ft−1] behaviour described in Lemma 2 yields a non-standard convergence criterion, namely convergence in terms of a weighted average of squared gradient norms. The weights increase with the iteration index until reaching a saturation level. Such a result may be more transparent for practical scenarios such as memory-efficient LLM fine-tuning, where the algorithm outputs the final iterate rather than an averaged solution. We also note that Lemma 5 relies on a uniform-in-iteration lower bound of the form cos (βt) > δ , which results in a fixed step size γtx and a constant additive increase of E Ct Ft−1] per iteration. However, as the policy improves, 
+
+cos (βt) increases, which simultaneously accelerates the growth of E Ct Ft−1] and allows for larger admissible step sizes γtx. Consequently, the uniform bound becomes loose after a certain number of iterations and does not fully capture these acceleration effects in the theoretical rate. Along similar lines, bounds of the type used in the proof of Lemma 1 yield average values on the order of 1 
+
+> d
+
+both for δ2 (consequently for γtx) and E[C0]. It introduces a factor d2 in the rate of Lemma 5 during the initial phase and results in growth of E Ct Ft−1] on the order of 1 
+
+> d
+
+per iteration. 
+
+B.2 Initialization leveraging gradient direction at the initial point 
+
+Lemma 3 
+
+Let Assumptions 1, 2 be satisfied, d ≥ 16 , and μ0 ∥ ∇ f (x0). Then for iterations of Algorithm 1 with 
+
+δ ≤ cos (β0) ≤ 1 − δ, δ ∈  0; 12
+
+ and ε = d− 32 δM  
+
+> 960
+
+, M = min t{∥ μt∥} , γ tx = δ2 
+
+> 3·214 ·52L
+
+, γ tμ = ∥μt∥2 
+
+> 640
+
+the following bound holds: 
+
+E[∥∇ f (xT )∥2] ≤ 10 f (x0) − f (x∗)
+
+T γ x
+
+.
+
+Proof. We start from noticing that (55) remains true. Additionally, given μ0 ∥ ∇ f (x0) in the setting of Lemma 2 Algorithm 1 is already in the regime where E Ct Ft−1] fluctuates in a neighbourhood of 1 and attains values no 28 smaller than cos   δ 
+
+> 32 d
+
++ Lγ tx + arccos(1 − δ)2 (1 − e−1). We choose δ = 14 which yields 
+
+E Ct Ft−1] ≥ 15 , for all t. (57) Substituting (55) with (57) into the Lemma 1 and rearranging the terms we derive the desired result. 29

@@ -1,0 +1,490 @@
+Title: Grow, Don't Overwrite: Fine-tuning Without Forgetting
+
+URL Source: https://arxiv.org/pdf/2603.08647v1
+
+Published Time: Tue, 10 Mar 2026 02:38:38 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# Grow, Don’t Overwrite: Fine-tuning Without Forgetting 
+
+# Dyah Adila 1∗ Hanna Mazzawi 2 Benoit Dherin 2 Xavier Gonzalvo 21University of Wisconsin-Madison 2Google Research 
+
+Abstract 
+
+Adapting pre-trained models to specialized tasks often leads to catastrophic forgetting, where new knowledge overwrites foundational capabilities. Existing methods either compromise performance on the new task or struggle to balance training stability with efficient reuse of pre-trained knowledge. We introduce a novel function-preserving expansion method that resolves this dilemma. Our technique expands model capacity by replicating pre-trained parameters within transformer submodules and applying a scaling correction that guarantees the expanded model is mathematically identical to the original at initialization, enabling stable training while exploiting existing knowledge. Empirically, our method eliminates the trade-off between plasticity and stability, matching the performance of full fine-tuning on downstream tasks without any degradation of the model’s original capabilities. Furthermore, we demonstrate the modularity of our approach, showing that by selectively expanding a small subset of layers we can achieve the same performance as full fine-tuning at a fraction of the computational cost. 
+
+# 1 Introduction 
+
+Neural networks suffer from a severe degradation of previously learned knowledge when fine-tuned on a new task, a phenomenon known as catastrophic forgetting [2 , 19 , 28 , 33 ]. This poses a critical obstacle for adapting large pre-trained models to new, specialized domains. When a model is fine-tuned for a specific purpose, such as scientific reasoning or medical diagnosis, it risks losing the foundational knowledge that makes it powerful. For example, a model specialized in quantum physics literature may excel at generating novel hypotheses but lose its ability to perform basic arithmetic, fundamentally limiting its utility and forcing practitioners into a compromise between expert skill and general competence [4, 22]. This forgetting happens because standard optimization overwrites a model’s parameters to fit new data, causing its internal representations to shift abruptly and erase existing skills [ 14 , 33 ]. A common family of solutions uses regularization, which adds a penalty to the loss function to discourage the model from deviating too far from its original state [ 14 , 19 , 33 ]. However, this imposes a zero-sum trade-off: within a fixed-capacity model, any resource allocated to remembering the past is a resource taken away from learning the future, preventing the model from excelling at either [9]. An alternative family of methods, capacity growth, circumvents this trade-off by adding new parameters for new tasks while freezing the original model. This, however, introduces its own dilemma between stability and efficiency. For training to be stable, the expansion must be function-preserving–that is, it must not alter the model’s outputs on existing data upon initialization [ 6]. Yet, for learning to be efficient, new components should exploit the rich knowledge from pre-training rather than starting from scratch. Current methods fail to reconcile these two needs. Some achieve stability by inserting randomly initialized identity modules, which is inefficient as it ignores existing knowledge [ 10 , 12 , 47 ]. Others attempt to reuse pre-trained weights but violates the function-preserving constraint [45]. A method that can expand capacity using pre-trained knowledge while guaranteeing function-preservation has remained a critical gap in the literature. In this work, we close this gap with a function-preserving expansion technique inspired by Deep Fusion [ 27 ]. The core of our method is to add capacity by replicating entire computational units within a Transformer’s MLP submodules (i.e., the intermediate neurons in the MLP). We guarantee that our approach is function-preserving with a two-step process  
+
+> ∗Work done during internship at Google Research.
+> †Corresponding author: Dyah Adila, adila@wisc.edu
+
+1 
+
+> arXiv:2603.08647v1 [cs.LG] 9 Mar 2026 (a) Our growing approach (b) Fine-tuning Strategy
+
+Figure 1: (a) We double the MLP’s hidden dimension by duplicating the up-projection weights ( 𝑊 (1)         
+
+> 𝑛 ) and compensating in the down-projection layer ( 𝑊 (2)
+> 𝑛 ) to preserve the original function. (b) In the G-Freeze variant, only new parameters (darker shades) are trained. In the G-Train variant, the entire up-projection matrix is trained while the down-projection matrix is frozen, as indicated by the snowflake symbol.
+
+occurring within each submodule. First, we expand its internal dimension by creating 𝑘 copies of the parameters in its up-projection layer (which maps the input to a wider hidden state). Second, to ensure the final output remains unchanged, we apply a compensatory scaling to the weights of the down-projection layer (which maps the internal state back to the model’s hidden dimension), dividing them by the replication factor 𝑘 . This simple scaling perfectly counteracts the wider internal activation, ensuring the expanded model is mathematically identical to the original at initialization. Our experiments show this approach resolves the trade-off between learning new skills and retaining old ones. Across a diverse set of benchmarks—including question-answering, translation, and mathematical reasoning—our method matches the performance of standard fine-tuning on new tasks while often exhibiting almost zero performance degradation 
+
+on the model’s original capabilities. We also demonstrate that expanding only a targeted subset of layers is sufficient to match the results of a network-wide expansion, substantially reducing computational cost. Furthermore, because it only expand MLP submodules, even a full expansion of every layer requires training only 60% of the original model’s parameters , offering a considerable saving compared to standard fine-tuning, which modifies 100%. 
+
+Main Contributions: 
+
+• A novel function-preserving network growing method that reuses pre-trained knowledge to learn new skills. 
+
+• Our approach matches standard fine-tuning (SFT) performance on new tasks while completely eliminating catastrophic forgetting. 
+
+• A modular framework where this performance is achieved by expanding and finetuning only a targeted subset of layers, reducing computational cost. 
+
+# 2 Background 
+
+Problem Statement. Given a pretrained language model 𝑀 0 with parameters 𝜃 0, we address the task of fine-tuning it for a downstream task represented by the dataset D𝑇 . The objective is to produce an adapted model, 𝑀 𝑇 with parameters 
+
+𝜃 𝑇 , that minimizes the new task loss without degrading performance on the original pre-training distribution. Our goal can be formally expressed as: 
+
+min 
+
+> 𝜃 𝑇
+
+L𝑇 (𝜃 𝑇 ) subject to L𝑃𝑇 (𝜃 𝑇 ) ≤ L 𝑃𝑇 (𝜃 0)
+
+In practice, the full pre-training corpus D𝑃𝑇 is often inaccessible. We therefore approximate the model’s general capabilities by measuring its performance on a proxy benchmark, Dproxy , which covers a broad range of foundational skills. Our evaluation thus aims to confirm low test error on the new task D𝑇 while demonstrating no increase in test error on the proxy benchmark Dproxy relative to the original model 𝑀 0.
+
+Preliminaries. We first establish notation for the Transformer architecture, adopting a convention similar to [ 6 ]. A Transformer model is composed of a stack of 𝑁 layers. Each layer 𝑛 ∈ [ 1, 𝑁 ] contains two primary submodules: a multi-head self-attention (MHA) mechanism and multi-layer perceptron (MLP), with residual connections and layer normalization applied after each. 2Our approach grows the MLP submodules within Transformer models. The operation of a standard MLP in layer 𝑛 is defined as: MLP 𝑛 (X) = ReLU (XW (1) 
+
+> 𝑛
+
++ B(1) 
+
+> 𝑛
+
+) × W(2) 
+
+> 𝑛
+
++ B(2)
+
+> 𝑛
+
+The input to the MLP submodule is X ∈ R𝑠 ×ℎ , where 𝑠 is the sequence length and ℎ is the model’s hidden dimension. The MLP consists of two linear layers. The first is an up-projection layer ( W(1) 
+
+> 𝑛
+
+∈ Rℎ×𝑝 and B(1) 
+
+> 𝑛
+
+) that maps the input from dimension ℎ to a usually larger intermediate hidden dimension 𝑝 . The second is a down-projection layer ( W(2) 
+
+> 𝑛
+
+∈ R𝑝 ×ℎ and 
+
+B(2) 
+
+> 𝑛
+
+) that projects the output back to dimension ℎ for the subsequent Transformer layer. For brevity in subsequent sections, we omit the bias terms ( B(1) 
+
+> 𝑛
+
+, B(2) 
+
+> 𝑛
+
+) and use underset notation to denote matrix dimensions (i.e., writing W(1) 
+
+> 𝑛
+
+∈ Rℎ×𝑝 as W(1)
+
+> 𝑛 ℎ×𝑝
+
+). Our method, however, remains fully compatible with models that include bias terms. 
+
+# 3 Methodology 
+
+Our method adds capacity to a pre-trained Transformer by growing its MLP submodules in a function-preserving manner. This guarantees the model’s initial behavior remains unchanged, while allowing it to learn new skills by building upon pretrained parameters instead of starting from random initialization. We achieve this with a two-step process. First, we double the MLP’s hidden dimension 𝑝 by duplicating the up-projection weight matrix, W(1) 
+
+> 𝑛
+
+. The new expanded matrix, ˆW(1) 
+
+> 𝑛
+
+, is formed by horizontally concatenating the original matrix with itself: 
+
+W(1)
+
+> 𝑛 ℎ×𝑝
+
+↦ → ˆW(1)
+
+> 𝑛 ℎ×2𝑝
+
+:=
+
+"
+
+W(1)
+
+> 𝑛 ℎ×𝑝
+
+W(1)
+
+> 𝑛 ℎ×𝑝
+
+#
+
+Next, to ensure the output of the MLP submodule remains identical, we compensate for this expansion in the down-projection layer. The new down-projection matrix, ˆW(2) 
+
+> 𝑛
+
+, is formed by vertically concatenating the original matrix, scaled by a factor of 12 , with itself: 
+
+W(2) 
+
+> 𝑛 𝑝 ×ℎ
+
+↦ → ˆW(2) 
+
+> 𝑛
+> 2𝑝 ×ℎ
+
+:=
+
+ 
+
+> 12
+
+W(2)  
+
+> 𝑛 𝑝 ×ℎ
+> 12
+
+W(2) 
+
+> 𝑛 𝑝 ×ℎ
+
+
+
+Proof of Function Preservation. Let Y = ReLU (XW (1) 
+
+> 𝑛
+
+). The output of the original, non-grown MLP is YW (2) 
+
+> 𝑛
+
+. After expansion, the output of the up-projection layer is [Y Y]. The final output of the expanded MLP is thus: 
+
+[Y Y]
+
+" 12 W(2) 
+
+> 𝑛
+> 12
+
+W(2)
+
+> 𝑛
+
+#
+
+= 12 YW (2) 
+
+> 𝑛
+
++ 12 YW (2) 
+
+> 𝑛
+
+= YW (2)
+
+> 𝑛
+
+This is identical to the output of the original MLP. □
+
+Fine-tuning Strategy. We freeze all original model parameters and exclusively train the new ones, enabling the model to learn new skills without disrupting its original capabilities. While standard fine-tuning of a 1B-parameter model updates all weights, our method—even when growing all layers—trains only the new parameters, which total approximately ~60% of the original count. As we show in Section 4.2, this cost can be reduced further by growing only a targeted subset of layers, often with comparable performance. From this principle, we derive two fine-tuning variants, detailed in Figure 1b: 
+
+• G-Freeze : Our primary and default strategy. It strictly trains only the newly added weights in both the up-projection ( ˆW(1) 
+
+> 𝑛
+
+) and down-projection ( ˆW(2) 
+
+> 𝑛
+
+) matrices. 
+
+• G-Train : An alternative strategy designed for cognitively demanding tasks like mathematical reasoning. This variant involves fine-tuning the entire expanded up-projection matrix ( ˆW(1) 
+
+> 𝑛
+
+) while keeping the entire down-projection 
+
+3matrix ( ˆW(2) 
+
+> 𝑛
+
+) and all other original parameters frozen. This approach is informed by prior work suggesting that factual knowledge is localized in the down-projection layer, which we aim to preserve [7, 29]. Unless otherwise stated, all experiments use the G-Freeze strategy. 
+
+Generalization to Arbitrary Expansion Factors. Our approach can be generalized from two copies to an arbitrary integer factor, 𝑘 ≥ 2. In this case, the up-projection matrix is concatenated 𝑘 times, and each of the 𝑘 copies in the stacked down-projection matrix is scaled by 1 
+
+> 𝑘
+
+. The function-preserving property holds for any value of 𝑘 . While our method supports any expansion factor, we found empirically that using 𝑘 = 2 consistently provided the best trade-off between performance gains and parameter efficiency. We therefore use 𝑘 = 2 for all experiments in this paper. 
+
+(a) French translation (b) Science entailment 
+
+(c) Science Q&A (d) Math QA 
+
+Figure 2: SFT (blue) shows severe degradation on the original domain (top plots), particularly for tasks with large domain shifts like translation and entailment. Our method (green, orange) maintain original performance while matching or exceeding the baseline on the new fine-tuning tasks (bottom plots). 
+
+# 4 Experimental Results 
+
+This section evaluates the following claims: 4(a) French translation (b) Science entailment (c) Science Q&A 
+
+Figure 3: Full performance can be achieved with a fraction of the trainable parameters. Growing a targeted subset of 10 layers (green) consistently matches the performance of growing all layers (orange). 
+
+• Resolving the Forgetting-Performance Trade-off (Section 4.1). Our method matches full SFT performance on new tasks while completely eliminating catastrophic forgetting. 
+
+• Parameter Efficiency (Section 4.2). Expanding a small, targeted subset of layers achieves the performance of growing the entire model at a fraction of the computational cost. 
+
+• Scalable Improvement (Section 4.3). Performance on new tasks scales positively with the number of layers expanded, linking increased capacity to improved skill. 
+
+• Task Complexity (Section 4.4). Capacity correlates with task difficulty; more cognitively demanding tasks like mathematical reasoning require larger expansions for optimal performance. 
+
+• Representation Stability (Section 4.5). Our method preserves the model’s original latent representations, directly preventing the representational shift known to cause forgetting. 
+
+Datasets and Metrics. We measure performance on two fronts: knowledge retention and new task acquisition. To measure retention and quantify catastrophic forgetting, we follow recent work [ 14 , 45 ] by evaluating performance on commonsense reasoning and language understanding benchmarks–a task that reflects foundational knowledge acquired during pre-training. We use the WinoGrande schema challenge [39]. To measure new task acquisition, we test on four tasks with varying degrees of domain shift from the general pre-training distribution: tasks with significant shifts, such as English-French translation (mtnt; 30 ) and entailment with its rigid answer format (SciTail; 17 ), and tasks with more subtle shifts, like science question-answering (QASC; 18 ) and mathematical reasoning (MathQA; 1). Performance on mtnt is measured using SacreBLEU [ 32 ], while for all other tasks, we report accuracy based on an exact string match between the model’s output and the ground truth answer. Unless stated otherwise, experiments on MathQA are using our G-train variant, and all other datasets are using G-freeze. 
+
+Setup. For all experiments, we finetune Gemma3-1B [ 42 ] models using Adam optimizer with 1𝑒 − 3 learning rate. To ensure a fair comparison, we determine the number of training steps based on the convergence of the vanilla finetuning baseline for each respective task. We then train all models for this same number of updates, plotting performance on both the new task and the WinoGrande proxy benchmark. This allows us to visualize the dynamics of new skill acquisition versus knowledge retention over time. 
+
+# 4.1 Eliminates Forgetting 
+
+Results. Figure 2 shows that our approach successfully eliminates the trade-off between new task acquisition and catastrophic forgetting. Our G-Freeze variant (orange line) achieves downstream performance comparable or superior to standard fine-tuning while almost perfectly preserving original domain knowledge. In stark contrast, the baseline (blue line) suffers a complete collapse of prior knowledge, with its accuracy on the original domain plummeting to near-zero on tasks with large domain shifts (Figures 2a and 2b). Our results hold for larger models, as shown in Appendix C. On more cognitively demanding tasks like MathQA (Figure 2d), the G-Train variant (green line)—which fine-tunes all 5up-projection parameters—outperforms G-Freeze. We hypothesize that for complex tasks with only a moderate domain shift, unfreezing the original up-projection parameters ( W(1) ) provides the necessary plasticity to boost new task performance without risking the loss of foundational knowledge stored in the down-projection layer. In Appendix C.1, we show that our results persist in bigger models. 
+
+# 4.2 Matching Full Fine-tuning with a Fraction of the Parameters 
+
+Setup. To evaluate the modularity and efficiency of approach, we compare the performance of growing all layers versus growing only a targeted subset. We identify the most task-relevant layers using a simple heuristic: after a preliminary standard fine-tuning run, we rank layers by the magnitude of their weight updates and select the top-𝑁 for expansion. While we use this straightforward method for our analysis, we hypothesize that performance could be further optimized with more sophisticated skill localization techniques Panigrahi et al. [31], Todd et al. [43]. 
+
+Results. Figure 3 shows that growing a targeted subset of 9-10 layers consistently matches the performance of growing all layers (green vs. orange lines, respectively). This allows us to achieve full performance while nearly halving the number of trainable parameters, reducing them from ~60% of the full model to ~30%.  
+
+> (a) G-freeze: Science entailment (b) G-train: Math QA
+
+Figure 4: Performance scales with the number of grown layers 𝑁 . New task performance (bottom) improves as 𝑁 increases, an effect most significant on the more complex MathQA task (b). 
+
+# 4.3 Scaling Properties 
+
+Setup. Next, we use the same layer selection procedure as Section 4.2, and vary 𝑁 ∈ { 1, 3, 5, 7, 10 , 15 , 20 } to test how performance changes with growing more layers. 
+
+Results. Figure 4 shows that new task performance scales positively with the number of layers grown ( 𝑁 ). This effect is most pronounced on complex tasks like MathQA (Figure 4b), whereas on simpler tasks like entailment (Figure 4a), the benefit is concentrated in the early training stages before performance converges. This scaling introduces a minor forgetting trade-off for the G-Train variant on MathQA, where increasing 𝑁 causes a gradual decline in original domain performance. The G-Freeze variant, however, does not exhibit this trade-off, with its original domain accuracy remaining stable within a ±2% range. 
+
+# 4.4 Task Complexity Analysis 
+
+Setup. Given our finding that more cognitively demanding tasks–i.e., tasks that require thinking steps– require a larger number of layers to grow, we now investigate the underlying reason for this phenomenon. We analyze this from the perspective of the weight update matrix, hypothesizing that they induce higher-rank 1 weight updates across a broader set of layers. To test this, we measure the change in the first MLP layer weights (up-projection) between vanilla model 
+
+> 1high rank here is still a fraction of what a full rank update would be.
+
+6(a) Science entailment (b) French Translation (c) Math QA 
+
+Figure 5: The effective rank of weight update matrix. Brighter colors in the colorbar indicate a higher rank. The x-axis is the layer index, the y-axis is the training stage–with the earliest stages at the top and the latest at the bottom. Cognitively demanding tasks like MathQA, involve high-rank weight updates in almost all layers. 
+
+(SFT, without growing) checkpoints ΔW(1) = W(1) 
+
+> 𝑡
+
+− W(1)  
+
+> 𝑡 −1
+
+with 𝑡 as the training step; then calculate the effective rank of 
+
+ΔW(1) .
+
+Results. Figure 5 supports our hypothesis by visualizing the rank of ΔW(1) (lighter colors indicate higher rank) across all layers (x-axis) over time. For tasks like science entailment and translation, the high-rank updates are consistently 
+
+localized to a specific subset of layers (e.g., early layers for entailment, middle-to-late layers for translation). In stark contrast, for MathQA, the high-rank updates are distributed broadly across nearly all layers, particularly in the initial fine-tuning stages. This suggests that simpler tasks can be learned by modifying a small, specialized part of the network, whereas complex reasoning tasks require diffuse, high-rank changes across the entire model, explaining why growing more layers is necessary for optimal performance. 
+
+# 4.5 Preserving Base Model Function Vectors 
+
+Table 1: Substantially Preserves Model Function Vector              
+
+> Dataset Method # Intersecting Heads ( ↑)FV Similarity ( ↑)Entailment SFT 2/10 0.28 Ours 5/10 0.95
+> Translation SFT 3/10 0.58 Ours 5/10 0.76
+
+Setup. We further investigate how our method mitigates forgetting by measuring its effect on the model’s internal representations. This experiment is motivated by the finding that forgetting occurs when a fine-tuned model’s latent representations diverge significantly from the original model’s for the same set of inputs [ 14 , 33 ]. Following Jiang et al. [14] , we measure this impact using Function Vectors (FV): a compact vector representation identified within transformer models hidden states during in-context learning (ICL) [ 43 ]. First, an activation patching procedure [ 29 ] is performed to determine the causal set of attention heads important for the task. Next, FV is calculated by summing the activations from these key heads during ICL. More details on FV can be found in [ 43 ], and we provide a discussion section on FV in Appendix B. We then compare the original pre-trained model against models fine-tuned with both our method and standard fine-tuning (SFT). We assess the effects on FVs in two ways: (1) the number of causal heads overlap between the pre-trained and fine-tuned models, and (2) the cosine similarity between the pre-trained model’s FV and the fine-tuned model’s FV. For both metrics, higher values signify better preservation of the model’s original capabilities. 
+
+Results. Table 1 shows that our method successfully preserves the model’s internal representation, unlike standard fine-tuning (SFT). Our approach achieved a high FV cosine similarity of 0.95 and retained 5 causal attention heads. In contrast, SFT’s similarity dropped to 0.28, with only 2-3 heads overlapping. These results indicate our method effectively prevents the representational drift associated with catastrophic forgetting. 75 Related Work 
+
+Catastrophic Forgetting. Catastrophic forgetting is a long-standing challenge in machine learning [ 5 , 28 ]. One popular approach is using regularization to constrain model updates, adding a penalty to prevent the fine-tuned parameters from deviating significantly from their original state [ 8 , 19 , 21 , 23 , 36 , 40 ]. A second popular approach is replay, where a subset of past data is stored and revisited during finetuning to reinforce old knowledge [ 15 , 24 , 26 , 34 , 35 , 37 ]. Both approaches operate under specific, constrained settings [ 16 ] and force an inherent trade-off within a fixed-capacity model. This work presents an alternative path that circumvents this trade-off by expanding model capacity. 
+
+Network Growing Network growing methods add capacity to pre-trained models, with early work initializing larger networks from smaller ones [ 27 , 38 , 41 , 46 , 48 ]. Recent approaches for Transformer architectures prioritize function-preserving expansions to ensure stable fine-tuning [ 6 ], but this has created a dilemma. Methods that achieve stability add zero-initialized weights, forcing new skills to be learned from scratch [ 10 , 47 ]. While approaches that reuse knowledge by copying entire blocks typically violate the function-preserving constraint [ 45 ]. Thus, a method that can both leverage pre-trained knowledge and guarantee function preservation remains a critical gap in the literature. We address this gap with a novel expansion method, inspired by Mazzawi et al. [27] , that is designed to be both function-preserving and exploiting pre-trained weights. 
+
+Parameter Efficient Finetuning (PEFT). PEFT techniques aim to adapt models to new tasks by updating only a small fraction of parameters. Prominent methods include Adapters [ 12 ], which insert small, task-specific modules into a frozen model, and Low-Rank Adaptation (LoRA) [ 13 ], which approximates weight updates using trainable low-rank matrices. The success of LoRA has inspired a large family of variants that improve its performance or extend it to specific settings like model quantization [ 3, 11 , 20 , 25 , 44 , 49 – 52 ]. Our work is orthogonal to this line of research. While PEFT methods focus on efficiency, our primary goal is to eliminate catastrophic forgetting while matching the performance of full fine-tuning. Our approach can be readily combined with PEFT techniques to gain both efficiency and knowledge preservation. 
+
+# 6 Conclusion 
+
+We present a method that resolves the fundamental trade-off between learning new tasks and retaining old knowledge in pre-trained models. Our approach adds capacity to the model’s MLP layers in a function-preserving manner, ensuring training stability. Our experiments prove that this approach completely eliminates catastrophic forgetting, matching standard fine-tuning performance on new tasks while fully preserving original capabilities. Our approach is modular and can be applied only to a subset of layers and still match full fine-tuning performance, enabling computational saving. Finally, we show that performance scales with the amount of added capacity. 
+
+# References 
+
+[1] Aida Amini, Saadia Gabriel, Peter Lin, Rik Koncel-Kedziorski, Yejin Choi, and Hannaneh Hajishirzi. Mathqa: Towards interpretable math word problem solving with operation-based formalisms, 2019. [2] Matthias De Lange, Rahaf Aljundi, Marc Masana, Sarah Parisot, Xu Jia, Aleš Leonardis, Gregory Slabaugh, and Tinne Tuytelaars. A continual learning survey: Defying forgetting in classification tasks. IEEE transactions on pattern analysis and machine intelligence , 44(7):3366–3385, 2021. [3] Tim Dettmers, Artidoro Pagnoni, Ari Holtzman, and Luke Zettlemoyer. Qlora: Efficient finetuning of quantized llms. 
+
+Advances in neural information processing systems , 36:10088–10115, 2023. [4] Guanting Dong, Hongyi Yuan, Keming Lu, Chengpeng Li, Mingfeng Xue, Dayiheng Liu, Wei Wang, Zheng Yuan, Chang Zhou, and Jingren Zhou. How abilities in large language models are affected by supervised fine-tuning data composition. arXiv preprint arXiv:2310.05492 , 2023. [5] Robert M French. Catastrophic forgetting in connectionist networks. Trends in cognitive sciences , 3(4):128–135, 1999. [6] Andrea Gesmundo and Kaitlin Maile. Composable function-preserving expansions for transformer architectures. 
+
+arXiv preprint arXiv:2308.06103 , 2023. 8[7] Mor Geva, Roei Schuster, Jonathan Berant, and Omer Levy. Transformer feed-forward layers are key-value memories. 
+
+arXiv preprint arXiv:2012.14913 , 2020. [8] Ian J Goodfellow, Mehdi Mirza, Da Xiao, Aaron Courville, and Yoshua Bengio. An empirical investigation of catastrophic forgetting in gradient-based neural networks. arXiv preprint arXiv:1312.6211 , 2013. [9] Stephen T Grossberg. Studies of mind and brain: Neural principles of learning, perception, development, cognition, and motor control , volume 70. Springer Science & Business Media, 2012. [10] Xue Han, Yitong Wang, Junlan Feng, Qian Hu, Chao Deng, et al. Loire: Lifelong learning on incremental data via pre-trained language model growth efficiently. In The Thirteenth International Conference on Learning Representations ,2025. [11] Soufiane Hayou, Nikhil Ghosh, and Bin Yu. Lora+: Efficient low rank adaptation of large models. arXiv preprint arXiv:2402.12354 , 2024. [12] Neil Houlsby, Andrei Giurgiu, Stanislaw Jastrzebski, Bruna Morrone, Quentin De Laroussilhe, Andrea Gesmundo, Mona Attariyan, and Sylvain Gelly. Parameter-efficient transfer learning for nlp. In International conference on machine learning , pages 2790–2799. PMLR, 2019. [13] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al. Lora: Low-rank adaptation of large language models. ICLR , 1(2):3, 2022. [14] Gangwei Jiang, Caigao Jiang, Zhaoyi Li, Siqiao Xue, Jun Zhou, Linqi Song, Defu Lian, and Ying Wei. Unlocking the power of function vectors for characterizing and mitigating catastrophic forgetting in continual instruction tuning. 
+
+arXiv preprint arXiv:2502.11019 , 2025. [15] Heechul Jung, Jeongwoo Ju, Minju Jung, and Junmo Kim. Less-forgetting learning in deep neural networks. arXiv preprint arXiv:1607.00122 , 2016. [16] Ronald Kemker, Marc McClure, Angelina Abitino, Tyler Hayes, and Christopher Kanan. Measuring catastrophic forgetting in neural networks. In Proceedings of the AAAI conference on artificial intelligence , volume 32, 2018. [17] Tushar Khot, Ashish Sabharwal, and Peter Clark. Scitail: A textual entailment dataset from science question answering. In Proceedings of the 32th AAAI Conference on Artificial Intelligence (AAAI 2018) , 2018. URL http: //ai2-website.s3.amazonaws.com/publications/scitail-aaai-2018_cameraready.pdf .[18] Tushar Khot, Peter Clark, Michal Guerquin, Peter Jansen, and Ashish Sabharwal. Qasc: A dataset for question answering via sentence composition. arXiv:1910.11473v2 , 2020. [19] James Kirkpatrick, Razvan Pascanu, Neil Rabinowitz, Joel Veness, Guillaume Desjardins, Andrei A Rusu, Kieran Milan, John Quan, Tiago Ramalho, Agnieszka Grabska-Barwinska, et al. Overcoming catastrophic forgetting in neural networks. Proceedings of the national academy of sciences , 114(13):3521–3526, 2017. [20] Dawid J Kopiczko, Tijmen Blankevoort, and Yuki M Asano. Vera: Vector-based random matrix adaptation. arXiv preprint arXiv:2310.11454 , 2023. [21] Sang-Woo Lee, Jin-Hwa Kim, Jaehyun Jun, Jung-Woo Ha, and Byoung-Tak Zhang. Overcoming catastrophic forgetting by incremental moment matching. Advances in neural information processing systems , 30, 2017. [22] Shane Legg and Marcus Hutter. Universal intelligence: A definition of machine intelligence. Minds and machines , 17 (4):391–444, 2007. [23] Xilai Li, Yingbo Zhou, Tianfu Wu, Richard Socher, and Caiming Xiong. Learn to grow: A continual structure learning framework for overcoming catastrophic forgetting. In International conference on machine learning , pages 3925–3934. PMLR, 2019. [24] Zhizhong Li and Derek Hoiem. Learning without forgetting. IEEE transactions on pattern analysis and machine intelligence , 40(12):2935–2947, 2017. [25] Shih-Yang Liu, Chien-Yi Wang, Hongxu Yin, Pavlo Molchanov, Yu-Chiang Frank Wang, Kwang-Ting Cheng, and Min-Hung Chen. Dora: Weight-decomposed low-rank adaptation. In Forty-first International Conference on Machine Learning , 2024. 9[26] David Lopez-Paz and Marc’Aurelio Ranzato. Gradient episodic memory for continual learning. Advances in neural information processing systems , 30, 2017. [27] Hanna Mazzawi, Xavi Gonzalvo, Michael Wunder, Sammy Jerome, and Benoit Dherin. Deep fusion: Efficient network training via pre-trained initializations. arXiv preprint arXiv:2306.11903 , 2023. [28] Michael McCloskey and Neal J Cohen. Catastrophic interference in connectionist networks: The sequential learning problem. In Psychology of learning and motivation , volume 24, pages 109–165. Elsevier, 1989. [29] Kevin Meng, David Bau, Alex Andonian, and Yonatan Belinkov. Locating and editing factual associations in gpt. 
+
+Advances in neural information processing systems , 35:17359–17372, 2022. [30] Paul Michel and Graham Neubig. Mtnt: A testbed for machine translation of noisy text. In Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing , 2018. [31] Abhishek Panigrahi, Nikunj Saunshi, Haoyu Zhao, and Sanjeev Arora. Task-specific skill localization in fine-tuned language models. In International Conference on Machine Learning , pages 27011–27033. PMLR, 2023. [32] Matt Post. A call for clarity in reporting BLEU scores. In Proceedings of the Third Conference on Machine Translation: Research Papers , pages 186–191, Belgium, Brussels, October 2018. Association for Computational Linguistics. URL 
+
+https://www.aclweb.org/anthology/W18-6319 .[33] Vinay V Ramasesh, Ethan Dyer, and Maithra Raghu. Anatomy of catastrophic forgetting: Hidden representations and task semantics. arXiv preprint arXiv:2007.07400 , 2020. [34] Roger Ratcliff. Connectionist models of recognition memory: constraints imposed by learning and forgetting functions. 
+
+Psychological review , 97(2):285, 1990. [35] Sylvestre-Alvise Rebuffi, Alexander Kolesnikov, Georg Sperl, and Christoph H Lampert. icarl: Incremental classifier and representation learning. In Proceedings of the IEEE conference on Computer Vision and Pattern Recognition , pages 2001–2010, 2017. [36] Hippolyt Ritter, Aleksandar Botev, and David Barber. Online structured laplace approximations for overcoming catastrophic forgetting. In S. Bengio, H. Wallach, H. Larochelle, K. Grauman, N. Cesa-Bianchi, and R. Garnett, editors, Advances in Neural Information Processing Systems , volume 31. Curran Associates, Inc., 2018. URL https:// proceedings.neurips.cc/paper_files/paper/2018/file/f31b20466ae89669f9741e047487eb37-Paper.pdf .[37] David Rolnick, Arun Ahuja, Jonathan Schwarz, Timothy Lillicrap, and Gregory Wayne. Experience replay for continual learning. Advances in neural information processing systems , 32, 2019. [38] Andrei A Rusu, Neil C Rabinowitz, Guillaume Desjardins, Hubert Soyer, James Kirkpatrick, Koray Kavukcuoglu, Razvan Pascanu, and Raia Hadsell. Progressive neural networks. arXiv preprint arXiv:1606.04671 , 2016. [39] Keisuke Sakaguchi, Ronan Le Bras, Chandra Bhagavatula, and Yejin Choi. Winogrande: An adversarial winograd schema challenge at scale. arXiv preprint arXiv:1907.10641 , 2019. [40] Joan Serra, Didac Suris, Marius Miron, and Alexandros Karatzoglou. Overcoming catastrophic forgetting with hard attention to the task. In Jennifer Dy and Andreas Krause, editors, Proceedings of the 35th International Conference on Machine Learning , volume 80 of Proceedings of Machine Learning Research , pages 4548–4557. PMLR, 10–15 Jul 2018. URL https://proceedings.mlr.press/v80/serra18a.html .[41] Sheng Shen, Pete Walsh, Kurt Keutzer, Jesse Dodge, Matthew Peters, and Iz Beltagy. Staged training for transformer language models. In International Conference on Machine Learning , pages 19893–19908. PMLR, 2022. [42] Gemma Team, Aishwarya Kamath, Johan Ferret, Shreya Pathak, Nino Vieillard, Ramona Merhej, Sarah Perrin, Tatiana Matejovicova, Alexandre Ramé, Morgane Rivière, et al. Gemma 3 technical report. arXiv preprint arXiv:2503.19786 ,2025. [43] Eric Todd, Millicent L. Li, Arnab Sen Sharma, Aaron Mueller, Byron C. Wallace, and David Bau. Function vectors in large language models. In Proceedings of the 2024 International Conference on Learning Representations , 2024. URL 
+
+https://openreview.net/forum?id=AwyxtyMwaG . arXiv:2310.15213. 10 [44] Mojtaba Valipour, Mehdi Rezagholizadeh, Ivan Kobyzev, and Ali Ghodsi. Dylora: Parameter efficient tuning of pre-trained models using dynamic search-free low-rank adaptation. arXiv preprint arXiv:2210.07558 , 2022. [45] Haichao Wei, Yunxiang Ren, Zhoutong Fu, Aman Lunia, Yi-Lin Chen, Alice Leung, and Ya Xu. Control llm: Controlled evolution for intelligence retention in llm. arXiv preprint arXiv:2501.10979 , 2025. [46] Tao Wei, Changhu Wang, Yong Rui, and Chang Wen Chen. Network morphism. In International conference on machine learning , pages 564–572. PMLR, 2016. [47] Chengyue Wu, Yukang Gan, Yixiao Ge, Zeyu Lu, Jiahao Wang, Ye Feng, Ying Shan, and Ping Luo. Llama pro: Progressive llama with block expansion. arXiv preprint arXiv:2401.02415 , 2024. [48] Junting Zhang, Jie Zhang, Shalini Ghosh, Dawei Li, Serafettin Tasci, Larry Heck, Heming Zhang, and C-C Jay Kuo. Class-incremental learning via deep model consolidation. In Proceedings of the IEEE/CVF winter conference on applications of computer vision , pages 1131–1140, 2020. [49] Longteng Zhang, Lin Zhang, Shaohuai Shi, Xiaowen Chu, and Bo Li. Lora-fa: Memory-efficient low-rank adaptation for large language models fine-tuning. arXiv preprint arXiv:2308.03303 , 2023. [50] Qingru Zhang, Minshuo Chen, Alexander Bukharin, Nikos Karampatziakis, Pengcheng He, Yu Cheng, Weizhu Chen, and Tuo Zhao. Adalora: Adaptive budget allocation for parameter-efficient fine-tuning. arXiv preprint arXiv:2303.10512 ,2023. [51] Hongyun Zhou, Xiangyu Lu, Wang Xu, Conghui Zhu, Tiejun Zhao, and Muyun Yang. Lora-drop: Efficient lora parameter pruning based on output evaluation. arXiv preprint arXiv:2402.07721 , 2024. [52] Bojia Zi, Xianbiao Qi, Lingzhi Wang, Jianan Wang, Kam-Fai Wong, and Lei Zhang. Delta-lora: Fine-tuning high-rank parameters with the delta of low-rank matrices. arXiv preprint arXiv:2309.02411 , 2023. 11 A Glossary 
+
+Table 2 shows glossary of terms used in this paper. Symbol Definition 
+
+𝑀 0 pretrained model 
+
+𝜃 0 pretrained model parameters 
+
+𝑀 𝑇 finetuned model 
+
+𝜃 𝑇 finetuned model parameters 
+
+L𝑇 finetuning task loss 
+
+D𝑇 downstream task dataset 
+
+Dproxy proxy dataset to measure performance on pretraining set 
+
+𝑁 Number of model layers 
+
+𝑛 model layer index 
+
+X input to model MLP module 
+
+𝑠 input sequence length 
+
+ℎ model hidden dimension 
+
+𝑝 MLP hidden dimension 
+
+W(1) 
+
+> 𝑛
+
+weight matrix of first layer of MLP module (up-projection) 
+
+W(2) 
+
+> 𝑛
+
+weight matrix of second layer of MLP module (down-projection) 
+
+B(1) 
+
+> 𝑛
+
+bias term of first layer of MLP module (up-projection) 
+
+B(2) 
+
+> 𝑛
+
+bias term of second layer of MLP module (down-projection) 
+
+ˆW(1) 
+
+> 𝑛
+
+expanded matrix of first layer of MLP module (up-projection) 
+
+ˆW(2) 
+
+> 𝑛
+
+expanded matrix of second layer of MLP module (down-projection) 
+
+Y outpaut of MLP module Table 2: Glossary of variables and symbols used in this paper. 
+
+# B Function vectors 
+
+This section provides a brief overview of Function Vectors (FVs) [43 ], a method for extracting a compact vector representation of a task from a Transformer’s hidden states. FVs are a powerful tool for analyzing how models perform in-context learning (ICL) and have become valuable for understanding catastrophic forgetting. A significant change to a task’s FV after fine-tuning can signal that the model’s underlying neural circuit for that task has been damaged or erased [14, 33]. The core idea is that a small subset of attention heads—the causal heads —can be identified as being most critical for performing a specific task. The FV is then constructed by summing the average activations of only these causal heads, which effectively isolates the functional circuit for that task. The derivation of a function vector 𝜃 𝑡 for a given task 𝑡 and model 𝑓 involves three main steps: 
+
+Step 1: Compute Mean Clean Activations. The process begins by running the model on a dataset 𝑃 𝑡 of clean, task-specific in-context learning prompts. For each attention head 𝑎 𝑙 𝑗 (at layer 𝑙 , head 𝑗 ), an average activation vector is computed across all these clean prompts. This yields the head’s activation pattern when performing the task correctly, denoted as ¯𝑎 𝑡 𝑙 𝑗 .
+
+¯𝑎 𝑡 𝑙 𝑗 = 1
+
+|𝑃 𝑡 |∑︁ 𝑝 𝑡 𝑖 ∈𝑃 𝑡 
+
+𝑎 𝑙 𝑗 (𝑝 𝑡 𝑖 )
+
+Step 2: Identify Causal Heads via Activation Patching. Next, activation patching (also known as causal tracing) [29] is used to identify the heads most responsible for the task. The procedure is as follows: 1. Corrupted prompts ˜𝑝 𝑡 𝑖 are created by shuffling the input-output pairs, causing the model to fail at the task. 12 2. The model is then run on these corrupted prompts. During the forward pass, an intervention is performed on a single attention head 𝑎 𝑙 𝑗 at a time by replacing its corrupted activation with its clean mean activation ¯𝑎 𝑡 𝑙 𝑗 from Step 1. 3. Finally, the Causal Indirect Effect (CIE) is measured. This value quantifies how much the patch restores the model’s ability to produce the correct answer 𝑦 𝑖 . A high CIE indicates the head is causally important. CIE (𝑎 𝑙 𝑗 ) = E𝑝 𝑡 𝑖 ∈𝑃 𝑡 
+
+h
+
+𝑓 ( ˜𝑝 𝑡 𝑖 |𝑎 𝑙 𝑗 ← ¯𝑎 𝑡 𝑙 𝑗 ) [ 𝑦 𝑖 ] − 𝑓 ( ˜𝑝 𝑡 𝑖 ) [ 𝑦 𝑖 ]
+
+i
+
+The set of causal heads, S, is defined as the top-k heads (e.g., top-10) with the highest CIE scores. 
+
+Step 3: Construct the Function Vector. The function vector 𝜃 𝑡 is then constructed by summing the mean clean activations of the causal heads identified in the previous step. 
+
+𝜃 𝑡 =∑︁  
+
+> (𝑙,𝑗 ) ∈ S
+
+¯𝑎 𝑡 𝑙 𝑗 
+
+In Section 4.5 of our main paper, we use FVs to demonstrate that our approach preserves latent representation of the pretrained model. We show that after fine-tuning, our method retains 5 of the top 10 original causal heads for a task and maintains a function vector cosine similarity of 0.95 with the original model. This provides strong evidence that our method mitigates catastrophic forgetting by preserving the essential computational circuits of the base model. For a more detailed treatment of FVs, we refer readers to Todd et al. [43] and Jiang et al. [14]. 
+
+# C Supplementary Experiments 
+
+This section provides additional experiments to further validate our claims. Specifically: 
+
+• Our results persist in larger models (C.1). 
+
+• Our proposed growing strategy is superior to a zero-initialization (C.2). 
+
+• Growing MLP is more effective than growing attention (C.3). 
+
+# C.1 Validation on Larger-Scale Models 
+
+To verify that our results generalize to larger models, we run our experiments on Gemma-4B models using the setup from Section 4. As shown in Figure 6, our method scales effectively: on larger models (4x the parameters of the model used in Section 4, it completely preserves original task performance while matching the new task performance of standard fine-tuning. 
+
+# C.2 Ablation Study on Initialization Strategy 
+
+To isolate the benefits of our proposed growth strategy, we compare it against a naive but common baseline: adding new layers with zero-initialization. We evaluate this baseline in two distinct settings to test its impact on both knowledge retention and new task acquisition. First, when all parameters (old and new) are trained jointly, the zero-initialized layers fail to effectively learn the new task. Figure 7a (bottom) shows that this baseline significantly underperforms our method on the fine-tuning domain. Second, in a setting analogous to our own, where original parameters are frozen, the zero-initialized model suffers from severe catastrophic forgetting. Figure 7b (top) shows that performance on the original task degrades sharply as more layers are added. These results demonstrate that simply adding new capacity is insufficient. Our initialization strategy is critical for both preserving prior knowledge and enabling the new parameters to learn the target task efficiently. 
+
+# C.3 Ablation on Component to Grow 
+
+To justify our focus on growing MLP layers, we conducted an ablation study to determine which part of the Transformer block is most effective to grow. We compare our approach against two alternatives for growing the attention mechanism: 13 (a) French translation (b) Science entailment 
+
+(c) Science Q&A (d) Math QA 
+
+Figure 6: Our results hold on larger models. 
+
+14 (a) Zero initialization, train old and new parameters (b) Zero initialization, train only new parameters 
+
+Figure 7: Comparison with zero initialization 
+
+(a) Grow attention head dimension (b) Grow number of attention heads 
+
+Figure 8: Comparison with growing attention head module 
+
+15 (1) increasing the attention head dimension (Figure 8a) and (2) increasing the number of attention heads (Figure 8b). Our findings clearly show that both strategies for expanding the attention module yield inferior performance compared to growing the MLP module. More surprisingly, we found that a combined approach of growing both the MLP and attention components simultaneously offered no additional benefit over growing MLP alone. This result provides empirical validation for our design choice to target the MLP layers for expansion, as this is the most parameter-efficient and performant strategy. 16

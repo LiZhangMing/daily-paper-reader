@@ -1,0 +1,281 @@
+Title: Beware of the Batch Size: Hyperparameter Bias in Evaluating LoRA
+
+URL Source: https://arxiv.org/pdf/2602.09492v1
+
+Published Time: Wed, 11 Feb 2026 01:36:21 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# Beware of the Batch Size: Hyperparameter Bias in Evaluating LoRA 
+
+Sangyoon Lee, Jaeho Lee 
+
+Pohang University of Science and Technology (POSTECH) 
+
+{sangyoon.lee, jaeho.lee}@postech.ac.kr 
+
+Abstract 
+
+Low-rank adaptation (LoRA) is a standard ap-proach for fine-tuning large language models, yet its many variants report conflicting empiri-cal gains, often on the same benchmarks. We show that these contradictions arise from a sin-gle overlooked factor: the batch size. When properly tuned, vanilla LoRA often matches the performance of more complex variants. We further propose a proxy-based, cost-efficient strategy for batch size tuning, revealing the im-pact of rank, dataset size, and model capacity on the optimal batch size. Our findings ele-vate batch size from a minor implementation detail to a first-order design parameter, recon-ciling prior inconsistencies and enabling more reliable evaluations of LoRA variants. 
+
+1 Introduction 
+
+Low-rank adaptation, or simply LoRA (Hu et al., 2022), has emerged as the de facto standard method for the parameter-efficient fine-tuning of large lan-guage models (LLMs). Building on this success, numerous LoRA variants have been proposed, each claiming a performance gain over the vanilla LoRA (Zhang et al., 2023; Liu et al., 2024; Meng et al., 2024; Wang et al., 2025; Kalajdzievski, 2023). A disturbing fact about LoRA variants is that they often contradict each other. For example, two recent works—PiSSA and MiLoRA—propose dif-ferent initialization strategies for LoRA, each fo-cusing on the faithful preservation of the principal singular vectors and minor singular vectors of the pretrained LLM weights, respectively (Meng et al., 2024; Wang et al., 2025). More intriguingly, exper-iments suggest that both methods provide perfor-mance gains on seemingly identical benchmarks. Why does such a contradiction takes place? In this work, we reveal that this apparent contra-diction stems from the inconsistency in a critical yet overlooked hyperparameter: the batch size . In particular, we observe that, given a properly tuned batch size and learning rates, the vanilla LoRA can match or even outperform its more complex vari-ants (Figure 1). This finding highlights the pivotal role of a careful batch size selection, not only for an effective LLM fine-tuning, but also for a reliable and reproducible evaluation of LoRA variants. Despite such an importance, the selection of LoRA batch sizes primarily relies on crude heuris-tics, e.g., “smaller is better” (Schulman and Think-ing Machines Lab, 2025). While the influence of batch size has been extensively studied for full-parameter training (Keskar et al., 2017; Shallue et al., 2019; Zhang et al., 2025; Pareja et al., 2025), these insights do not directly extend to LoRA, op-erating under unique constraints and demonstrat-ing distinct optimization dynamics (Shuttleworth et al., 2025; Biderman et al., 2025). Furthermore, given that LoRA is primarily used in resource-constrained settings, an exhaustive hyperparameter sweep of the batch size may be infeasible as well. To address this gap, we initiate a systematic study toward understanding how various scale pa-rameters of LoRA workloads—rank, dataset scale, and model size—affect the optimal batch size. By identifying for which hyperparameters the optimal batch size remains consistent under change, we can develop a low-cost proxy LoRA task upon which one can conduct a hyperparameter sweep. In par-ticular, we find that the optimal batch size remains relatively consistent under the changes in terms of the rank and the model size, but not for the dataset size. This observation suggests that one may tune the batch size on small-scale LLMs with low rank, then transfer the batch size to the larger models. In summary, our contributions are threefold: 1. We demonstrate that vanilla LoRA remains a highly competitive baseline when batch sizes are properly tuned, suggesting that reported gains in its variants are partially artifacts of suboptimal hyperparameter choices. 1
+
+> arXiv:2602.09492v1 [cs.LG] 10 Feb 2026
+
+2. We find that using a larger batch does not necessarily lead to strictly worse accuracy. In-stead, we identify an optimal batch size that maximizes test performance. 3. We establish a practical guideline for small-scale proxies, showing that the optimal batch configurations can be identified using lower ranks and smaller model capacities as long as dataset scale is preserved. Taken together, our findings shed light on a criti-cal yet overlooked role of batch size in LoRA. We hope this work encourages more robust and repro-ducible evaluation practices and provides action-able guidance for practitioners deploying LLMs under real world constraints. 
+
+2 Experimental Setup 
+
+Our experimental setup primarily follows that of Meng et al. (2024), with varying selections of the batch sizes. Also, all reported figures, except for those in Figures 3, 4, and 5, are an average of three random seeds. Other details are as follows. 
+
+Model. We mainly use the LLaMA-2-7B model as the main backbone (Touvron et al., 2023). This choice is to ensure the consistencies with the key baselines (Meng et al., 2024; Wang et al., 2025). 
+
+Datasets. We follow the standard evaluation pipeline for the mathematical reasoning task: We fine-tune the model on MetaMathQA (Yu et al., 2023), and then evaluate on GSM8K benchmark (Cobbe et al., 2021). By default, we use first 100K samples in the training split of the MetaMathQA. 
+
+Learning rate sweep. For each batch size se-lected, we conduct a hyperparameter sweep to find the optimal learning rate. This is mainly due to the prior observations in the full-parameter training literature which indicates that the batch size closely interact with the learning rate (Smith et al., 2018). We select learning rates in the range of 1 × 10 −5
+
+to 3 × 10 −3; see Appendix E for details. 
+
+Fixed sample protocol. To decouple the impact of batch size from the total number of training to-kens used, our primary experiments are conducted under a fixed sample protocol restricted to a single epoch. This setup aligns with data efficiency objec-tives and reflects standard practice in the supervised fine-tuning literature (Pareja et al., 2025), where limited data availability necessitates precise control over training duration to mitigate overfitting. Note that this configuration implies that larger batch sizes undergo fewer gradient updates, which is one potential reason why the heuristic of “smaller is better.” holds. To provide a more comprehen-sive view, we also include results where the num-ber of optimization steps is fixed across the setups (Appendix B). In such case, the total number of processed samples varies. Unless otherwise stated, we adopt the fixed sample protocol to align with common fine-tuning practices. 
+
+Warm-up ratio. We set the warm-up ratio to zero for all experiments. This decision stems from the fact that varying the batch size alters the total number of training steps for a fixed sample proto-col, making it difficult to adjust the warm-up pe-riod across different configurations. Furthermore, Pareja et al. (2025) suggest that warm-up steps and learning rate schedulers have a negligible impact on performance in supervised fine-tuning scenarios. Our empirical analysis in Appendix C confirms that omitting the warm-up phase does not degrade performance; rather, it leads to greater robustness across a wide range of batch sizes. In contrast, we observed that the learning rate scheduler itself significantly influences accuracy. Therefore, we exclude only the warm-up phase from our setup. 
+
+Other hyperparameters. We keep all other hy-perparameters identical across the setups, in order to study the effect of batch size in isolation. See more details in Appendix D. 
+
+3 Re-evaluating LoRA Variants: The Impact of Batch Size 
+
+In this section, we evaluate the performance of LoRA alongside two prominent variants, PiSSA (Meng et al., 2024) and MiLoRA (Wang et al., 2025). PiSSA utilizes the principal singular vectors of pretrained weight matrices to align adapters with dominant directions. Conversely, MiLoRA adopts an orthogonal initialization strategy using minor singular vectors, aiming to preserve the knowl-edge of the base model. Both studies report state-of-the-art results on the same benchmarks, while their original evaluations were conducted under disparate configurations, leading to contradictory conclusions. To ensure a rigorous comparison, we re-evaluate these methods within a unified experi-mental framework, as illustrated in Figure 1. 2Figure 1: Impact of batch size across LoRA variants. 
+
+> We observe that batch size selection alone can lead to a performance gap of over 10% in accuracy. Notably, when evaluated at its optimal batch size, vanilla LoRA beats both PiSSA and MiLoRA in math reasoning task.
+
+3.1 Dissecting reported gains: Methodological superiority or hyperparameter bias? 
+
+In Figure 1, a performance crossover exists be-tween recent LoRA variants: PiSSA achieves su-perior accuracy in the large batch regime, whereas MiLoRA performs better with smaller batches. This discrepancy aligns with the experimental set-tings reported in their respective studies, where MiLoRA was evaluated using smaller batch sizes than PiSSA. These observations suggest that the reported gains and opposing insights in both pa-pers may stem not only from algorithmic differ-ences but also from the confounding bias induced by batch size configurations. Consequently, no single method appears to be universally superior across the entire batch size spectrum. Furthermore, we emphasize that vanilla LoRA still remains a competitive baseline when evaluated under fair conditions. LoRA exhibits a similar per-formance level to its variants across varying batch sizes and achieves the best overall result when its hyperparameters are optimally tuned. These find-ings underscore that the influence of batch size has been largely overlooked in the landscape of LoRA-based training. In an era of rapidly emerging LoRA research, establishing a fundamental understanding of batch size dynamics is essential to isolating the intrinsic effectiveness of any given method from confounding hyperparameter effects. We demonstrate that fine-tuning performance does not scale monotonically as batch size de-creases. Our findings stand in contrast to prevalent heuristics, such as those proposed by Schulman and Thinking Machines Lab (2025), which suggest that smaller batch sizes are universally superior for LoRA-based fine-tuning. Instead, we charac-terize the optimal batch size, which can be lever-aged to maximize computational efficiency without compromising final accuracy. This trend is robust across multiple LoRA variants, while the critical threshold varies. Given that LoRA is typically de-ployed in resource constrained environments, max-imizing hardware utility is pivotal; however, this must be balanced against systemic variables such as LoRA rank, dataset scale, and base model capacity. To facilitate more accessible batch size tuning, we investigate three primary elements for construct-ing small scale proxies that can reliably predict optimal configurations. Accordingly, in Section 4, we provide a rigorous analysis of the interac-tions between batch size and these determinants to establish a more systematic guideline for optimal hyperparameter configuration. 
+
+4 Determinants of Batch Size Effect 
+
+Given the prohibitive cost of batch size tuning in resource constrained environments, this section identifies the fundamental factors required to con-struct a reliable low-cost proxy for batch size tun-ing. We investigate how the impact of batch size varies through three key determinants: (i) LoRA rank, (ii) dataset scale, and (iii) base model capac-ity. These variables are selected as they represent the primary factors of the total computational over-head in LoRA-based training. For each analysis, we maintain our setup established in Section 2, while altering each determinant independently. We reveal a critical insight for establishing an effective proxy: while batch size effects are largely robust to changes in LoRA rank and base model size, they are highly sensitive to dataset scale. Consequently, we demonstrate that one can reliably tune batch sizes for LoRA using lower rank with smaller mod-els, while the full dataset scale should be preserved. 
+
+4.1 Impact of LoRA rank 
+
+We first investigate the interaction between batch size and the rank r of LoRA adapters. Figure 2a illustrates the test accuracies across a range of batch sizes for ranks spanning from 32 to 256. While minor variances exist, the fundamental per-formance trend relative to batch size remains con-sistent across all evaluated ranks. Notably, in Fig-ure 6a, increasing the rank beyond a certain thresh-old yields marginal performance gains. These re-323 25 27 29         
+
+> Batch Size
+> 45.0
+> 47.5
+> 50.0
+> 52.5
+> 55.0
+> 57.5
+> 60.0
+> Shifted Accuracy
+> rank=32
+> rank=64
+> rank=128
+> rank=256 (a) LoRA rank 2123252729
+> Batch Size
+> 45.0
+> 47.5
+> 50.0
+> 52.5
+> 55.0
+> 57.5
+> 60.0
+> Shifted Accuracy
+> 25K
+> 50K
+> 100K
+> 200K (b) Dataset scale 23252729
+> Batch Size
+> 45.0
+> 47.5
+> 50.0
+> 52.5
+> 55.0
+> 57.5
+> 60.0
+> Shifted Accuracy
+> 7B
+> 13B (c) Base model capacity
+
+Figure 2: Effect of batch size across key determinants. We examine the interaction between batch size and three factors: (a) LoRA rank : the impact of batch size remains consistent across varying ranks r; (b) dataset scale :larger data regimes effectively leverage larger batch training; and (c) base model capacity : batch size effects are largely invariant to model scale. For a unified comparison, accuracies are normalized by shifting the maximum value of each setup to match the default configuration ( r = 128 , 100K samples, 7B model). Original accuracy values are provided in Figure 6 for reference. 
+
+sults suggest that in some scenarios, employing a moderate LoRA rank in conjunction with a larger batch size can expect a more Pareto optimal config-uration for balancing performance and throughput. 
+
+4.2 Impact of dataset scale 
+
+We compare training configurations using subsets of the MetaMathQA dataset ranging from 25K to 200K samples. As illustrated in Figure 2b, LoRA training on larger datasets effectively accommo-dates larger batch sizes without the performance degradation observed in smaller data regimes. This phenomenon can be attributed to the reduction in relative gradient noise; as the dataset scale in-creases, the optimization process becomes more robust, allowing for increased batch sizes while maintaining stable convergence. This highlights that the batch size is not a static hyperparameter but a dynamic one that must be carefully calibrated relative to the total available data scale. 
+
+4.3 Impact of base model capacity 
+
+To examine how the capacity of the backbone model influences batch size effect, we compared two different models, LLaMA-2-7B and 13B. Our empirical results in Figure 2c demonstrate that the impact of batch size remains remarkably consis-tent regardless of the model scale. This suggests that the relationship between batch size and the model capacity is scale invariant. From a practical standpoint, this suggests that optimal batch size configurations identified on smaller, more manage-able models can be reliably extrapolated to larger models, significantly reducing the computational cost of hyperparameter tuning. 
+
+4.4 Guidelines for Small-Scale Proxies 
+
+Building on our analysis, we establish a practical strategy for constructing a low-cost proxy to iden-tify the optimal batch size for LoRA fine-tuning. The batch size effect is scale invariant regarding LoRA rank and model capacity, while it is highly sensitive to the total data scale. In conclusion, the most reliable and efficient proxy is to employ a smaller model with a lower rank while training on the full target dataset. This approach ensures high fidelity hyperparameter transfer with a fraction of the original computational overhead. 
+
+5 Conclusion 
+
+In this study, we provide a comprehensive re-evaluation of LoRA and its prominent variants, specifically focusing on the critical yet overlooked impact of batch size on fine-tuning performance. Our analysis demonstrates that reported advantages of some LoRA variants are confounded by hyper-parameter bias. Notably, we highlight that vanilla LoRA remains a remarkably fine baseline when evaluated under optimized conditions. Contrary to conventional heuristics suggesting that smaller batches yield lower regret, we identify the optimal point, where large batch does not harm model performance. Crucially, our experiments reveal that the optimal batch size of LoRA can be found efficiently by utilizing a smaller model along with small rank, while preserving the scale of dataset. These insights provide a more rigorous foundation for batch size effects in LoRA and offer practical guidance for efficient resource utilization in limited environments. 4Limitations 
+
+While our analysis provides empirical and practical insights, several avenues remain for further investi-gation. First, the underlying optimization dynamics that govern the observed phenomena, such as batch size trends, remain underexplored. The absence of a formal theoretical framework prevents the deriva-tion of universal, concise guidelines for batch size selection in LoRA scenarios. Second, our study mainly focuses on a single mathematical reasoning task to maintain a con-trolled and unified experimental setting with a widely adopted benchmark. However, training dy-namics are often domain-specific; different tasks (e.g., code generation or instruction following) may exhibit divergent behaviors. Finally, while we utilize the LLaMA 2 series to ensure reproducibility and relevance, the gen-eralizability of our findings to other architectures remains to be seen. Further extensive studies are required to validate these patterns across diverse model families and scales to establish a truly uni-versal heuristic for optimal configuration. 
+
+References 
+
+Dan Biderman, Jacob Portes, Jose Javier Gonzalez Ortiz, Mansheej Paul, Philip Greengard, Connor Jennings, Daniel King, Sam Havens, Vitaliy Chiley, Jonathan Frankle, Cody Blakeney, and John P. Cunningham. 2025. Lora learns less and forgets less. In Interna-tional Conference on Learning Representations .Karl Cobbe, Vineet Kosaraju, Mohammad Bavarian, Mark Chen, Heewoo Jun, Lukasz Kaiser, Matthias Plappert, Jerry Tworek, Jacob Hilton, Reiichiro Nakano, and 1 others. 2021. Training verifiers to solve math word problems. Noah Golmant, Nikita Vemuri, Zhewei Yao, Vladimir Feinberg, Amir Gholami, Kai Rothauge, Michael W. Mahoney, and Joseph Gonzalez. 2018. On the com-putational inefficiency of large batch sizes for stochas-tic gradient descent. Elad Hoffer, Itay Hubara, and Daniel Soudry. 2017. Train longer, generalize better: closing the general-ization gap in large batch training of neural networks. In Advances in Neural Information Processing Sys-tems .Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. 2022. LoRA: Low-rank adaptation of large language models. In International Conference on Learning Representations .Damjan Kalajdzievski. 2023. A rank stabilization scal-ing factor for fine-tuning with lora. arXiv e-prints .Nitish Shirish Keskar, Dheevatsa Mudigere, Jorge No-cedal, Mikhail Smelyanskiy, and Ping Tak Peter Tang. 2017. On large-batch training for deep learning: Gen-eralization gap and sharp minima. In International Conference on Learning Representations .Shuaipeng Li, Penghao Zhao, Hailin Zhang, Xingwu Sun, Hao Wu, Dian Jiao, Weiyan Wang, Chengjun Liu, Zheng Fang, Jinbao Xue, Yangyu Tao, Bin Cui, and Di Wang. 2024. Surge phenomenon in optimal learning rate and batch size scaling. In Advances in Neural Information Processing Systems .Shih-Yang Liu, Chien-Yi Wang, Hongxu Yin, Pavlo Molchanov, Yu-Chiang Frank Wang, Kwang-Ting Cheng, and Min-Hung Chen. 2024. Dora: Weight-decomposed low-rank adaptation. In International Conference on Machine Learning .Martin Marek, Sanae Lotfi, Aditya Somasundaram, An-drew Gordon Wilson, and Micah Goldblum. 2025. Small batch size training for language models: When vanilla sgd works, and why gradient accumulation is wasteful. In Advances in Neural Information Pro-cessing Systems .Sam McCandlish, Jared Kaplan, Dario Amodei, and OpenAI Dota Team. 2018. An empirical model of large-batch training. Fanxu Meng, Zhaohui Wang, and Muhan Zhang. 2024. Pissa: Principal singular values and singular vectors adaptation of large language models. In Advances in Neural Information Processing Systems .Aldo Pareja, Nikhil Shivakumar Nayak, Hao Wang, Kr-ishnateja Killamsetty, Shivchander Sudalairaj, Wen-long Zhao, Seungwook Han, Abhishek Bhandwaldar, Guangxuan Xu, Kai Xu, Ligong Han, Luke Inglis, and Akash Srivastava. 2025. Unveiling the secret recipe: A guide for supervised fine-tuning small llms. John Schulman and Thinking Machines Lab. 2025. Lora without regret. Thinking Machines Lab: Con-nectionism .Christopher J. Shallue, Jaehoon Lee, Joseph Antognini, Jascha Sohl-Dickstein, Roy Frostig, and George E. Dahl. 2019. Measuring the effects of data parallelism on neural network training. In Journal of Machine Learning Research .Reece Shuttleworth, Jacob Andreas, Antonio Torralba, and Pratyusha Sharma. 2025. Lora vs full fine-tuning: An illusion of equivalence. Samuel L. Smith, Pieter-Jan Kindermans, Chris Ying, and Quoc V. Le. 2018. Don’t decay the learning rate, increase the batch size. In International Conference on Learning Representations .Hugo Touvron, Louis Martin, Kevin Stone, Peter Al-bert, Amjad Almahairi, Yasmine Babaei, Nikolay Bashlykov, Soumya Batra, Prajjwal Bhargava, Shruti Bhosale, and 1 others. 2023. Llama 2: Open foun-dation and fine-tuned chat models. ArXiv preprint arXiv:2307.09288. 
+
+5Hanqing Wang, Yixia Li, Shuo Wang, Guanhua Chen, and Yun Chen. 2025. MiLoRA: Harnessing minor singular components for parameter-efficient LLM finetuning. In Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the Asso-ciation for Computational Linguistics: Human Lan-guage Technologies (Volume 1: Long Papers) .Longhui Yu, Weisen Jiang, Han Shi, Jincheng Yu, Zhengying Liu, Yu Zhang, James T Kwok, Zhen-guo Li, Adrian Weller, and Weiyang Liu. 2023. Metamath: Bootstrap your own mathematical ques-tions for large language models. arXiv preprint arXiv:2309.12284 .Hanlin Zhang, Depen Morwani, Nikhil Vyas, Jingfeng Wu, Difan Zou, Udaya Ghai, Dean Foster, and Sham M. Kakade. 2025. How does critical batch size scale in pre-training? In International Confer-ence on Learning Representations .Qingru Zhang, Minshuo Chen, Alexander Bukharin, Pengcheng He, Yu Cheng, Weizhu Chen, and Tuo Zhao. 2023. Adaptive budget allocation for parameter-efficient fine-tuning. In International Con-ference on Learning Representations .
+
+A Related Work 
+
+Batch size in deep learning and LLMs. The influence of batch size on optimization and gen-eralization has been extensively investigated in the broader deep learning literature (Keskar et al., 2017; Hoffer et al., 2017; Shallue et al., 2019; McCandlish et al., 2018; Golmant et al., 2018). McCandlish et al. (2018) characterize a critical batch size Bcrit beyond which increasing the batch size yields diminishing returns in training accel-eration, along with the concept of gradient noise scale. While these principles are well established for standard architectures, their application to mod-ern Large Language Models (LLMs) is an area of active refinement. Recent work revisits these ques-tions in the LLM training setting. In particular, Zhang et al. (2025) systematically measure critical batch size across model and data scales and find that it is driven primarily by data size rather than parameter count. On the fine-tuning side, Pareja et al. (2025) observe that larger batches can be beneficial when paired with appropriately reduced learning rates in full fine-tuning. At the other ex-treme, Marek et al. (2025) show that very small batches can train stably with batch size-aware opti-mizer hyperparameters, and they argue that gradi-ent accumulation can be compute-inefficient when its primary role is to emulate large batches. 
+
+Distinct dynamics of LoRA. A growing body of evidence suggests that findings from full fine-22 23 24 25 26 27 28 29
+
+> Batch Size
+> 0.30
+> 0.35
+> 0.40
+> 0.45
+> 0.50
+> 0.55
+> Accuracy (%)
+
+Figure 3: Batch size effect under fixed training steps. 
+
+Under a fixed optimization steps, larger batch sizes lead to superior performance due to increased data through-put. This trend persists until a critical threshold is reached, where increasing batch size beyond no longer yields improvements in test accuracy. 
+
+tuning (FFT) do not directly translate to parameter-efficient fine-tuning methods such as LoRA. The low rank constraint imposes a distinct optimiza-tion dynamics; Shuttleworth et al. (2025) show that FFT updates typically evolve with a signif-icantly higher effective rank than updates of the same rank LoRA. Furthermore, LoRA tends to ex-hibit a "learn-less and forget-less" phenomenon (Biderman et al., 2025), characterized by smaller weight shifts and better preservation of pre-trained features compared to FFT. These differences im-ply that the sensitivity to batch size in LoRA may follow a trajectory distinct from standard patterns. While Pareja et al. (2025) suggest that larger batches are generally beneficial for FFT, recent work (Schulman and Thinking Machines Lab, 2025) investigates into a “low regret regime", where LoRA can achieves similar performance to full fine-tuning, arguing that LoRA is less tolerant of large-batch training than FFT. Moreover, they suggest this gap may no matter much in practice, since smaller batches are better in both LoRA and full fine-tuning. Our work diverges from this bi-nary view; we demonstrate that neither smaller nor larger batches are universally optimal. Instead, we identify the optimal batch size that can be deter-mined through three fundamental determinants of LoRA rank, dataset scale, and model capacity, as detailed in Section 4. 
+
+B Experiments Under Fixed Steps 
+
+Figure 3 illustrates test performance across varying batch sizes under a constrained 200 optimization 623 25 27 29
+
+> Batch Size
+> 50
+> 52
+> 54
+> 56
+> 58
+> 60
+> Accuracy (%)
+> no warm-up & lr scheduling
+> no warm-up
+> default
+
+Figure 4: Impact of warm-up phase and lr scheduling. 
+
+We show that while removing the warm-up phase main-tains robust performance across all batch sizes without significant accuracy loss, the LR scheduling remains critical to model performance. 
+
+steps. In this configuration, where training with a batch size of 512 corresponds to approximately one epoch of the MetaMathQA100K dataset, larger batch sizes naturally entail a greater volume of training samples. Consequently, we observe a positive correlation between batch size and per-formance, as the increased data outweighs the po-tential impact of batch size. This indicates that the degradation observed in fixed sample protocol is partially attributable to insufficient updates rather than batch size itself. However, we emphasize that larger batches do not always yield superior out-comes even in a fixed step setup; rather, there is a point of diminishing returns where the effect of batch size begins to affect larger than data volume. 
+
+C Ablations: Warm-up & Learning Rate Scheduling. 
+
+In this section, we evaluate the sensitivity of LoRA fine-tuning to warm-up phases and learning rate (lr) scheduling. Figure 4 illustrates the test accu-racies across a range of batch sizes under varying optimization configurations. Consistent with the observations of Pareja et al. (2025), our results in-dicate that the inclusion of a warm-up stage yields marginal performance differences; in fact, omitting the warm-up phase leads to slightly superior results across the majority of the batch size spectrum. The presence of an lr scheduler (e.g., cosine decay) is critical for performance stability, which is contrary to Pareja et al. (2025). We find that the absence of lr scheduling results in a substantial performance degradation of approximately 5% in accuracy. Consequently, we employ an lr scheduler 21 23 25 27 29
+
+> Batch Size
+> 0.0002
+> 0.0004
+> 0.0006
+> 0.0008
+> 0.0010
+> Learning Rate
+
+Figure 5: Interaction between optimal learning rate and batch size. We demonstrate that the optimal learn-ing rate follows a non-monotonic trajectory as batch size increases, initially scaling upward before declining beyond a critical threshold. 
+
+without a warm-up phase for all main experiments in this study. 
+
+D Hyperparameter Configurations. 
+
+In Table 1, we provide our detailed configurations of all hyperparameters. This setup basically fol-lows that of Meng et al. (2024), except for some settings discussed in Section 2. 
+
+Table 1: Detailed hyperparameter configurations .
+
+Default Configurations rank r 128 
+
+α same as rank r
+
+Optimizer AdamW Dropout 0LR Scheduler cosine Warmup Ratio 0Epoch 1Placement query, key, value, output, gate, MLP up, MLP down 
+
+E Optimal Learning Rate Dynamics. 
+
+As detailed in Section 2, we determine the optimal learning rate (lr) independently for each batch size configuration to ensure a fair comparison. Specifi-cally, we conduct a grid search across an lr range of [1 × 10 −5, 3 × 10 −3]. To ensure a precise iden-tification of the optimal point, we employ a refined logarithmic grid consisting of {1, 2, 5} × 10 n, with additional points such as 3×10 −4 to provide higher granularity in the high performance region where 7the optimal lr frequently appears. We also include 
+
+3 × 10 −3 as the learning rate approaches the sta-bility boundary. Figure E illustrates the resulting optimal lr trajectory for each batch size in our de-fault setup with a single seed. Our analysis reveals that the optimal learning rate exhibits a non-monotonic relationship with batch size: the lr initially increases but subse-quently declines as the batch size continues to in-crease. This behavior in LoRA scenarios aligns with recent findings by Li et al. (2024), suggesting that the standard linear scaling rule may not hold for Adam style optimizers. 823 25 27 29
+
+Batch Size 
+
+45.0 
+
+47.5 
+
+50.0 
+
+52.5 
+
+55.0 
+
+57.5 
+
+60.0 
+
+62.5 
+
+> Accuracy (%)
+> rank=32
+> rank=64
+> rank=128
+> rank=256
+
+(a) LoRA rank 23 25 27 29
+
+Batch Size 
+
+30 
+
+35 
+
+40 
+
+45 
+
+50 
+
+55 
+
+60 
+
+65  
+
+> Accuracy (%)
+> 25K
+> 50K
+> 100K
+> 200K
+
+(b) Dataset scale 23 25 27 29
+
+Batch Size 
+
+50 
+
+55 
+
+60 
+
+65 
+
+70  
+
+> Accuracy (%)
+> 7B
+> 13B
+
+(c) Base model capacity 
+
+Figure 6: Original accuracies of Figure 2. We provide original accuracies of Figure 2, which are averaged over three seeds. 
+
+9

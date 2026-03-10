@@ -1,0 +1,362 @@
+Title: CeRA: Breaking the Linear Ceiling of Low-Rank Adaptation via Manifold Expansion
+
+URL Source: https://arxiv.org/pdf/2602.22911v2
+
+Published Time: Wed, 04 Mar 2026 01:16:00 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# CERA: B REAKING THE LINEAR CEILING OF LOW -R ANK 
+
+# ADAPTATION VIA MANIFOLD EXPANSION 
+
+Hung-Hsuan Chen 
+
+Computer Science and Information Engineering National Central University Taoyuan, Taiwan 
+
+hhchen1105@acm.org 
+
+# ABSTRACT 
+
+Low-Rank Adaptation (LoRA) dominates parameter-efficient fine-tuning (PEFT). However, it faces a critical “linear ceiling” in complex reasoning tasks: simply increasing the rank yields diminishing returns due to intrinsic linear constraints. We introduce CeRA (Capacity-enhanced Rank Adaptation), a weight-level parallel adapter that injects SiLU gating and structural dropout to induce manifold expansion. On the SlimOrca benchmark, CeRA breaks this linear barrier: at rank 64 (PPL 3.89), it outperforms LoRA at rank 512 (PPL 3.90), demonstrating superior spectral efficiency. This advantage generalizes to mathematical reasoning, where CeRA achieves a perplexity of 1.97 on MathInstruct, significantly surpassing LoRA’s saturation point of 2.07. Mechanism analysis via Singular Value Decomposition (SVD) confirms that CeRA activates the dormant tail of the singular value spectrum, effectively preventing the rank collapse observed in linear methods. 
+
+Keywords PEFT · LoRA · LLM 
+
+# 1 Introduction 
+
+Parameter-Efficient Fine-Tuning (PEFT) has evolved from an optimization trick into the backbone of Large Language Model (LLM) deployment. Among various techniques, Low-Rank Adaptation (LoRA) [ 1] has established itself as the de facto standard. Its popularity rests on a specific “mergeability dogma”: the assumption that weight updates must be inherently linear ( ∆W = BA ) to allow seamless merging with the base model for zero-latency inference. We challenge this structural orthodoxy. Although recent variants have attempted to refine LoRA through weight decomposition [ 2] or adaptive rank allocation [ 3], they primarily focus on optimizing the learning dynamics of the linear subspace. Crucially, they leave the underlying hypothesis space unchanged. Consequently, these methods remain bounded by the expressivity limits of linear transformations, creating a hard ceiling for reasoning-intensive tasks such as mathematics and logic. We present empirical evidence of this “linear ceiling” effect, where LoRA suffers from “rank saturation”. In complex reasoning benchmarks, simply increasing the parameter budget yields diminishing returns. In our experiment, a high-rank LoRA ( r = 512 ) performs no better than a low-rank counterpart ( r = 64 ), indicating that the bottleneck is not the parameter count, but the structural rigidity of the linearity itself. To break this ceiling, we introduce CeRA (Capacity-enhanced Rank Adaptation). CeRA marks a paradigm shift from linear subspace optimization to non-linear manifold deformation. By injecting SiLU gating and structural dropout directly into a fine-grained, parallel adapter architecture, CeRA unlocks the high-dimensional expressivity required for complex reasoning. We argue that for high-value vertical tasks, the performance gains from non-linearity outweigh the convenience of weight merging. Furthermore, in the era of cloud-scale multi-tenant serving (e.g., S-LoRA [ 4 ], Punica [ 5]), unmerged adapters are already the architectural standard, rendering the cost of non-linearity negligible in practice. Our contributions are fourfold: 
+
+> arXiv:2602.22911v2 [cs.LG] 2 Mar 2026
+
+Running Title for Header • Architecture: We propose CeRA, a fine-grained, weight-level parallel adapter that integrates non-linear gating to capture complex functional updates beyond linear approximations. • Empirical Scaling: We demonstrate that CeRA breaks the linear ceiling. On the large-scale SlimOrca benchmark [ 6], CeRA continues to scale, with CeRA at rank 64 significantly outperforming LoRA at Rank 512. • Domain Generalization: We validate the robustness of our approach on the MathInstruct dataset [ 7], showing consistent performance gains in mathematical reasoning and confirming that the manifold expansion is not dataset-specific. • Theoretical Mechanism: Through Singular Value Decomposition (SVD) analysis, we provide a spectral proof of manifold expansion. We show that CeRA activates the dormant tail of the singular value spectrum, preventing the rank collapse that constrains linear methods. 
+
+# 2 CeRA: Capacity-enhanced Rank Adaptation 
+
+We introduce CeRA, a methodology that reconciles the efficiency of parameter-efficient fine-tuning with the high-dimensional expressivity required for complex reasoning. 
+
+2.1 Preliminaries: The Linear Confinement 
+
+LoRA operates under the restrictive hypothesis that the intrinsic dimension of weight updates for downstream tasks is low. For a pre-trained weight matrix W0 ∈ Rd×k, LoRA constrains the update ∆W to a low-rank decomposition BA ,where B ∈ Rd×r , A ∈ Rr×k, and r ≪ min( d, k ). The forward pass is: 
+
+h = W0x + αr BAx, (1) where x and h are the input and output of the layer, and α is a scaling hyperparameter. This formulation is purely linear. Although computationally convenient – allowing ∆W to merge into W0 – it imposes a linear constraint. The model can rotate the feature space, but it cannot twist or fold it. We argue that this limitation is the root cause of the observed under-utilization of ranks in complex tasks. 
+
+2.2 The CeRA Architecture 
+
+CeRA breaks this linear constraint. We retain the parallel bottleneck structure to preserve synchronization with the main branch but inject non-linearity to unlock high-rank capacity, as illustrated in Figure 1 (bottom-right). Formally, CeRA is defined as: 
+
+h = W0x + s · Wdown (D(σ(Wup x))) (2) where Wup ∈ Rr×k projects input to a latent dimension r, σ(·) is the SiLU activation function, D(·) denotes structural dropout, Wdown ∈ Rd×r projects back to the output dimension, and s is a scaling scalar. This architecture introduces three critical design pivots: 
+
+Weight-Level Granularity. As shown in Figure 1, a critical distinction between CeRA and parallel adapters lies in the insertion point. Unlike traditional Parallel Adapters (top-right), which operate at the module level by processing the aggregate output of an attention block, CeRA operates at the weight level (bottom-right). By injecting updates directly into the internal query ( Wq ) and value ( Wv ) projections, CeRA fundamentally alters the internal feature dynamics of the attention mechanism rather than simply correcting its output. 
+
+SiLU Gating. Linearity forces the adapter to process all input features uniformly. By introducing SiLU ( σ(x) = 
+
+x · sigmoid (x)), CeRA gains a gating mechanism. This non-linearity allows the adapter to selectively suppress noise or amplify specific feature directions in the latent space, approximating complex decision boundaries that linear low-rank updates cannot represent. 
+
+Structural Dropout as Manifold Expander. In standard PEFT, dropout is often omitted. In CeRA, we utilize dropout 
+
+D not only as a regularizer, but as a mechanism for manifold expansion. By stochastically blocking latent paths during training, we force the model to distribute information across the entire rank spectrum, preventing the optimization from collapsing into a narrow subspace (rank collapse). 2Running Title for Header Weight -Level 
+
+Adaptation          
+
+> 𝑥
+> ℎ
+> 𝑾 𝑄 𝑾 𝐾 𝑾 𝑉
+> Attention
+> Adapter
+> (MLP)
+> +
+> 𝑥
+> ℎ
+> 𝑾 𝑄 𝑾 𝐾 𝑾 𝑉
+> Attention
+> Adapter
+> (MLP)
+> 𝑥
+> ℎ
+> Attention
+> 𝑾 𝑄 𝑾 𝐾 𝑾 𝑉
+> ++
+> 𝑨
+> 𝑩
+> 𝑨 ′
+> 𝑩 ′
+> 𝑥
+> ℎ
+> Attention
+> 𝑾 𝑄 𝑾 𝑉
+> ++
+> 𝑾 𝐾
+> 𝑾 𝑢𝑝
+> 𝑾 𝑑𝑜𝑤𝑛
+> 𝜎
+> 𝒟
+> 𝑾 𝑢𝑝
+> ′
+> 𝑾 𝑑𝑜𝑤𝑛
+> ′
+> 𝜎
+> 𝒟
+
+Module -
+
+Level 
+
+Adaptation 
+
+Figure 1: Architectural evolution of adaptation methods. Top Row (Module-Level): Traditional adapters operate on the output of the entire attention block. (Top-left) Serial Adapters create latency bottlenecks. (Top-right) Parallel Adapters improve efficiency but lack fine-grained control over internal projections. Bottom Row (Weight-Level): (Bottom-left) LoRA injects linear updates ( ∆W = BA ) directly into Wq and Wv . (Bottom-right) CeRA (Ours) operates at the same fine-grained level but introduces non-linear modeling via SiLU gating ( σ) and structural Dropout (D). This architecture combines the efficiency of weight-level injection with the high-capacity expressivity of non-linear manifolds. 
+
+2.3 The Mergeability Trade-off 
+
+A common critique of nonlinear adapters is the loss of “mergeability” – the ability to collapse ∆W into W0 for zero-latency inference. We challenge the relevance of this constraint in modern deployment. In cloud-scale multi-tenant serving systems (e.g., S-LoRA [ 4 ], Punica [ 5 ]), merging is structurally impossible. To serve thousands of users with different fine-tuned models, the system holds one shared backbone and dynamically fetches unmerged adapter weights for each request. Merging weights would necessitate duplicating the massive backbone for every user, exploding VRAM usage. Therefore, the industrial standard is unmerged inference . In this paradigm, CeRA fits seamlessly. It requires no architectural changes to the serving infrastructure, only the execution of an additional activation kernel. We deliberately trade the theoretical mergeability—which is rarely used in multi-tenant scaling—for tangible gains in reasoning capacity. 
+
+2.4 Spectral Analysis Framework: Effective Rank 
+
+To quantify CeRA and LoRA’s “manifold expansion” capability, we adopt the effective rank (ER) metric [ 8]. Unlike the parametric rank (which is fixed), the effective rank measures the actual dimensionality of the information encoded in the activation space. Let H ∈ RN ×d be the matrix of adapter activations collected from N samples. The singular values of H are 
+
+σ1 ≥ σ2 ≥ · · · ≥ σk ≥ 0. We define the normalized singular value distribution as pi = σiPkj=1 σj
+
+. The effective rank is defined as the exponential of the Shannon entropy: ER (H) = exp −
+
+> k
+
+X
+
+> i=1
+
+pi ln pi
+
+!
+
+(3) 3Running Title for Header A higher ER implies a more uniform distribution of energy across dimensions, indicating that the non-linear gating successfully forces the model to utilize the full rank budget. Conversely, a low ER indicates rank collapse. 
+
+# 3 Experimental Setup 
+
+We design our experiments to rigorously test and analyze the scaling limits of linear versus non-linear adaptation. 
+
+3.1 Base Model and Implementation 
+
+We utilize Llama-3-8B as the backbone for all experiments. Training is conducted in bfloat16 precision using the AdamW optimizer with a cosine learning rate schedule. To ensure a fair comparison, we freeze all backbone parameters and strictly control the trainable parameter budget, varying only the adapter rank and architecture. 
+
+3.2 Datasets 
+
+We select two distinct datasets to evaluate capacity scaling and domain robustness: • SlimOrca (Primary - Scaling): A large-scale collection of ∼300k GPT-4 augmented instruction pairs. Unlike standard datasets that yield concise responses, SlimOrca emphasizes Chain-of-Thought (CoT), prioritizing detailed reasoning steps and logical explanations over short answers. Spanning diverse complex domains such as mathematics, logic, and code interpretation, this dataset allows us to probe the capacity scaling law , as its complexity and scale are sufficient to saturate high-rank adapters and expose the “linear ceiling.” • MathInstruct (Secondary - Reasoning): A composite dataset of 100k mathematical problems (including GSM8K and MATH). We use this to validate CeRA’s domain adaptation capabilities, specifically its ability to model the complex logical dependencies required for mathematical derivation. 
+
+3.3 Baselines 
+
+We compare CeRA directly with the industry standard LoRA. To investigate rank saturation, we sweep across a logarithmic scale of ranks r ∈ { 16 , 64 , 128 , 512 }. This spectrum covers the transition from parameter-efficient constraints to high-capacity regimes. 
+
+3.4 Evaluation Metrics 
+
+We employ a multi-faceted evaluation strategy combining performance and mechanism analysis: • Perplexity (PPL): We use the perplexity of the hold-out test set as the primary measure of predictive perfor-mance. • Singular Value Decomposition (SVD): We compute the singular value spectrum of the learned adapter weights to visualize rank collapse versus tail activation. • Effective Rank (ER): To quantify the “manifold expansion,” we calculate the effective rank [ 8] of the adapter activations. A higher ER indicates a more uniform distribution of information across the available rank budget. 
+
+# 4 Empirical Analysis 
+
+In this section, we present the main empirical findings, focusing on the scaling behavior on the SlimOrca benchmark and domain generalization on the MathInstruct dataset. 
+
+4.1 The Capacity Scaling Law 
+
+We first investigate whether non-linearity allows the model to overcome the rank saturation observed in linear adapters. We train both LoRA and CeRA on the 300k-sample SlimOrca dataset in ranks r ∈ { 16 , 64 , 128 , 512 }.
+
+The Linear Ceiling. As illustrated in Figure 2, standard LoRA exhibits rapid diminishing returns. Despite increasing the parameter budget by 32 × (from r = 16 to r = 512 ), LoRA’s performance plateaus around a perplexity of 3.90. This empirically confirms the existence of a “linear ceiling,” where additional rank provides no meaningful gain in expressivity for complex reasoning data. 4Running Title for Header 16 64 128 512 Rank (log scale) 3.85 3.90 3.95 4.00 4.05 4.10 Perplexity (lower is better) 
+
+> LoRA
+> Ce RA
+
+Figure 2: The Capacity Scaling Law of SlimOrca. Although LoRA plateaus rapidly, CeRA continues to improve with rank. In particular, CeRA at rank 64 outperforms LoRA at rank 512, breaking the linear ceiling. 
+
+Breaking the Ceiling via Spectral Efficiency. Although the absolute PPL improvement from 3.90 (LoRA) to 3.83 (CeRA) demonstrates the benefit of non-linearity, the most critical finding is the crossover in efficiency. As shown in Figure 2, CeRA of rank 64 (PPL 3.89) outperforms LoRA of rank 512 (PPL 3.90). This indicates that CeRA achieves superior expressivity with 8× fewer singular dimensions than the linear baseline, proving that the “linear ceiling” is a structural bottleneck rather than a parameter-capacity issue. 
+
+4.2 Generalization on Mathematical Reasoning 
+
+To ensure that the observed gains are not specific to the SlimOrca dataset, we extend our evaluation to the domain of mathematical reasoning using the MathInstruct dataset. 16 64 128 512 Rank (log scale) 2.0 2.2 2.4 2.6 2.8 3.0 Perplexity (lower is better) 
+
+> LoRA
+> Ce RA
+
+Figure 3: Scaling laws of MathInstruct. CeRA consistently outperforms LoRA across all ranks, with the gap widening at higher ranks ( r = 512 ). While LoRA continues to improve, it remains strictly dominated by CeRA’s non-linear adaptation curve. 5Running Title for Header Table 1: Case study on iterative reasoning: Comparison of generation outputs for a logistic map problem. LoRA with a larger rank 512 suffers from state collapse, repeating the same value after the second step. In contrast, CeRA, even with a smaller rank 128, successfully models the non-linear recursive updates, generating a dynamic trajectory despite having 4× fewer parameters.                                        
+
+> Problem Prompt:
+> Consider the logistic map xn+1 = 3 .5xn(1 −xn)with x0= 0 .4. Calculate the first few iterations.
+> LoRA (Rank 512) – State Collapse
+> Step 1: x1= 3 .5(0 .4)(0 .6) = 0 .84 .Step 2: x2= 3 .5(0 .84)(0 .16) = 0 .4704 .Step 3: x3= 3 .5(0 .4704)(0 .5296) ≈0.8719 .Step 4: x4=0.8719 .Step 5: x5=0.8719 .... (Model repeats 0.8719 indefinitely)
+> CeRA (Rank 128) – Dynamic Tracking
+> Step 1: x1= 3 .5(0 .4)(0 .6) = 0 .84 .Step 2: x2= 3 .5(0 .84)(0 .16) = 0 .4704 .Step 3: x3= 3 .5(0 .4704)(0 .5296) ≈0.8719 .Step 4: x4= 3 .5(0 .8719)(0 .1281) ≈0.3909 .Step 5: x5= 3 .5(0 .3909)(0 .6091) ≈0.8333 .(Model continues to update values dynamically)
+
+Consistent Gains via Non-linearity. As illustrated in Figure 3, CeRA maintains a consistent advantage over LoRA throughout the rank spectrum. Mathematical derivation inherently requires capturing sharp, non-linear dependencies between logical steps; standard linear updates often struggle to model these rigid logical boundaries. By introducing non-linearity, CeRA effectively accommodates these complex mappings, achieving a lower perplexity of 1.97 at rank 512 compared to LoRA’s 2.07. 
+
+The Role of Data Diversity. Note that while CeRA dominates LoRA on MathInstruct, the performance gap is less pronounced than on SlimOrca. We attribute this to the difference in dataset diversity and manifold geometry. SlimOrca contains highly diverse, open-ended reasoning tasks (Chain-of-Thought, coding, common sense), which form a complex, irregular solution manifold that quickly saturates linear subspaces. In contrast, MathInstruct focuses on a more specialized domain where problem structures are more regular and patterned. In this highly structured manifold, linear approximations (LoRA) remain relatively effective for longer. Nevertheless, CeRA’s ability to squeeze out further gains confirms that even in structured domains, non-linearity provides a necessary edge for "last-mile" optimization. 
+
+4.3 Qualitative Analysis: Escaping the Linear Trap 
+
+Although perplexity and effective rank provide quantitative evidence of CeRA’s superiority, it is crucial to examine how this translates into actual reasoning capabilities. We conduct a qualitative case study using the MathInstruct dataset to analyze the generation behavior of both models. We specifically focus on iterative reasoning tasks, such as calculating the trajectory of a logistic map defined by 
+
+xn+1 = rx n(1 − xn). These problems are particularly challenging because they require the model to maintain and update a dynamic hidden state over multiple time steps without succumbing to error accumulation or state collapse. 
+
+Rank Collapse vs. Dynamic Tracking. Table 1 presents a representative example. The task requires the model to compute a non-linear recursion. • LoRA (rank 512): Despite having a high rank, LoRA exhibits a phenomenon we term state collapse . After correctly calculating the first two steps, the model fails to update its internal representation for the next iteration. It degenerates into a repetitive loop, outputting the same value ( 0.8719 ) for all subsequent steps. This suggests that the linear subspace of LoRA is too rigid to capture the continuous curvature of the logistic function, effectively hitting a “linear ceiling.” • CeRA (rank 128): In contrast, CeRA demonstrates robust dynamic tracking . It successfully recognizes that the value of xn must change at every step. Although CeRA utilizes a significantly smaller rank budget ( r = 128 ), its non-linear gating mechanism (SiLU) and the dropping mechanism allow the model to switch contexts and project the hidden states into a broader manifold. 6Running Title for Header 0 100 200 300 400 500 600 Singular Value Index 10 5    
+
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> Singular Value (log scale)
+> (512) Limit Rank
+> Ce RA LoRA
+
+Figure 4: Spectral Signature of the SlimOrca dataset. LoRA exhibits “rank collapse,” where singular values drop precipitously, indicating under-utilization of the rank budget. CeRA maintains a “heavy tail,” activating a broader subspace. 
+
+Interpretation. This qualitative difference aligns with our spectral analysis. The “heavy tail” in CeRA’s singular value spectrum reflects its ability to encode subtle state changes required for multi-step reasoning. LoRA’s rank collapse in the spectral domain manifests itself directly as repetitive generation in the text domain. 
+
+# 5 Mechanism & Design Analysis 
+
+In this section, we deconstruct CeRA to isolate the source of its performance. We move beyond predictive metrics (PPL) to analyze the structural properties of the learned weight manifolds using spectral analysis. 
+
+5.1 Spectral Signature of Non-linearity 
+
+To understand why CeRA utilizes parameters more efficiently than LoRA, we visualize the singular value spectrum of the learned adapter updates. 
+
+5.1.1 Visualizing Expansion 
+
+As shown in Figure 4, standard LoRA in the SlimOrca dataset exhibits rank collapse : the singular values decay rapidly, effectively using only a fraction of the allocated rank. In contrast, CeRA demonstrates tail activation, maintaining significant energy across the singular value spectrum. This confirms that the non-linearity prevents the optimization path from being confined to a low-dimensional linear subspace. The experimental results in the MathInstruct dataset show a similar trend, as demonstrated in Figure 7 in Appendix B. 
+
+5.1.2 Quantifying Manifold Expansion 
+
+We quantify the extent of subspace collapse using the effective rank (ER) metric [ 8]. As illustrated in Figure 5, a stark divergence emerges as the rank increases. At a target rank of r = 512 , LoRA suffers from severe spectral saturation, using only a fraction of its capacity with an effective rank of ≈ 60 . In contrast, CeRA successfully induces manifold expansion, maintaining a high effective rank that exceeds 330. This quantitative gap, where CeRA activates over 5×
+
+more spectral dimensions than LoRA at high ranks, provides the geometric explanation for the efficiency crossover observed in Section 4. The experimental results in the MathInstruct dataset show a similar trend, as demonstrated in Figure 8 in Appendix B. 7Running Title for Header 16 64 128 512 Target Rank Constraint 050 100 150 200 250 300 350 400 Effective Rank LoRA 
+
+> Ce RA
+
+Figure 5: Effective Rank Analysis on SlimOrca. We compare the spectral utilization of LoRA and CeRA across increasing rank budgets ( r ∈ { 16 , 64 , 128 , 512 }). As the rank budget increases to 512, LoRA’s effective rank saturates significantly, plateauing around ∼60. This confirms the “linear ceiling” hypothesis, where linear constraints prevent the model from utilizing the additional parameter budget. Conversely, CeRA demonstrates superior spectral efficiency. Its effective rank scales with the budget, reaching over 330 at r = 512 . This validates that our non-linear architecture successfully expands the representation manifold, avoiding the collapse observed in linear adapters. 
+
+5.2 Deconstructing CeRA: An Ablation Study 
+
+To validate our architectural decisions, we conduct a comprehensive ablation study on the SlimOrca dataset at rank 128. We isolate three core design pivots: granularity, activation function, and dropout. Table 2: Deconstructing CeRA (rank 128). We report test PPL (lower is better) on the SlimOrca dataset. The results confirm that the full CeRA architecture—combining weight-level granularity, SiLU gating, and structural dropout—yields the optimal performance. 
+
+Model Variant Component Change Test PPL ↓
+
+CeRA (Ours) Full Architecture 3.81 
+
+(a) Granularity Module-level (Parallel) 3.90 
+
+(b) Activation Identity (Linear) 3.97 ReLU 3.84 
+
+(c) Dropout No Dropout 3.85 
+
+5.2.1 Granularity: The Weight-Level Advantage 
+
+Row (a) in Table 2 compares CeRA with a standard parallel adapter applied at the module output. The degradation in PPL (3.90) confirms that fine-grained intervention within the projection matrices ( Wq , W v ) is crucial. The Weight-level adaptation allows CeRA to manipulate the internal feature dynamics of the attention mechanism, whereas the module-level adaptation operates too coarsely. 
+
+5.2.2 Activation: The Necessity of Non-linearity 
+
+Row (b) validates the “non-linear” in CeRA. Replacing SiLU with an identity function (effectively reverting to a linear parallel adapter) yields the worst PPL (3.97). Furthermore, SiLU outperforms ReLU (3.84), suggesting that the smooth gating property of SiLU facilitates better gradient flow and manifold curvature than the rigid sparsity of ReLU. 8Running Title for Header Table 3: Efficiency-Performance Trade-off: Comparison on SlimOrca. (1) Parameter efficiency: CeRA ( r = 64 )matches the performance of LoRA ( r = 512 ) with ≈ 8× fewer parameters. (2) Optimal Balance: CeRA ( r = 128 )achieves a great perplexity (3.81) while using only 25% of the LoRA baseline’s parameters. (3) Latency: Inference overhead is dominated by kernel launching rather than computation size, resulting in consistent throughput ( ≈ 51 tok/s) across CeRA ranks.                     
+
+> Model Rank Params Test PPL ( ↓)Rel. Latency Throughput
+> LoRA 512 218.1M 3.90 1.00 ×54.15 tok/s
+> CeRA 64 27.3M 3.89 1.06 ×50.90 tok/s
+> CeRA 128 54.5M 3.81 1.06 ×51.05 tok/s
+
+5.2.3 Dropout: Structural Manifold Expansion 
+
+Row (c) reveals a critical insight: removing dropout ( p = 0 ) hurts generalization (PPL increases from 3.81 to 3.85). This confirms that in CeRA, dropout acts as a structural manifold expander. By stochastically blocking latent paths, it forces the model to distribute information across more dimensions, preventing the network from over-relying on dominant singular values. 
+
+5.3 Efficiency Trade-off: Capacity per Parameter 
+
+A common concern with non-linear structures is the potential computational overhead. We analyze the trade-off between parameter efficiency and inference latency. 
+
+5.3.1 Parameter Efficiency 
+
+Table 3 reveals a compelling contrast in parameter utilization. CeRA at rank 64 achieves a perplexity of 3.89, effectively matching the LoRA baseline at rank 512 (3.90) while using only 27.3M parameters, an 8× reduction compared to LoRA’s 218.1M. Furthermore, increasing the CeRA rank to 128 (54.5M parameters) reduces the perplexity to 3.81, significantly outperforming the high-rank LoRA baseline while still consuming only 25% of its parameter budget. This confirms that structural complexity (non-linearity) is a significantly more efficient driver of performance than brute-force dimensional scale .
+
+5.3.2 Inference Latency 
+
+Since CeRA involves non-linear operations, the weights cannot be mathematically merged into the base model (W0 + ∆ W ) for zero-latency inference. However, in modern multi-tenant serving systems (e.g., S-LoRA, Punica), unmerged inference is the standard paradigm to support dynamic adapter switching. Our benchmarks indicate a modest latency overhead of approximately 6% compared to the merged LoRA baseline. Notably, the throughput for CeRA remains consistent across ranks 64 and 128 ( ≈ 51 tok/s). This suggests that the overhead is primarily driven by fixed kernel launching costs (for SiLU and Dropout operations) rather than the computational cost of the adapter’s matrix multiplication. We argue that for high-stakes reasoning tasks, this marginal latency cost is well justified by the significant gains in generation quality and parameter efficiency. 
+
+# 6 Related Work 
+
+We position CeRA within the PEFT landscape by contrasting it with linear low-rank variants and existing adapter architectures. Table 4 summarizes the structural differences. 
+
+6.1 LoRA and Linear Variants 
+
+LoRA [ 1] established the standard for efficient fine-tuning by hypothesizing that weight updates reside in a low-rank linear subspace. Subsequent work has optimized this paradigm: AdaLoRA [ 3 ] allocates rank budgets dynamically; DoRA [ 2] decomposes updates into magnitude and direction for stability; and QLoRA [ 9 ] focuses on quantization. Crucially, while these methods improve efficiency or stability, they remain bound by the linear form ∆W = BA . Our work identifies this linearity as the primary bottleneck for reasoning-intensive tasks. CeRA is orthogonal to these optimizations; it challenges the functional form of the update itself, replacing the linear subspace assumption with a non-linear manifold hypothesis. 9Running Title for Header Table 4: Feature Comparison. Unlike LoRA and its variants, CeRA introduces nonlinearity. Unlike traditional parallel adapters, which operate at the coarse module-level , CeRA operates at the fine-grained weight-level , enabling precise manifold deformation within attention projections. 
+
+Feature LoRA Houlsby Adapter Parallel Adapter CeRA (Ours) Insertion Point Weight-level Module-level Module-level Weight-level 
+
+(Granularity) (Wq , W v internal) (After Attn/FFN) (Parallel to Attn/FFN) (Wq , W v internal) Structure Linear Update Non-linear MLP Non-linear MLP Non-linear Gated MLP 
+
+h = W x + BAx h = W x + s ·
+
+Wd(D(σ(Wux))) 
+
+Non-Linearity No Yes Yes Yes (SiLU + Dropout) Mergeable? Yes No No No Expressivity Low High High High 
+
+(Linear Subspace) (Manifold Deforma-tion) 6.2 Granularity in Parallel Adapters 
+
+The original series of adapters [ 10 ] inserted MLPs sequentially, resulting in high latency. To mitigate this, parallel adapters [ 11 , 12 ] placed adapters along transformer sub-layers. However, a critical distinction lies in granularity. Prior parallel adapters operate at the module-level – processing the aggregate output of an entire attention or feedforward network (FFN) block (visualized as the “Parallel Adapter” in Figure 1). In contrast, CeRA operates at the weight level, injecting nonlinearity directly into the internal query ( Wq ) and value ( Wv ) projections. This fine-grained intervention allows CeRA to fundamentally alter the attention mechanism’s internal feature dynamics rather than merely correcting its output. 
+
+6.3 The Expressivity-Mergeability Trade-off 
+
+In the PEFT literature, linearity is often preserved solely to allow weight merging ( ∆W + W ) for zero-latency inference. We argue that for high-value vertical domains (e.g., mathematics, logic), the expressivity gains from nonlinearity outweigh the cost of unmerged inference. Furthermore, with the rise of multi-tenant serving systems such as S-LoRA [ 4] and Punica [ 5], which dynamically serve unmerged adapters, the deployment barrier for non-linear adapters such as CeRA has been effectively removed. 
+
+6.4 Linear Re-parameterization vs. Structural Expansion 
+
+Recent advances in PEFT have focused on optimizing the learning dynamics of low-rank updates. In particular, DoRA [ 2 ] decomposes weights into magnitude and direction components, successfully bridging the gap between LoRA and full fine-tuning. However, DoRA and similar variants (e.g., AdaLoRA [ 3]) fundamentally operate within the 
+
+linear adaptation paradigm, where the final effective weight remains W ′ = W + ∆ W . In contrast, CeRA pursues an orthogonal direction: structural expansion . By introducing non-linear gating (SiLU), dropout, and MLP-like interactions, CeRA breaks the linear ceiling, expanding the functional class of the adapter itself. While DoRA optimizes 
+
+how we learn a linear subspace, CeRA changes what the subspace can represent. 
+
+# 7 Limitations 
+
+Although CeRA demonstrates significant advantages in reasoning-intensive domains, we acknowledge certain limita-tions. First, the requirement for unmerged inference may pose challenges for edge devices with strictly limited memory bandwidth, where weight merging is mandatory. Second, our current analysis focuses on the Llama-3 architecture; future work is needed to validate the universality of the “linear ceiling” hypothesis across other architectures like Mixture-of-Experts (MoE) or Mamba. 10 Running Title for Header 
+
+# 8 Conclusion 
+
+In this work, we challenge the prevailing “linear sufficiency” hypothesis in Parameter-Efficient Fine-Tuning. We identify that for reasoning-intensive tasks, standard LoRA suffers from a linear ceiling , where increasing the parameter budget yields diminishing returns due to intrinsic structural rigidity. We introduce CeRA (Capacity-enhanced Rank Adaptation), a weight-level architecture that injects SiLU gating and structural dropout directly into the low-rank bottleneck. Our findings demonstrate that with sufficient data, such as in the SlimOrca benchmark, CeRA unlocks the latent capacity that linear methods waste. Crucially, CeRA at rank 64 outperforms LoRA at rank 512, demonstrating that non-linearity enables superior spectral efficiency. Through singular value spectrum analysis, we further confirm that CeRA activates the dormant tail of the singular value spectrum, significantly increasing the effective rank and preventing the representation collapse observed in linear updates. We argue that for high-value vertical domains, the rigorous demands of reasoning outweigh the convenience of weight merging. CeRA proves that non-linearity is key to unlocking high-rank potential, positioning itself not merely as another adapter variant, but as a necessary evolution for scenarios where reasoning depth is paramount. Future work will extend this non-linear paradigm to larger-scale backbones (e.g., 70B parameters) and multi-modal reasoning tasks. Finally, we note that the structural benefits of CeRA are theoretically orthogonal to the parameterization improvements of DoRA. A promising direction for future work is to explore a hybrid “Weight-Decomposed Non-linear Adapter,” potentially combining the stable optimization dynamics of DoRA with the high expressivity of CeRA. 
+
+# Acknowledgments and GenAI Usage Disclosure 
+
+We acknowledge support from the National Science and Technology Council of Taiwan under grant number 113-2221-E-008-100-MY3. The authors used Gemini to improve language and readability. The authors reviewed and edited the content as needed and take full responsibility for the content. 
+
+# References 
+
+[1] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al. Lora: Low-rank adaptation of large language models. ICLR , 1(2):3, 2022. [2] Shih-Yang Liu, Chien-Yi Wang, Hongxu Yin, Pavlo Molchanov, Yu-Chiang Frank Wang, Kwang-Ting Cheng, and Min-Hung Chen. Dora: Weight-decomposed low-rank adaptation. In Forty-first International Conference on Machine Learning , 2024. [3] Qingru Zhang, Minshuo Chen, Alexander Bukharin, Nikos Karampatziakis, Pengcheng He, Yu Cheng, Weizhu Chen, and Tuo Zhao. Adalora: Adaptive budget allocation for parameter-efficient fine-tuning. arXiv preprint arXiv:2303.10512 , 2023. [4] Ying Sheng, Shiyi Cao, Dacheng Li, Coleman Hooper, Nicholas Lee, Shuo Yang, Christopher Chou, Banghua Zhu, Lianmin Zheng, Kurt Keutzer, et al. S-lora: Serving thousands of concurrent lora adapters. arXiv preprint arXiv:2311.03285 , 2023. [5] Lequn Chen, Zihao Ye, Yongji Wu, Danyang Zhuo, Luis Ceze, and Arvind Krishnamurthy. Punica: Multi-tenant lora serving. Proceedings of Machine Learning and Systems , 6:1–13, 2024. [6] Wing Lian, Guan Wang, Bleys Goodson, Eugene Pentland, Austin Cook, Chanvichet Vong, and "Teknium". Slimorca: An open dataset of gpt-4 augmented flan reasoning traces, with verification, 2023. [7] Xiang Yue, Xingwei Qu, Ge Zhang, Yao Fu, Wenhao Huang, Huan Sun, Yu Su, and Wenhu Chen. Mammoth: Building math generalist models through hybrid instruction tuning. arXiv preprint arXiv:2309.05653 , 2023. [8] Olivier Roy and Martin Vetterli. The effective rank: A measure of effective dimensionality. In 2007 15th European signal processing conference , pages 606–610. IEEE, 2007. [9] Tim Dettmers, Artidoro Pagnoni, Ari Holtzman, and Luke Zettlemoyer. Qlora: Efficient finetuning of quantized llms, 2023. URL https://arxiv. org/abs/2305.14314 , 2, 2023. [10] Neil Houlsby, Andrei Giurgiu, Stanislaw Jastrzebski, Bruna Morrone, Quentin De Laroussilhe, Andrea Gesmundo, Mona Attariyan, and Sylvain Gelly. Parameter-efficient transfer learning for nlp. In International conference on machine learning , pages 2790–2799. PMLR, 2019. [11] Junxian He, Chunting Zhou, Xuezhe Ma, Taylor Berg-Kirkpatrick, and Graham Neubig. Towards a unified view of parameter-efficient transfer learning. arXiv preprint arXiv:2110.04366 , 2021. 11 Running Title for Header [12] Yaoming Zhu, Jiangtao Feng, Chengqi Zhao, Mingxuan Wang, and Lei Li. Counter-interference adapter for multilingual machine translation. arXiv preprint arXiv:2104.08154 , 2021. 
+
+# A Extended Spectral Analysis on SlimOrca 16 64 128 512 Target Rank Constraint 050 100 150 200 250 300 350 Manifold Dimensionality (90% Variance) LoRA 
+
+> Ce RA
+
+Figure 6: Cumulative Spectral Energy (AUC-90) on SlimOrca. LoRA reaches energy saturation rapidly, indicating that the majority of the rank budget is redundant. In contrast, CeRA’s manifold dimensionality continues growing, demonstrating a more uniform distribution of information across singular dimensions. In the main text, we demonstrate CeRA’s performance superiority on the SlimOrca benchmark. Here, we investigate whether the theoretical mechanism – manifold expansion – holds for this general reasoning dataset. 
+
+AUC-90 Analysis. Figure 6 presents the Cumulative Spectral Energy (AUC-90) for models fine-tuned on SlimOrca. The y-axis represents the cumulative proportion of the energy explained. • LoRA’s Saturation: We observe that LoRA plateaus early. This indicates that the update matrix ∆W is located in a very low-dimensional subspace, utilizing only a fraction of the allocated rank budget. This confirms that the “rank collapse” phenomenon persists even in large-scale general instruction tuning. • CeRA’s Expansion: Conversely, CeRA continues growing as rank increases. This means that the spectral energy is distributed across a broader range of singular vectors. The non-linear gating mechanism effectively forces the optimization process to utilize the “tail” dimensions, thereby expanding the representation manifold to capture the diverse reasoning patterns found in SlimOrca. 
+
+# B Comprehensive Spectral Evaluation on MathInstruct 
+
+Mathematical reasoning requires high-precision state tracking, making it an ideal testbed for analyzing the expressivity of adapters. We present a detailed spectral breakdown of CeRA versus LoRA on the MathInstruct dataset. 
+
+B.1 Singular Value Spectrum Analysis (SVSA) The Heavy Tail Phenomenon Figure 7 visualizes the singular values of the learned updates in a logarithmic scale. • Linear Ceiling in LoRA: LoRA exhibits a precipitous drop in singular values after the leading dimensions. The spectrum quickly degrades to near-zero noise ( 10 −4 range), revealing that increasing the rank r contributes little to the actual expressivity. • Manifold Expansion in CeRA: CeRA maintains a significantly higher magnitude in the tail of the spectrum (the “heavy tail”). This spectral signature proves that the non-linear components (SiLU, Dropout, and MLP 12 Running Title for Header 0 100 200 300 400 500 600 Singular Value Index 10 5    
+
+> 10 4
+> 10 3
+> 10 2
+> 10 1
+> Singular Value (log scale) LoRA
+> Ce RA
+
+Figure 7: Spectral Signature of the MathInstruct dataset. LoRA exhibits “rank collapse,” where singular values drop precipitously, indicating under-utilization of the rank budget. CeRA maintains a “heavy tail,” activating a broader subspace. structures) prevent the weight updates from collapsing into a trivial low-rank subspace, thereby breaking the linear ceiling. 
+
+B.2 Effective Rank and Information Capacity 16 64 128 512 Target Rank Constraint 050 100 150 200 250 300 Effective Rank LoRA 
+
+> Ce RA
+
+Figure 8: Effective Rank Analysis on MathInstruct. We compare the spectral utilization of LoRA and CeRA across increasing rank budgets ( r ∈ { 16 , 64 , 128 , 512 }). As the rank budget increases to 512, LoRA’s effective rank saturates significantly, whereas CeRA’s effective rank scales with the budget. 
+
+Effective Rank Analysis To quantify the “richness” of the learned representation, we compute the effective rank ( eH ,where H is the spectral entropy). As shown in Figure 8, CeRA achieves a substantially higher effective rank compared to LoRA configurations of similar or even larger parameter counts. This metric serves as a proxy for information capacity, suggesting that CeRA encodes more complex functional transformations within the same dimensional budget. 13 Running Title for Header 
+
+B.3 Spectral Energy Distribution 16 64 128 512 Target Rank Constraint 050 100 150 200 250 300 350 Manifold Dimensionality (90% Variance) LoRA 
+
+> Ce RA
+
+Figure 9: AUC-90 on MathInstruct. CeRA requires more singular components to reach 90% energy variance, confirming a richer and less sparse representation compared to LoRA. 
+
+Energy Cumulative Density Figure 9 corroborates the findings of the SVSA and the effective rank analysis. Similarly to the observation in SlimOrca, the LoRA baseline on MathInstruct suffers from rapid energy saturation. CeRA’s manifold dimensionality grows as rank increases, indicating that the model relies on a diverse set of orthogonal features to solve mathematical problems, rather than overfitting to a few dominant directions. 14

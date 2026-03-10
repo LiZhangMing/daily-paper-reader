@@ -1,0 +1,1341 @@
+Title: Sparse Layer Sharpness-Aware Minimization for Efficient Fine-Tuning
+
+URL Source: https://arxiv.org/pdf/2602.09395v1
+
+Published Time: Wed, 11 Feb 2026 01:26:27 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+> JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 1
+
+# Sparse Layer Sharpness-Aware Minimization for Efficient Fine-Tuning 
+
+Yifei Cheng, Xianglin Yang, Guoxia Wang, Chao Huang, Fei Ma, Dianhai Yu, Xiaochun Cao, Li Shen 
+
+Abstract —Sharpness-aware minimization (SAM) seeks the minima with a flat loss landscape to improve the generalization performance in machine learning tasks, including fine-tuning. However, its extra parameter perturbation step doubles the computation cost, which becomes the bottleneck of SAM in the practical implementation. In this work, we propose an approach 
+
+SL-SAM to break this bottleneck by introducing the sparse technique to layers. Our key innovation is to frame the dynamic selection of layers for both the gradient ascent (perturbation) and descent (update) steps as a multi-armed bandit problem. At the beginning of each iteration, SL-SAM samples a part of the layers of the model according to the gradient norm to participate in the backpropagation of the following parameter perturbation and update steps, thereby reducing the computation complexity. We then provide the analysis to guarantee the convergence of 
+
+SL-SAM . In the experiments of fine-tuning models in several tasks, SL-SAM achieves the performances comparable to the state-of-the-art baselines, including a #1 rank on LLM fine-tuning. Meanwhile, SL-SAM significantly reduces the ratio of active parameters in backpropagation compared to vanilla SAM (SL-SAM activates 47%, 22% and 21% parameters on the vision, moderate and large language model respectively while vanilla SAM always activates 100%), verifying the efficiency of our proposed algorithm. 
+
+Index Terms —Stochastic optimization, sharpness-aware mini-mization, efficient fine-tuning. 
+
+I. I NTRODUCTION 
+
+# GENERALIZATION ability is an important metric in machine learning as the model is susceptible to being over-trained on the training set and may face distribution shifts between the training and test data. The studies in [1], [2] reveal the connection between the generalization ability and sharpness of the loss landscape. Based on this, Sharpness-Aware Minimization (SAM) is proposed and renowned as a powerful optimization technique for its ability to enhance model generalization by seeking flat loss minima [3]. Its mechanism operates in a two-step process: it first computes a worst-case adversarial perturbation that maximizes loss within a local neighborhood, and then updates the model parameters by minimizing the loss at this perturbed point. This approach 
+
+Y. Cheng, C. Huang, X. Cao and L. Shen are with the School of Cyber Science and Technology, Sun Yat-sen University, Shenzhen Cam-pus. E-mail: {yfcheng.ifc, mathshenli }@gmail.com, {huangch253, caoxi-aochun }@mail.sysu.edu.cn. X. Yang is with the School of Computing, National University of Singapore. E-mail: yxlyzxl@gmail.com. G. Wang and D. Yu are with the Baidu Inc. E-mail: {wangguoxia, yudianhai }@baidu.com. F. Ma is with the Guangdong Laboratory of Artificial Intelligence and Digital Economy (SZ). E-mail: mafei@gml.ac.cn. Corresponding author: Li Shen. 10 7 10 8 10 9 10 10 
+
+> Number of Parameters for Gradient Calculation
+> 55 60 65 70 75 80 85 90 95 100
+> Accuracy(%)
+> DeiT-Small RoBERTa Llama-3B-Instruction
+> AdaSAM ESAM SL-SAM
+
+Fig. 1. Average number of model parameters that participate in gradient calculation per iteration vs. task accuracy. We compare SL-SAM with AdaSAM [5] (vanilla SAM with AdamW) and a representative efficient variant ESAM [7]. The points connected by dotted lines indicate that they achieve comparable performances, while the parameters participate in backpropagation in SL-SAM is 47%, 22% and 21% of that in AdaSAM across three tasks. The results in the table show the GPU memory and wall-clock time savings compared to AdaSAM. Details are referred to the Experiments section. 
+
+has been highly successful, further incurring widespread adop-tion in resource-intensive tasks such as fine-tuning large-scale Transformers models and Large Language Models (LLMs) with billion-level parameters [4]–[6]. However, this performance gain comes at a steep price: by requiring two sequential forward and backward passes (perturbation and update), SAM effectively doubles the gra-dient calculation time of classical optimizers. This prohibitive computational overhead severely limits its practical adoption, creating a critical bottleneck in real-world applications. Natu-rally, we raise a question: 
+
+Can we improve the computation efficiency of SAM? 
+
+While prior works have sought to improve SAM’s efficiency, they often focus on reducing the frequency of the perturbation step [8], [9] or introducing sparsity in a suboptimal manner. For instance, ESAM [7] applies perturbation to a randomly selected subset of parameters, failing to distinguish which are most critical to stabilize. SSAMF [10] considers the adoption of the sparse mask, but still needing to obtain the exact gradient first. This situation leaves a crucial gap: proposing a method that indeed reduces the gradient computation overhead in both of SAM’s two steps. To address this gap, we introduce Sparse-Layer SAM 
+
+(SL-SAM ), a novel framework that injects the adaptive lay- 
+
+> arXiv:2602.09395v1 [cs.LG] 10 Feb 2026 JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 2
+
+Step 1 : Laye rs Sampling 
+
+…
+
+Step  2: SAM Perturbation 
+
+Distributions  𝑝 𝑡 ,𝑖 
+
+𝑝 𝑡 ,1
+
+𝑝 𝑡 ,2
+
+𝑝 𝑡 ,𝑁  …
+
+Parameter 
+
+Layer s
+
+Perturbed 
+
+Parameters 
+
+Step 4: Update distribution 
+
+Ascent 
+
+Gradients 
+
+…
+
+Updated 
+
+Parameters 
+
+De scent 
+
+Gradients 
+
+Step 3: Parameters Update       
+
+> Calculated Gradients Blank Gradients
+> Frozen Laye rsActive Laye rs
+> Fig. 2. The workflow of our algorithm SL-SAM .Step 1: all the parameter blocks (in blue) are sampled according to the distributions: the active layers participate in this training iteration while the others are frozen; Step 2 & 3: calculate the gradients for active layers to perform the parameter perturbation and update steps; Step 4: update the distributions by the gradient norms obtained in the perturbation.
+
+erwise sparsity into SAM. Our approach is predicated on the insight that the gradient norm of the model layer is a strong proxy for a layer’s importance to both the perturbation and update steps, motivating us to activate only partial layers’ parameters to participate in the gradient calculation. However, a naive greedy strategy for conducting the sparse gradient that simply selects the layers with the top gradient norms at each step is brittle. The set of important layers is highly dynamic, and a greedy approach is susceptible to the stochasticity of mini-batch gradients, failing to explore layers that are temporarily dormant but may become critical for convergence. Therefore, our key innovation is to reframe layer selection as a multi-armed bandit problem. This enables SL-SAM to robustly balance exploration and exploitation, dynamically identifying the most salient layers for optimization over time. In each iteration, the bandit samples an active set of layers for SAM’s process: a sparse gradient ascent for perturbation, followed by a sparse gradient descent for model update. All other layers are frozen to skip the gradient calculation to save computation in this iteration. The bandit is guided by using each layer’s gradient norm as a reward signal, ensuring computational resources are intelligently focused on the most critical layers of the model. This process is visualized in Figure 2. We evaluate our method with both theoretical and em-pirical validation. We formally prove that SL-SAM achieves a convergence rate of 1
+
+> T
+
+PTt=1 E∥∇ f (xt)∥1 = O(T −1/4),guaranteeing its optimization property. Furthermore, extensive fine-tuning experiments on DeiT, RoBERTa, and large lan-guage models demonstrate that SL-SAM delivers a state-of-the-art trade-off between the efficiency and performance. It consistently achieves top-tier performances, including a #1 rank in downstream evaluation tasks for the LLM, while reducing training time by up to 25.8% and significantly cutting memory costs compared to vanilla SAM. Our main contributions are as follows:  
+
+> •
+
+A Novel Two-Sided Sparsity Framework: We propose 
+
+SL-SAM , an optimization algorithm that applies the lay-erwise sparsity to both the perturbation and update steps of SAM to improve its efficiency. To our best knowledge, this is the first work to achieve this sparsification effect.  
+
+> •
+
+Formal Convergence Guarantee: We theoretically prove that SL-SAM achieves a convergence rate of 
+
+> 1
+> T
+
+PTt=1 E∥∇ f (xt)∥1 = O(T −1/4), providing the first theoretical evidence that a sparse SAM method can maintain the rate of the original SAM.  
+
+> •
+
+Superior Efficiency and Competitive Performance: We demonstrate that SL-SAM offers the best efficiency while maintaining the great performance. Across several fine-tuning tasks, it always achieves scores comparable to other baselines, especially the highest score on LLM fine-tuning. Benefiting from the sparse gradient, the average number of parameters involved in gradient calculation of 
+
+SL-SAM is dramatically reduced, resulting in significant savings in GPU memory and training time. We show an overview in Figure 1.  
+
+> •
+
+Great Compatibility: We extend to inject the sparse lay-erwise gradient computation into the single-step version of SAM proposed recently. The experimental results still show an efficiency improvement with a marginal loss of performance. Thus, our strategy is compatible with different goals: whether the great performance achieved by the double-step SAM or the shorter training time realized by the single-step SAM. II. R ELATED WORK 
+
+A. Sharpness-Aware Minimization 
+
+Through solving a minimax optimization problem consid-ering the worst-case in the neighborhood, Sharpness-Aware Minimization (SAM) [3] finds a flat loss minima by parameter perturbation and update steps. Its success in improving the JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 3
+
+model generalization has led to a series of works aiming to further enhance its performance [10]–[14] and spurred theoretical analysis of its convergence or revelation of its mechanisms [15]–[17]. Sufficient experiments have shown that the great generaliza-tion ability of SAM is also applicable to language models [18]. Among the following works on language models, AdaSAM [5] replaces the base optimizer with AMSGrad together with a convergence analysis. FSAM [4] further suggests generating the Fisher mask to only perturb elements with large gradient values. Recently, Li et al. [6] observe that incorporating SAM into AdamW could significantly mitigate catastrophic forgetting in continual tuning LLMs. However, SAM’s primary drawback is its computational cost, as its two-step process doubles the gradient calculation time. Efforts to mitigate this cost often have some limitations. RST [8] conducts the perturbation step randomly; LookSAM [9] and SALA [19] select the strategy that performs SAM periodically. Although these methods could reduce the number of perturbation steps, they still need to calculate the full-dimensional gradients, resulting in the same memory cost as SAM. ESAM [7] and SSAMF [10] adopt the heuristic sparsify strategy: the former randomly samples parameters to perturb and the latter employs a sparse mask on the perturbation. However, they also involve the full gradient calculation in two steps and introduce extra steps as selecting a subset of samples and obtaining the sparse mask respectively. SAMPa [20] conducts the parallelism for the two steps which increases memory usage. In addition, most of them are not verified in the fine-tuning tasks. Thus, sparsing both of SAM’s core steps to make the fine-tuning efficient remains an open challenge. 
+
+B. Principled Sparsity for Efficient Training 
+
+Sparsity is a cornerstone of efficient deep learning, with representative techniques such as Dropout [21], and network pruning [22]–[24]. The huge size of deep learning models poses the demand for cost reduction, which matches the effects of the sparse structure. Sun et al. [25] introduce pruning into the large-size model to reduce the computational cost. DropIT [26] and Back Razor [27] drop the activations’ elements with small absolute values in the forward pass to reduce the memory cost of activations, then recover the sparse tensors to be dense to compute an approximated gradient in backpropagation. JointSpar [28] samples partial layers to cal-culate the gradients and freezes the others in backpropagation to accelerate the local computation and communication in distributed learning. A key innovation in this method is that the layer selection is framed as a multi-armed bandit problem to adaptively allocate computational resources. PreBackRazor [29] inherits this technique to sample the activations to be pruned and skip the gradient computation for them to improve Back Razor, achieving both memory and computation efficient. Our work is the first to adapt this technique to solve the two-step optimization problem of SAM. We employ the bandit formulation that explicitly accounts for both the gradient ascent and descent steps, creating a method uniquely tailored to the dynamics of sharpness-aware optimization. III. M ETHODOLOGY 
+
+This section develops our proposed method SL-SAM . We first review the fundamentals of Sharpness-Aware Minimiza-tion (SAM) to establish the context for our work. We then present the motivation for our algorithm, which leverages the gradient norm as a unified criterion for sparsity. Following this, we formally introduce the SL-SAM algorithm and conclude with a theoretical analysis that guarantees its convergence. 
+
+A. Preliminary: Sharpness-Aware Minimization 
+
+We address the standard non-convex optimization problem in deep learning: 
+
+min 
+
+> x∈Rd
+
+f (x) := Eξ∼D [f (x, ξ )] , (1) where x ∈ Rd represents the model parameters and f (x, ξ )
+
+is the loss for a sample ξ from the data distribution D.While standard optimizers can converge to “sharp” minima that generalize poorly, Sharpness-Aware Minimization (SAM) [3] seeks “flat” minima to improve generalization. SAM achieves this via a two-step process at each iteration 
+
+t. Firstly, it finds an adversarial perturbation ϵt(xt) to perform a gradient ascent step to maximize the loss within a ρ-ball neighborhood: 
+
+ϵt(xt) = ρ ∇f (xt, ξ t)
+
+∥∇ f (xt, ξ t)∥2
+
+. (2) Secondly, it computes the gradient at this perturbed point, then performs gradient descent to update the parameters. 
+
+xt+1 = xt − η∇f (xt + ϵt(xt), ξ t). (3) This two-step process requires two full-dimensional forward and backward passes, making the computational cost of SAM higher than standard optimizers. This bottleneck is the primary challenge we aim to address. 
+
+B. Motivation 
+
+Our approach is motivated by the insight that not all layers contribute equally at each training step. We hypothesize that the layer-wise gradient norm is a powerful and unified proxy for identifying the most critical layers for both of SAM’s steps. This is supported by two established lines of research: 1) For the Perturbation Step: Generally, the landscape flatnesses of the model parameters are not uniformly distributed. We could give priority to the parameters with bad flatness to perform perturbation, as a result, only calculating the sparse gradients with respect to these parameters. Zhao et al. [30] point out that penalizing the gradient norm leads the loss function to have a small Lipschitz constant, further indicating the model has a flat landscape. This implies that layers with a larger gradient norm likely reside in sharper regions and are the highest priority for SAM’s perturbation. 2) For the Update Step: The goal of the descent step is to optimize the model. It is well-established that parameters with a larger gradient norm are most influential in driving the optimization process [31], [32]. These two points converge on one powerful principle: JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 4
+
+The parameters with a large gradient norm are the most critical for both generalization (perturbation) and convergence (update). 
+
+While this principle suggests a simple strategy, i.e. deter-ministically selecting the layers with the top-k largest gradient norms in each iteration. A recent work SAFER [33] just employs this strategy to sample layers with large norms of gradients of the adversarial loss, then applies SAM on them to address the adversarial overfitting. However, such a greedy strategy is suboptimal for two critical reasons. Firstly, it is purely exploitative , risking that layers with temporarily small gradients are never selected and thus never updated, which can lead to poor convergence. Secondly, its computation cost is significantly higher than the vanilla SAM, resulting in the increased training time (SAFER updates the selected layers periodically to avoid this dilemma, at the expense of losing the instant tracking of dynamic changes during training). To address these challenges, we require a more robust mechanism that can balance exploration and exploitation. We therefore introduce an adaptive sampling strategy . Instead of adopting a fixed or greedy selection criterion, we maintain a probability distribution pt over the model’s layers. This distribution is updated at each iteration based on the observed gradient norms, effectively allowing the algorithm to “learn” and track which layers are important over time in a stable manner. By framing the selection as a multi-armed bandit problem, we provide a principled way to manage the trade-off between exploration and exploitation, ensuring that all layers have a chance to be updated while still focusing computation on the most critical ones. This idea motivates our novel algorithm, SL-SAM .
+
+C. SL-SAM Algorithm 
+
+Based on our motivation, we propose Sparse-Layer SAM (SL-SAM ), a novel algorithm that improves the efficiency of SAM by introducing layer-wise sparsity. At each iteration t,
+
+SL-SAM performs the following key steps: 1) Layer Sampling: It samples a subset of layers St to be active based on the probability distribution pt.2) Sparse SAM Update: It performs the two-step SAM update (perturbation and update) only on the parameters of the active layers in St.3) Distribution Update: It updates the sampling distribu-tion to pt+1 for the next iteration based on the gradient norms obtained in the perturbation step. This process is illustrated in Figure 2 and detailed in Algorithm 1. Next, we introduce the details of these steps. 
+
+Step ❶: Layer Sampling. We consider a model with N
+
+layers. We maintain a probability distribution pt ∈ RN , where the l-th element pt,l is the probability of selecting layer l at iteration t. At the start of the iteration, we sample an active set of layers St ⊆ [N ] by performing a Bernoulli trial for each layer l with success probability pt,l . The initial distribution 
+
+p1 is uniform, with p1,l = s/N for all layers, where s is a hyperparameter satisfies P 
+
+> l
+
+pt,l = s, representing the desired number of active layers. 
+
+Algorithm 1 Sparse Layer SAM ( SL-SAM )
+
+Input: Initial values x1, perturbation radius ρ, learning rate 
+
+η, p1,l = s/N, m 0,l = 0 , v 0,l = 0, ∀l ∈ [N ], coefficients 
+
+β1, β 2 < 1. 
+
+> 1:
+
+for t = 1 , ..., T do  
+
+> 2:
+
+Sample active layers St = {l : Zt,l = 1 , ∀l ∈ [N ]}
+
+according to the distribution P(Zt,l = 1) = pt,l , where each Zt,l follows the Bernoulli distribution;  
+
+> 3:
+
+Sample a minibatch ξt from the dataset;  
+
+> 4:
+
+for l ∈ St do  
+
+> 5:
+
+Compute the gradient rt,l = ∇fl(xt, ξ t); 
+
+> 6:
+
+Compute the perturbation ϵt,l = ρ rt,l  
+
+> ∥rt,l ∥
+
+; 
+
+> 7:
+
+Compute the gradient gt,l = ∇fl(xt + ϵt, ξ t); 
+
+> 8:
+
+xt+1 ,l = AdamW (xt,l , g t,l ); 
+
+> 9:
+
+end for  
+
+> 10:
+
+pt+1 ,l = Update Distribution (pt,l , S t, ∥rt,l ∥); 
+
+> 11:
+
+end for  
+
+> 12: 13:
+
+optimizer AdamW( xt,l , g t,l ) 
+
+> 14:
+
+for l ∈ St do  
+
+> 15:
+
+mt,l = β1mt−1,l + (1 − β1)gt,l ; 
+
+> 16:
+
+vt,d = β2vt−1,l + (1 − β2)gt,l ⊙ gt,l ; 
+
+> 17:
+
+xt+1 ,l = xt,l − η mt,l 
+
+√vt,l +ϵ − ηλ txt,l ; 
+
+> 18:
+
+end for  
+
+> 19:
+
+end optimizer Step ❷: Sparse SAM Update. For the sampled active layers St, we perform a two-step SAM update. First, we compute the stochastic gradient rt,l = ∇fl(xt, ξ t) for each layer l ∈ St. This gradient is used to obtain the perturbation 
+
+ϵt,l with radius ρ. Second, we compute the gradient gt,l at the perturbed point and use it to update the parameters xt,l . For this step, we use the AdamW optimizer [34], a standard choice for fine-tuning Transformer-based models. The parameters of all other layers ( l / ∈ St) remain frozen during this iteration. 
+
+Step ❸: Adaptive Distribution Update. After the update, we adapt the sampling distribution for the next iteration. Our goal is to increase the sampling probability for layers with larger gradient norms. Motivated by [28], we frame this as a multi-armed bandit problem and use an EXP3-based algorithm [35] to update the probabilities, as detailed in Algorithm 2. 
+
+pmin and αp are hyper-parameters where pmin denotes the lower bound of pt,d ’s. Dkl (·||· ) represents the KL-divergence. The layer-wise gradient norms ∥rt,l ∥ from the active set are used to update the distribution pt to pt+1 , ensuring that layers which are currently more important for optimization are more likely to be selected in the future. 
+
+Comparison with Prior Works: Our work is distinguished from prior art in efficient SAM optimization through its unique approach to adaptive, layer-wise sparsity in gradient compu-tation. We categorize related works into two main groups: those that reduce the frequency of SAM updates and those that introduce sparsity like us. A primary line of research reduces SAM’s cost by de-creasing its frequency of computing the perturbation gradients, either randomly (RST [8]), periodically (LookSAM [9], SALA JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 5
+
+Algorithm 2 Update Distribution( pt,l , S t, ∥rt,l ∥)
+
+Input: pt,l for l ∈ [N ], St, ∥rt,l ∥ for l ∈ St. 
+
+> 1:
+
+for l ∈ [N ] do  
+
+> 2:
+
+if l ∈ St then  
+
+> 3:
+
+G is the maximal value of elements in ∥rt,l ∥’s;  
+
+> 4:
+
+˜kt,l = − ∥rt,l ∥2
+
+> p2
+> t,l
+
++ G2
+
+> p2
+> min
+
+; 
+
+> 5:
+
+else  
+
+> 6:
+
+˜kt,l = 0 ; 
+
+> 7:
+
+end if  
+
+> 8:
+
+ut,l = pt,l exp ( −αp ˜kt,l /p t,l ); 
+
+> 9:
+
+pt+1 ,l = argmin q∈P Dkl (q|| ut,l ); 
+
+> 10:
+
+end for Ensure: pt+1 ,l 
+
+[19]), or only in the late stages of training [36]. These methods reduce computation along the iteration axis. In contrast, our 
+
+SL-SAM reduces computation along the parameter axis at every single step. These two research directions are orthogonal and could be synergistically combined in future work. Among sparsity-based methods, ESAM [7] differs from 
+
+SL-SAM in three crucial ways: (1) ESAM samples parameters randomly, whereas SL-SAM uses an adaptive, gradient-norm-based strategy to focus on the most critical layers; (2) ESAM requires an extra forward pass for sample selection, adding overhead that we avoid; and (3) ESAM reverts to a dense gra-dient for the final update step, while SL-SAM maintains spar-sity throughout the entire process. Similarly, while SSAMF [10] also adopts the principle of sparse perturbation, its implementation paradoxically incurs a higher computational cost than standard SAM as it periodically updates the mask and calculates the full-dimensional gradient before applying the mask. In contrast, SL-SAM could provide a substantial reduction in gradient computation cost. 
+
+D. Theoretical Analysis 
+
+To provide theoretical guarantees for our algorithm, we make the following standard assumptions, which are common in the analysis for algorithms involving adaptive optimizers [37]–[39]. 
+
+Assumption 1 (Coordinate-wise L-smoothness) . f (x, ξ ) is differentiable and satisfies the following inequality: 
+
+∥∇ fi(x, ξ ) − ∇ fi(y, ξ )∥ ≤ L∥xi − yi∥, ∀i ∈ [d].
+
+Assumption 2 (Coordinate-wise Gradient Variance Bounded) .
+
+There exist positive constants σi such that 
+
+E∥∇ fi(x, ξ ) − ∇ fi(x)∥2 ≤ σ2 
+
+> i
+
+, ∀i ∈ [d].
+
+We denote σ2 
+
+> s
+
+= P 
+
+> i
+
+σ2 
+
+> i
+
+additionally. 
+
+Theorem 1. If f (x) in Algorithm 1 satisfies Assumptions 1 and 2. Assume the constant γ ∈ (0 , 1] , denote ˆσ2 =max {4σ2 
+
+> s
+
++ 12 dρ 2L2, L(f (x1)−f ∗) 
+
+> γ2T
+
+}. We set the coefficients satisfy 1 − √β1 =
+
+q L(f (x1)−f ∗)ˆσ2T , β2 ≤ √β1, and the parameters satisfy ϵ = ˆσ2 
+
+> d
+
+, η = O(
+
+q 1 
+
+> dT
+
+), λ = O( √d   
+
+> (T3ˆσ2)1/4
+
+).Let the model is initialized with ∥x1∥∞ = O( Td ). Then we have the following result for Algorithm 1 
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥∇ f (xt)∥1 = O
+
+ √dT 1/4 +
+
+r dT
+
+
+
+. (4) 
+
+Corollary 1. We can conclude the 1
+
+> T
+
+PTt=1 E∥∇ f (xt)∥1 =
+
+O(T −1/4) convergence rate for SL-SAM from the above theorem. This rate recovers the theoretical result in other SAM-related works [10], [15]. 
+
+Remark 1. The proof for our theorem is a corollary of the conclusion in [39]. Note that this proof does not rely on the assumption of gradient bounded adopted in [5], [28], [38]. We provide a detailed derivation in the supplementary material. 
+
+IV. E XPERIMENTS 
+
+We evaluate SL-SAM by fine-tuning models of varying scales on several benchmark tasks 1. We compare it against a suite of strong baselines: AdamW [34], AdaSAM [5] (Adap-tive base optimizer version of SAM) and three efficient SAM variants RST [8], ESAM [7] and SSAM-F [10]. All SAM-based optimizers use AdamW as their base optimizer since it is the default for transformer models. Experiments are conducted on a single NVIDIA RTX A6000 GPU or A100 GPU, where we measure both task performance and efficiency in terms of time and memory. To ensure broader applicability, we adapted the baseline to several popular frameworks. We note that this adaptation process may introduce some fluctuations in memory cost, as their original implementations were designed for their initial network architecture. 
+
+A. Fine-tune Vision-Transformer Model 
+
+Models and Dataset. We conduct experiments on a Vision Transformer model: DeiT-Small (21.7M parameters) [40]. We fine-tune this model on the CIFAR10 and CIFAR100 datasets, initializing it from publicly available checkpoints pre-trained on ImageNet-1k. 
+
+Common Hyper-parameters. For all experiments, we use a batch size of 128, an initial learning rate of 10 −4 according to [14] and decayed with the cosine schedule. The weight decay is 5 × 10 −5 and the model is fine-tuned for 20 epochs. 
+
+Method-Specific Hyper-parameters. For all SAM-based methods, we set the perturbation radius ρ = 0 .01 , follow-ing prior work [5]. For the baselines, we adopt the hyper-parameters recommended in their respective papers: the prob-ability of performing the perturbation step for RST and the sparsity for SSAM-F are set to 0.5; the selecting ratios of parameters and samples for ESAM are also both set to 0.5. For our method, we tune the layer sparsity parameter s/N and find the value 0.2 to be optimal. 
+
+Performance Analysis. We report the results of the DeiT fine-tuning experiments over three runs with different random seeds in Table I. “Accuracy” represents the best test accu-racy in all epochs. Across both CIFAR-10 and CIFAR-100 datasets, AdaSAM achieves the highest accuracies. SL-SAM                                                             
+
+> 1Codes are available at https://github.com/chengyif/SL-SAM. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 6
+> TABLE I EXPERIMENTAL RESULTS OF FINE -TUNING DEI TON CIFAR 10 AND CIFAR100. Algorithm CIFAR-10 CIFAR-100 Max Mem(MB) Epoch Time(s) Accuracy(%) Active Ratio Accuracy(%) Active Ratio AdamW 98.04 ±0.02 1.0×87.49 ±0.08 1.0×8584 118.51 AdaSAM 98.22 ±0.06 2.0×87.86 ±0.06 2.0×8546(100%) 231.39(100%) RST 98.16 ±0.07 1.5×87.75 ±0.07 1.5×8548(+0.02%) 179.70(-22.33%) ESAM 98.17 ±0.04 1.5×87.72 ±0.03 1.5×8188(-4.19%) 202.21(-12.61%) SSAM-F 98.08 ±0.08 2.0×87.72 ±0.06 2.0×8754(+2.43%) 242.11(+4.63%)
+> SL-SAM (ours) 98.12 ±0.04 0.942 ×87.83 ±0.08 0.961 ×7832(-8.35%) 198.35(-14.28%) 025 50 75 100 125 150 175 200
+> Layer Index
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Exact Active Ratio
+> CIFAR-10
+> Fig. 3. The exact active ratio for each layer throughout the DeiT-Small fine-tuning on CIFAR-10.
+
+shows a negligible performance drop compared to AdaSAM, and consistently performs on par with the other SAM-based baselines, especially outperforms them on CIFAR-100. This demonstrates that our adaptive layer selection strategy suc-cessfully preserves the generalization benefits of SAM, even while a significant portion of the model is frozen in each step. While full-dimensional gradient methods like AdaSAM is at the top rank, they do so at a prohibitive cost, which SL-SAM 
+
+is designed to solve. 
+
+Computational and Memory Efficiency. Though the parame-ter “ s/N ” in SL-SAM represents the ratio of layers participat-ing in backpropagation, the number of model parameters varies across all layers. We count the actual number of parameters that participate in the gradient calculation steps and report its ratio to that of AdamW as “Active Ratio”. The values of RST and ESAM are evaluated according to 0.5 sparsity since they use uniform sampling. SL-SAM activates only 47.1% 
+
+of the parameters per gradient pass in average on CIFAR10. Since SAM requires two backward passes, SL-SAM ’s total computation per step involves 94.2% of the model parameters (2 ×47.1%). In the same way, 96.1% parameters participate in gradient computation on CIFAR-100. These are dramatically lower than the 200% required by AdaSAM and SSAM-F, and also lower than the 100% of an AdamW step. This computational efficiency directly translates to sig-nificant memory and time savings. As shown in Table I, by caching fewer gradient coordinates for backpropagation, 
+
+SL-SAM consumes 8.35% less GPU memory than AdaSAM on CIFAR10. 2 Benefiting from the calculation of sparse gra-dient, SL-SAM reduces the average epoch time by 14.28% 
+
+compared to AdaSAM. Though the time reduction of RST is larger than SL-SAM it consumes the same GPU memory as AdaSAM. The savings of ESAM are both weaker than 
+
+SL-SAM . These results confirm that SL-SAM is not only effective but also highly efficient, making it well-suited for memory-constrained environments or for scaling up batch sizes to accelerate the entire training process. In addition, for each layer, we count the exact ratio of iterations it is activated to participate in gradient computation in the experiment on CIFAR-10. We plot the result in Figure 3. Under the setting of sparsity parameter “ s/N ” as 0.2, only 15% of model layers are active in more than half of the itera-tions, and none of layers are with extremely low active ratio. This indicates that our strategy guarantees sufficient training for all layers, achieving the trade-off between exploration and exploitation successfully. 
+
+B. Fine-tune Moderate Language Model 
+
+Model and Task. We next evaluate our method on natural lan-guage tasks by fine-tuning the RoBERTa model [41] (125M parameters) on the GLUE benchmark [42]. 
+
+Hyper-parameters. All methods are run for 30 epochs with a batch size of 16. To ensure a robust and fair comparison, we adopt the task-specific learning rates from the recent state-of-the-art work [43]. The weight decay is set to 0.01. All other hyper-parameters are kept consistent with our DeiT experiments: the SAM perturbation radius is ρ = 0 .01 , and the method-specific settings for RST, ESAM, SSAM-F, and our SL-SAM remain unchanged (except that s/N = 0 .25 on the RTE dataset). 
+
+Performance Analysis. As shown in Table II, SL-SAM se-cures the highest score on one task (MRPC), second-highest on two tasks (CoLA and SST2), and achieves the third average performance across all baselines. AdaSAM achieves the best performance benefiting from the exact gradients that come at a high cost as discussed                                                                                                                       
+
+> 2Max Mem. measures the peak memory usage throughout the training obtained with Nvidia’s nvidia-smi command. Considering the evaluation on the test set would influence the memory usage, “Max Mem” and “Epoch Time” are counted in the run without evaluation. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 7
+> TABLE II
+> EXPERIMENTAL RESULTS OF FINE -TUNING ROBERT A MODEL ON GLUE. M ETRICS :WE REPORT MATTHEW ’S CORRELATION FOR COLA, P EARSON CORRELATION FOR STS-B, F1 SCORE FOR MRPC, AND ACCURACY FOR THE REMAINING TASKS .SL-SAM ACHIEVES THE TOP SCORE ON 1/8 TASKS ,
+> AND THE SECOND SCORE ON 2/8 TASKS . I N ADDITION ,THE AVERAGE SCORE OF SL-SAM IS RANKED THIRD .Algorithms CoLA STS-B MRPC RTE SST2 MNLI QNLI QQP Average Active Ratio AdamW 61.64 90.91 91.68 77.98 94.04 87.43 92.75 91.90 86.04 1×
+> AdaSAM 63.08 90.92 92.50 80.87 95.41 87.46 92.99 92.12 86.92 2×
+> RST 62.38 90.97 92.39 79.42 95.07 87.57 93.25 91.89 86.62 1.5×
+> ESAM 63.41 90.96 92.88 80.51 94.50 87.52 92.90 91.97 86.83 1.5×
+> SSAM-F 61.32 91.11 92.73 80.14 95.53 87.59 93.01 92.16 86.70 2×
+> SL-SAM (ours) 63.36 90.38 93.45 79.78 95.41 87.55 92.64 91.63 86.78 0.441 ×
+> TABLE III
+> GPU USAGE AND AVERAGE EPOCH TIME OF SAM-TYPE ALGORITHMS IN TWO TASKS .VALUES IN PARENTHESES DENOTE THE PERCENTAGE CHANGE RELATIVE TO ADA SAM. Algorithm Max Mem(MB) Epoch Time(s) CoLA task AdaSAM 3296( 100% )52.48( 100% )RST 3316( +0 .61% )40.63( −22 .58% )ESAM 3160( −4.13% )54.23( +3 .33% )SSAM-F 7288( +121 .12% )65.66( +25 .11% )
+> SL-SAM 3080( −6.55% )43.66( −16 .81% )MNLI task AdaSAM 8076( 100% )3015.16( 100% )RST 8078( +0 .02% )2314.12( −23 .25% )ESAM 7336( −9.16 )2871.64( −4.76% )SSAM-F 7426( −8.05% )3078.06( +2 .09% )
+> SL-SAM 6462 (−19 .99% )2238.76 (−25 .75% )
+
+below. The gap between SL-SAM and AdaSAM is tiny, which illustrates that adopting sparse gradients suffices to perform well in this experiment. The performance of SL-SAM is comparable to ESAM and SSAM-F. These results verify that SAM finds a flatter loss landscape compared to AdamW, which is in line with the experimental results in [4], [5], [18]. 
+
+Computational and Memory Efficiency. The great perfor-mance of SL-SAM is achieved with remarkable efficiency. Due to RoBERTa’s relatively uniform layer sizes, our sparsity setting of s/N = 0.2 results in activating only 22% of parameters per pass. This means the total computational cost per step (2 passes × 22% ≈ 44%) is far less than a standard AdamW step (100%) and dramatically lower than the 200% of full-dimensional SAM methods. This fundamental efficiency leads to the lowest time and memory cost. We select two tasks with different levels of data size, and count the maximal GPU memory usage and the average wall-clock time of one epoch for the SAM-type algorithms, as detailed in Table III: the GPU memory cost of SL-SAM is 6.55% and 19.99% lower than AdaSAM on CoLA and MNLI tasks, and the epoch time is 16.81% and 25.75% lower. We emphasize that our algorithm is the only method that achieves both the reduction of memory and time across two tasks, and the magnitude of the reduction is also the greatest in three of four metrics. Though RST has a significant time saving on CoLA, it still requires high memory for its full backpropagation steps. ESAM reduces the GPU memory on both tasks, but the complex sampling overheads diminish the speed gains. As a comparison, our bandit-based layer selection is lightweight and highly effective. Thus, in summary, SL-SAM achieves superior generalization while simultaneously contributing to significant savings for time and memory efficiency among SAM-based optimizers. 
+
+C. Fine-tune Large Language Model 
+
+Model and Task. Inspired by recent findings that SAM can mitigate catastrophic forgetting during continual fine-tuning [6], we simulate a similar scenario by fine-tuning the 
+
+Llama-3.2-3B-Instruct model. As the model has been instruction fine-tuned, we continue to fine-tune the checkpoint on the Open-Platypus dataset [44] that aims to improve the reasoning ability of the model. We evaluate the final model checkpoint on a diverse suite of downstream benchmarks to measure its generalization across different cognitive abilities. Our evaluation tasks include:  
+
+> •
+
+Domain Knowledge: MMLU (subsets: STEM, Human-ities, Social Sciences) [45].  
+
+> •
+
+Commonsense Reasoning: RTE [46], Hellaswag [47] and BoolQ [48].  
+
+> •
+
+Question Answering: OpenBookQA [49].  
+
+> •
+
+Science Exams: ARC-Challenge [50]. 
+
+Hyper-parameters and Baselines. We fine-tune for one epoch using a learning rate of 1 × 10 −5 and a batch size of 2. We try to complete the task on one GPU. This setup ensures a fair and direct comparison, as the publicly available implementations for most baseline methods are designed for single-GPU exe-cution. Due to the maximal GPU usage exceeding the memory of the A100 GPU, SSAM-F is excluded from this experiment. All other method-specific parameters remain consistent with the experiments on GLUE. 
+
+Performance Analysis. The results on downstream tasks are summarized in Table IV. SL-SAM achieves the highest score on two tasks (shown in bold in the Table) and the second highest score on three tasks (underlined). Especially, SL-SAM 
+
+achieves the highest average score across all downstream JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 8
+
+TABLE IV PERFORMANCES ON DOWNSTREAM TASKS OF FINE -TUNING LLAMA 3-3B-I NSTRUCT ON OPEN -P LATYPUS . SL-SAM ACHIEVES THE TOP SCORE ON 2/8  
+
+> TASKS
+
+(BOLD ), AND THE SECOND SCORE ON 3/8 TASKS (UNDERLINED ). T HE AVERAGE SCORE OF SL-SAM IS THE HIGHEST .Algorithms STEM Humanities S-Sciences RTE Hellaswag Boolq Openbookqa Arc-c Average AdamW 49.92 56.49 65.42 70.76 70.27 79.14 36.20 44.11 59.039 AdaSAM 50.49 55.90 65.52 72.56 70.17 79.20 36.20 44.28 59.290 RST 50.52 55.98 65.58 72.56 70.33 79.24 36.20 43.94 59.294 ESAM 50.02 56.13 64.64 71.48 69.99 79.79 38.20 44.11 59.295 
+
+SL-SAM (ours) 49.83 55.73 65.00 73.29 70.33 79.39 37.20 44.11 59.360 
+
+TABLE V GPU MEMORY AND EPOCH TIME OF SAM-TYPE ALGORITHMS IN FINE -TUNING LLAMA 3-3B-I NSTRUCT .Algorithm Max Mem(MB) Epoch Time(s) AdaSAM 51294( 100% ) 15969( 100% )RST 51294( +0 .00% ) 14317( −10 .35% )ESAM 48310( −5.82% ) 14013( −12 .25% )
+
+SL-SAM 47388( −7.61% ) 12690( −20 .53% )
+
+benchmarks, demonstrating that our adaptive sparsity indeed preserves the model generalization ability in complex and various tasks. The advantage over ESAM underscores the superiority of our bandit-based layer selection over simpler heuristics, particularly in this low batch size regime where ESAM’s sample selection strategy offers little benefit. Fi-nally, the performance gain of all SAM-based baselines over AdamW corroborates recent findings on the role of SAM in mitigating catastrophic forgetting [6]. 
+
+Computational and Memory Efficiency. SL-SAM ’s leader-ship is also reflected in its excellent efficiency which is a critical factor for LLM fine-tuning. We count that the exact sparsity of gradient in SL-SAM is 21 .03% , indicating the 
+
+42 .06% active ratio for gradient calculation, which is far lower than AdamW and other baselines. As shown in Table V, it reduces peak GPU memory by 7.61% and wall-clock time by a significant 20.53% compared to AdaSAM. This advantage is a direct result of our adoption of a more aggressive strategy for saving computation cost. Meanwhile, the other baselines suffer from some inherent limitations: RST still incurs the full memory cost of the vanilla SAM, and ESAM only sparsifies the gradient ascent step while leaving the descent step fully dense. The reductions on epoch time of these two methods also have an obvious gap to SL-SAM . By applying sparsification to both the perturbation and update steps, SL-SAM provides a more comprehensive and effective reduction in computational load. In the resource-intensive domain of LLM fine-tuning, where every percentage point of efficiency matters, SL-SAM 
+
+is validated as a powerful and uniquely practical solution. 
+
+D. Robustness and Ablation Study 
+
+Robustness Study. An important hyper-parameter of our proposed algorithm SL-SAM is s/N , i.e. the desired ratio of active model layers, also known as the sparsity of model 0.15 0.20 0.25 0.30 0.35     
+
+> Sparsity of Model Layers
+> 97.9
+> 98.0
+> 98.1
+> 98.2
+> Test Accuracy(%)
+> CIFAR10
+> 0.15 0.20 0.25 0.30 0.35
+> Sparsity of Model Layers
+> 86.0
+> 86.5
+> 87.0
+> 87.5
+> 88.0
+> CIFAR100
+
+Fig. 4. Test Accuracy v.s. Sparsity of Model Layers in SL-SAM. Left: CIFAR-10 dataset; Right: CIFAR-100 dataset. 
+
+layers, which is set to 0.2 in most experiments. In this section, we show the performances across different sparsities in fine-tuning the DeiT-Small model. As shown in Figure 4, the test accuracies are close in the sparsity range of [0.2,0.25,0.3,0.35] on both CIFAR-10 and CIFAR-100 datasets and have a drop at 0.15. Though the average accuracy of three runs is at the highest level when the sparsity is set to 0.35, the performance at sparsity 0.2 has a negligible gap to it and obviously could save more GPU memory and time cost. To sum up, we adopt the selection of 0.2 in our experiments in the main body. 
+
+Ablation Study. The core of SL-SAM is the identification of model layers through a multi-armed bandit method. We also compare this with two heuristic methods: the first one selects the layers randomly with a uniform distribution, named as Random-SL-SAM; the second one computes the full-dimensional gradient then selects the layers with the top-k largest norms in a greedy manner, named as Top-SL-SAM. We compare these three algorithms on fine-tuning DeiT-Small. Top-SL-SAM fails to converge just after the first epoch. We make a deep investigation into this result and find that as many as 137 of 200 model layers are not selected to participate in training throughout the whole epoch. This is in line with the insight in the “Introduction” section: “a greedy approach is susceptible to the stochasticity of mini-batch gradients, failing to explore layers that are temporarily dormant but may become critical for convergence”. The test accuracies of Random-SL-SAM are 97 .93 ± 0.08% and 86 .19 ± 0.21% 
+
+on CIFAR-10 and CIFAR-100 respectively, have a gap of 
+
+0.19% and 1.64% to SL-SAM, as well as a larger standard deviation. This advantage verifies that our strategy focuses the gradient calculation on those impactful layers, thus improving the convergence of the model. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 9
+
+Algorithm 3 S2-SAM 
+
+Input: Initial values x1, perturbation radius ρ, learning rate 
+
+η, m0,l = 0 , v 0,l = 0, ∀l ∈ [N ], coefficients β1, β 2 < 1. 
+
+> 1:
+
+for t = 1 , ..., T do  
+
+> 2:
+
+Sample a minibatch ξt from the dataset;  
+
+> 3:
+
+Compute the perturbation ϵt = ρ gt−1 
+
+> ∥gt−1∥
+
+; 
+
+> 4:
+
+Compute the gradient gt = ∇f (xt + ϵt, ξ t); 
+
+> 5:
+
+xt+1 = AdamW (xt, g t); 
+
+> 6:
+
+end for Algorithm 4 SL-S2-SAM 
+
+Input: Initial values x1, perturbation radius ρ, learning rate 
+
+η, p1,l = s/N, m 0,l = 0 , v 0,l = 0, ∀l ∈ [N ], coefficients 
+
+β1, β 2 < 1. 
+
+> 1:
+
+for t = 1 , ..., T do  
+
+> 2:
+
+Sample active layers St = {l : Zt,l = 1 , ∀l ∈ [N ]}
+
+according to the distribution P(Zt,l = 1) = pt,l , where each Zt,l follows the Bernoulli distribution;  
+
+> 3:
+
+Sample a minibatch ξt from the dataset;  
+
+> 4:
+
+for l ∈ St do  
+
+> 5:
+
+Compute the perturbation ϵt,l = ρ gt−1,l  
+
+> ∥gt−1,l ∥
+
+; 
+
+> 6:
+
+Compute the gradient gt,l = ∇fl(xt + ϵt, ξ t); 
+
+> 7:
+
+xt+1 ,l = AdamW (xt,l , g t,l ); 
+
+> 8:
+
+end for  
+
+> 9:
+
+pt+1 ,l = Update Distribution (pt,l , S t, ∥gt,l ∥); 
+
+> 10:
+
+end for 
+
+V. E XTENSION : C OUPLE WITH SINGLE -S TEP SAM We notice that a recent work [51] proposes an algorithm S2-SAM which performs the perturbation step using the gradient calculated in the last iteration. As a result, S2-SAM only needs to calculate the gradient once per iteration, reducing the computation overhead of SAM remarkably. In this section, we couple the “Sparse Layer Selection” technique in SL-SAM 
+
+with this Single-Step SAM to form a novel algorithm named as SL-S2-SAM. Two algorithms are listed as Algorithms 3 and 4 (we also employ AdamW as the base optimizer for the model update step). We conduct experiments to show that SL-
+
+S2-SAM could further reduce the cost of S2-SAM with the help of sparse gradients. 
+
+Model Setups. We conduct the same experiments as those in section IV: fine-tuning DeiT-Small on CIFAR, RoBERTa on GLUE and Llama-3.2-3B-Instruction models on Open-Platypus. The learning rate is tuned in [5e-5, 8e-5, 1e-4, 1.5e-4] when training DeiT-Small. The layer sparsity of SL-S2-SAM is set to 0.3 for DeiT-Small, 0.2 for all datasets in GLUE and 0.5 for Llama-3.2-3B-Instruction. All other hyper-parameters are kept unchanged. Specially, SL-S2-SAM runs the standard AdamW step for all layers in the first iteration to initial the record of the previous gradients. 
+
+Performance Analysis. We summarize the experimental re-sults in Tables VI and VII respectively. On two CIFAR datasets, the test accuracies of SL-S2-SAM are marginally lower than those of S2-SAM. For the language models fine-tuning, SL-S2-SAM is ahead of S2-SAM in three of eight datasets on GLUE (shown in bold), as well as yielding higher scores than SL-S2-SAM in two tasks during the evaluations of Llama-3.2-3B-Instruction on downstream tasks. Across all experimental cases, the gap of average scores between SL-S2-SAM and S2-SAM is consistently within 0.2. The performances of SL-S2-SAM are close to S2-SAM, but it is at a disadvantage overall. We analyze this phenomenon and think this is due to the latencies of the adopted previous gradients for perturbation of these two algorithms have an obvious difference. Specifically, S2-SAM uses the gradients in the last iteration for perturbation, which yields a latency of one iteration compared to the standard SAM. As a result, the performances of S2-SAM are falling behind two-step SAM methods (results shown in the last section) in all fine-tuning experiments. Then, since SL-S2-SAM samples partial layers to calculate the gradients in each iteration, the latency of the gradients for perturbation equals the interval between two sampled iterations for one model layer. This latency is no less than 1 and may be large for some seldom sampled layers, leading to the direction of perturbation has a bias to that of the current gradient adopted in standard SAM. Thus, we speculate that the latency of the gradient for perturbation is an important factor that affects the performance. This disadvantage also results in the variation of the value of sparsity across three sets of experiments. We consider to improve the performance SL-S2-SAM through correcting the perturbation direction in the future work. 
+
+Computational and Memory Efficiency. We count the actual active ratio of model parameters, peak GPU memory usage and average epoch training time in three experiments. The active ratio of parameters is 65.1% in fine-tuning DeiT-Small on CIFAR10, yielding a 2.95% and 4.42% reduction on GPU memory and epoch time. Then on all datasets in GLUE, the average active ratio of SL-S2-SAM is 21.2%, significantly lower than the 1.0 of S2-SAM. We select the MNLI dataset as a representative, and the run on it shows a memory reduction of 17.38% and a time cost reduction of 30.74% . Finally, SL-
+
+S2-SAM activates 47.7% parameters in average to participate in the training on Llama-3.2-3B-Instruction, contributing to 
+
+14.9% of the training time saving. These results indicate that our layer selection strategy consistently help to improve the efficiency of single-step SAM by reducing the overhead of gradient calculation. VI. C ONCLUSION 
+
+To address the prohibitive computational cost of SAM, we introduced SL-SAM that applies SAM’s steps to a dynamically selected subset of layers. Grounded in the principle that the gradient norm is a strong proxy for layer importance for both of SAM’s perturbation and update steps, SL-SAM 
+
+uses an adaptive sampling strategy to focus computation on impactful layers. We prove its convergence and empirically demonstrate that it matches the performance of vanilla SAM while substantially reducing computational overhead, resulting in great savings of memory and time in fine-tuning. The extension work couples the sparse gradient computation with the single-step SAM. The experiments consistently show a negligible performance drop and an obvious cost reduction. In JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 10 
+
+TABLE VI EXPERIMENTAL RESULTS OF FINE -TUNING DEI T ON CIFAR 10 AND CIFAR100. Algorithm CIFAR-10 CIFAR-100 Max Mem(MB) Epoch Time(s) Accuracy(%) Active Ratio Accuracy(%) Active Ratio 
+
+S2-SAM 98.10 ±0.08 1.0× 87.59 ±0.07 1.0× 8466(100%) 119.76(100%) SL-S2-SAM 98.04 ±0.02 0.651 × 87.45 ±0.05 0.676 × 8216(-2.95%) 114.47(-4.42%) TABLE VII EXPERIMENTAL RESULTS OF FINE -TUNING TWO LANGUAGE MODELS : (T OP ): ROBERT A MODEL ON THE GLUE BENCHMARK ; (B OTTOM ): 
+
+DOWNSTREAM TASKS PERFORMANCES AFTER FINE -TUNING LLAMA -3.2-3B-I NSTRUCTION ON OPEN -P LATYPUS .Algorithms CoLA STS-B MRPC RTE SST2 MNLI QNLI QQP Average Active Ratio Epoch Time(s) 
+
+S2-SAM 58.51 90.86 92.69 79.78 95.07 87.25 92.90 91.95 86.13 1× 1630(100%) SL-S2-SAM 59.33 90.59 93.21 79.42 94.27 87.28 92.62 90.69 85.93 0.212 × 1129(-30.74%) Algorithms STEM Human. S-Sciences RTE Hella. Boolq Open. Arc-c Average Active Ratio Epoch Time(s) 
+
+S2-SAM 50.14 56.58 65.19 70.76 70.14 79.08 36.60 44.11 59.075 1× 8425(100%) SL-S2-SAM 49.92 55.92 64.06 71.48 69.79 78.35 38.00 43.26 58.848 0.477 × 7171(-14.9%) 
+
+summary, our work presents SL-SAM as a practical algorithm that makes the SAM-based training computationally feasible for more machine learning applications. REFERENCES [1] N. S. Keskar, D. Mudigere, J. Nocedal, M. Smelyanskiy, and P. T. P. Tang, “On large-batch training for deep learning: Generalization gap and sharp minima,” arXiv preprint arXiv:1609.04836 , 2016. [2] B. Neyshabur, S. Bhojanapalli, D. McAllester, and N. Srebro, “Explor-ing generalization in deep learning,” Advances in neural information processing systems , vol. 30, 2017. [3] P. Foret, A. Kleiner, H. Mobahi, and B. Neyshabur, “Sharpness-aware minimization for efficiently improving generalization,” arXiv preprint arXiv:2010.01412 , 2020. [4] Q. Zhong, L. Ding, L. Shen, P. Mi, J. Liu, B. Du, and D. Tao, “Improving sharpness-aware minimization with fisher mask for better generalization on language models,” arXiv preprint arXiv:2210.05497 , 2022. [5] H. Sun, L. Shen, Q. Zhong, L. Ding, S. Chen, J. Sun, J. Li, G. Sun, and D. Tao, “Adasam: Boosting sharpness-aware minimization with adaptive learning rate and momentum for training deep neural networks,” Neural Networks , vol. 169, pp. 506–519, 2024. [6] H. Li, L. Ding, M. Fang, and D. Tao, “Revisiting catastrophic forgetting in large language model tuning,” arXiv preprint arXiv:2406.04836 , 2024. [7] J. Du, H. Yan, J. Feng, J. T. Zhou, L. Zhen, R. S. M. Goh, and V. Y. Tan, “Efficient sharpness-aware minimization for improved training of neural networks,” arXiv preprint arXiv:2110.03141 , 2021. [8] Y. Zhao, H. Zhang, and X. Hu, “Randomized sharpness-aware training for boosting computational efficiency in deep learning,” arXiv preprint arXiv:2203.09962 , 2022. [9] Y. Liu, S. Mai, X. Chen, C.-J. Hsieh, and Y. You, “Towards efficient and scalable sharpness-aware minimization,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,2022, pp. 12 360–12 370. [10] P. Mi, L. Shen, T. Ren, Y. Zhou, X. Sun, R. Ji, and D. Tao, “Make sharpness-aware minimization stronger: A sparsified perturbation ap-proach,” Advances in Neural Information Processing Systems , vol. 35, pp. 30 950–30 962, 2022. [11] J. Kwon, J. Kim, H. Park, and I. K. Choi, “Asam: Adaptive sharpness-aware minimization for scale-invariant learning of deep neural net-works,” in International Conference on Machine Learning . PMLR, 2021, pp. 5905–5914. [12] Y. Liu, S. Mai, M. Cheng, X. Chen, C.-J. Hsieh, and Y. You, “Ran-dom sharpness-aware minimization,” Advances in neural information processing systems , vol. 35, pp. 24 543–24 556, 2022. [13] J. Zhuang, B. Gong, L. Yuan, Y. Cui, H. Adam, N. Dvornek, S. Tatikonda, J. Duncan, and T. Liu, “Surrogate gap minimization improves sharpness-aware training,” arXiv preprint arXiv:2203.08065 ,2022. [14] T. Li, P. Zhou, Z. He, X. Cheng, and X. Huang, “Friendly sharpness-aware minimization,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 2024, pp. 5631–5640. [15] M. Andriushchenko and N. Flammarion, “Towards understanding sharpness-aware minimization,” in International Conference on Machine Learning . PMLR, 2022, pp. 639–668. [16] K. Wen, T. Ma, and Z. Li, “How sharpness-aware minimization minimizes sharpness?” in The Eleventh International Conference on Learning Representations , 2022. [17] Y. Dai, K. Ahn, and S. Sra, “The crucial role of normalization in sharpness-aware minimization,” Advances in Neural Information Pro-cessing Systems , vol. 36, pp. 67 741–67 770, 2023. [18] D. Bahri, H. Mobahi, and Y. Tay, “Sharpness-aware minimization improves language model generalization,” arXiv preprint arXiv:2110.08529 , 2021. [19] C. Tan, J. Zhang, J. Liu, and Y. Gong, “Sharpness-aware lookahead for accelerating convergence and improving generalization,” IEEE Transac-tions on Pattern Analysis and Machine Intelligence , 2024. [20] W. Xie, T. Pethick, and V. Cevher, “Sampa: Sharpness-aware minimiza-tion parallelized,” arXiv preprint arXiv:2410.10683 , 2024. [21] N. Srivastava, G. Hinton, A. Krizhevsky, I. Sutskever, and R. Salakhut-dinov, “Dropout: a simple way to prevent neural networks from over-fitting,” The journal of machine learning research , vol. 15, no. 1, pp. 1929–1958, 2014. [22] Y. LeCun, J. Denker, and S. Solla, “Optimal brain damage,” Advances in neural information processing systems , vol. 2, 1989. [23] B. Hassibi, D. G. Stork, and G. J. Wolff, “Optimal brain surgeon and general network pruning,” in IEEE international conference on neural networks . IEEE, 1993, pp. 293–299. [24] T. Gale, E. Elsen, and S. Hooker, “The state of sparsity in deep neural networks,” arXiv preprint arXiv:1902.09574 , 2019. [25] M. Sun, Z. Liu, A. Bair, and J. Z. Kolter, “A simple and effective pruning approach for large language models,” arXiv preprint arXiv:2306.11695 ,2023. [26] J. Chen, K. Xu, Y. Wang, Y. Cheng, and A. Yao, “Dropit: Dropping intermediate tensors for memory-efficient dnn training,” arXiv preprint arXiv:2202.13808 , 2022. [27] Z. Jiang, X. Chen, X. Huang, X. Du, D. Zhou, and Z. Wang, “Back razor: Memory-efficient transfer learning by self-sparsified backpropagation,” 
+
+Advances in neural information processing systems , vol. 35, pp. 29 248– 29 261, 2022. [28] R. Liu and B. Mozafari, “Communication-efficient distributed learning for large batch optimization,” in International Conference on Machine Learning . PMLR, 2022, pp. 13 925–13 946. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 11 
+
+[29] Z. Yu, L. Shen, L. Ding, X. Tian, Y. Chen, and D. Tao, “Sheared backpropagation for fine-tuning foundation models,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,2024, pp. 5883–5892. [30] Y. Zhao, H. Zhang, and X. Hu, “Penalizing gradient norm for efficiently improving generalization in deep learning,” in International conference on machine learning . PMLR, 2022, pp. 26 982–26 992. [31] T. B. Johnson and C. Guestrin, “Training deep models faster with robust, approximate importance sampling,” Advances in Neural Information Processing Systems , vol. 31, 2018. [32] Y.-L. Sung, V. Nair, and C. A. Raffel, “Training neural networks with fixed sparse masks,” Advances in Neural Information Processing Systems , vol. 34, pp. 24 193–24 205, 2021. [33] B. Gopal, H. Yang, M. Horton, and Y. Chen, “Safer: Sharpness aware layer-selective finetuning for enhanced robustness in vision transform-ers,” arXiv preprint arXiv:2501.01529 , 2025. [34] I. Loshchilov and F. Hutter, “Decoupled weight decay regularization,” 
+
+arXiv preprint arXiv:1711.05101 , 2017. [35] P. Auer, N. Cesa-Bianchi, and P. Fischer, “Finite-time analysis of the multiarmed bandit problem,” Machine learning , vol. 47, pp. 235–256, 2002. [36] Z. Zhou, M. Wang, Y. Mao, B. Li, and J. Yan, “Sharpness-aware minimization efficiently selects flatter minima late in training,” arXiv preprint arXiv:2410.10373 , 2024. [37] R. Das, N. Agarwal, S. Sanghavi, and I. S. Dhillon, “Towards quantifying the preconditioning effect of adam,” arXiv preprint arXiv:2402.07114 , 2024. [38] P. Zhou, X. Xie, Z. Lin, and S. Yan, “Towards understanding con-vergence and generalization of adamw,” IEEE transactions on pattern analysis and machine intelligence , vol. 46, no. 9, pp. 6486–6493, 2024. [39] H. Li, Y. Dong, and Z. Lin, “On the o( 
+
+> √dK1/4
+
+) convergence rate of adamw measured by ℓ1 norm,” arXiv preprint arXiv:2505.11840 , 2025. [40] H. Touvron, M. Cord, M. Douze, F. Massa, A. Sablayrolles, and H. J´ egou, “Training data-efficient image transformers & distillation through attention,” in International conference on machine learning .PMLR, 2021, pp. 10 347–10 357. [41] Y. Liu, “Roberta: A robustly optimized bert pretraining approach,” arXiv preprint arXiv:1907.11692 , vol. 364, 2019. [42] A. Wang, A. Singh, J. Michael, F. Hill, O. Levy, and S. R. Bowman, “Glue: A multi-task benchmark and analysis platform for natural lan-guage understanding,” arXiv preprint arXiv:1804.07461 , 2018. [43] J. Zhao, Z. Zhang, B. Chen, Z. Wang, A. Anandkumar, and Y. Tian, “Galore: Memory-efficient llm training by gradient low-rank projection,” 
+
+arXiv preprint arXiv:2403.03507 , 2024. [44] A. N. Lee, C. J. Hunter, and N. Ruiz, “Platypus: Quick, cheap, and powerful refinement of llms,” arXiv preprint arXiv:2308.07317 , 2023. [45] D. Hendrycks, C. Burns, S. Basart, A. Zou, M. Mazeika, D. Song, and J. Steinhardt, “Measuring massive multitask language understanding,” 
+
+arXiv preprint arXiv:2009.03300 , 2020. [46] D. Giampiccolo, B. Magnini, I. Dagan, and W. B. Dolan, “The third pascal recognizing textual entailment challenge,” in Proceedings of the ACL-PASCAL workshop on textual entailment and paraphrasing , 2007, pp. 1–9. [47] R. Zellers, A. Holtzman, Y. Bisk, A. Farhadi, and Y. Choi, “Hel-laswag: Can a machine really finish your sentence?” arXiv preprint arXiv:1905.07830 , 2019. [48] C. Clark, K. Lee, M.-W. Chang, T. Kwiatkowski, M. Collins, and K. Toutanova, “Boolq: Exploring the surprising difficulty of natural yes/no questions,” arXiv preprint arXiv:1905.10044 , 2019. [49] T. Mihaylov, P. Clark, T. Khot, and A. Sabharwal, “Can a suit of armor conduct electricity? a new dataset for open book question answering,” 
+
+arXiv preprint arXiv:1809.02789 , 2018. [50] P. Clark, I. Cowhey, O. Etzioni, T. Khot, A. Sabharwal, C. Schoenick, and O. Tafjord, “Think you have solved question answering? try arc, the ai2 reasoning challenge,” arXiv preprint arXiv:1803.05457 , 2018. [51] J. Ji, G. Li, J. Fu, F. Afghah, L. Guo, X. Yuan, and X. Ma, “A single-step, sharpness-aware minimization is all you need to achieve efficient and accurate sparse training,” Advances in Neural Information Processing Systems , vol. 37, pp. 44 269–44 290, 2024. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 12 
+
+APPENDIX ADETAILED PROOF OF THEOREM 
+
+Lemma 1. (Lemma 2 in [39]) If β2 ≤ √β1, then we have the following result for SL-SAM 
+
+m2
+
+> t,i
+
+vt,i 
+
+≤ 8, ∀t ∈ [T ], i ∈ [d].
+
+Lemma 2. (Lemma 2 and “Proof 1” in [39]) If ηλ ≤ √v  
+
+> 5T5/4
+
+, ∥x1∥∞ ≤ √v  
+
+> 4λT 1/4
+
+, √vT 1/4 < 1, and β2 ≤ √β1, then we have the following result for SL-SAM 
+
+λ∥xt∥∞ ≤√vT 1/4 , ∀t ∈ [T ].
+
+Lemma 3. If f (x) in Algorithm 1 satisfies Assumptions 1 and 2, then we have 
+
+E∥gt,i − ∇ fi(xt)∥2 ≤ 12 ρ2L2 + 4 σ2 
+
+> i
+
+, E∥gt,i ∥2 ≤ 12 ρ2L2 + 4 σ2 
+
+> i
+
++ 4 E∥∇ fi(xt)∥2.
+
+Proof. 
+
+E∥gt,i − ∇ fi(xt)∥2
+
+=E∥∇ fi(xt + ρ ∇fi(xt, ξ t)
+
+∥∇ fi(xt, ξ t)∥ , ξ t) − ∇ fi(xt + ρ ∇fi(xt)
+
+∥∇ fi(xt)∥ , ξ t) + ∇fi(xt + ρ ∇fi(xt)
+
+∥∇ fi(xt)∥ , ξ t) − ∇ fi(xt)∥2
+
+≤2ρ2L2E∥ ∇fi(xt, ξ t)
+
+∥∇ fi(xt, ξ t)∥ − ∇fi(xt)
+
+∥∇ fi(xt)∥ ∥2 + 2 E∥∇ fi(xt + ρ ∇fi(xt)
+
+∥∇ fi(xt)∥ , ξ t) − ∇ fi(xt, ξ t) + ∇fi(xt, ξ t) − ∇ fi(xt)∥2(a)
+
+≤ 8ρ2L2 + 4 E∥∇ fi(xt + ρ ∇fi(xt)
+
+∥∇ fi(xt)∥ , ξ t) − ∇ fi(xt, ξ t)∥2 + 4 E∥∇ fi(xt, ξ t) − ∇ fi(xt)∥2(b)
+
+≤12 ρ2L2 + 4 σ2 
+
+> i
+
+,
+
+where (a) comes from Assumption 1 and (b) comes from Assumptions 1 and 2. The second inequality could be obtained directly in the same way. 
+
+Lemma 4. If f (x) in Algorithm 1 satisfies Assumptions 1 and 2, denote ˜vt,i = β2vt−1,i +(1 −β2)(4 |∇ fi(xt)|2 +4 σ2 
+
+> i
+
++12 ρ2L2),denote ∥σ∥1 = Pdi=1 σi, then we have that 
+
+> T
+
+X
+
+> t=1
+> d
+
+X
+
+> i=1
+
+Ep˜vt,i + ϵ ≤ 2∥σ∥1T + (4 ρL + √ϵ)dT + 8 
+
+> T
+
+X
+
+> t=1
+> d
+
+X
+
+> i=1
+
+E |∇ fi(xt)|2
+
+p˜vt,i + ϵ .
+
+Proof. Taking the result in Lemma 3 into the proof of Lemma 4 in [39], then obtaining the result. 
+
+Lemma 5. If f (x) in Algorithm 1 satisfies Assumption 1, denote θ = ⌈ 11−β5/41
+
+⌉, then we have that 
+
+E∥mt,i − ∇ fi(xt)∥2 ≤ pβ1E∥mt−1,i − ∇ fi(xt−1)∥2 + β3/41 η2L2
+
+(1 − β1/41 )√ϵ E ∥mt−1,i + λx t−1,i 
+
+√vt−1,i + ϵ∥2
+
+√vt−1,i + ϵ
+
++ θ(1 − β1)2(4 σ2 
+
+> i
+
++ 12 ρ2L2)
+
+Proof. From the update rule of the algorithm, we have that 
+
+mt,i − ∇ fi(xt) = β1(mt−1,i − ∇ fi(xt−1)) − β1(∇f (xt) − ∇ f (xt−1)) + (1 − β1)( gt,i − ∇ fi(xt)) 
+
+Further, we have that 
+
+E∥mt,i − ∇ fi(xt)∥2(a)
+
+≤ β−5/41 E∥β1(mt−1,i − ∇ fi(xt−1)) − β1(∇fi(xt) − ∇ fi(xt−1)) ∥2 + θ(1 − β1)2(4 σ2 
+
+> i
+
++ 12 ρ2L2)
+
+> (b)
+
+≤β3/41 (β−1/41 E∥mt−1,i − ∇ fi(xt−1)∥2 + 11 − β1/41
+
+E∥∇ fi(xt) − ∇ fi(xt−1)∥2) + θ(1 − β1)2(4 σ2 
+
+> i
+
++ 12 ρ2L2)
+
+≤pβ1E∥mt−1,i − ∇ fi(xt−1)∥2 + β3/41 η2L2
+
+(1 − β1/41 )√ϵ E ∥mt−1,i + λx t−1,i 
+
+√vt−1,i + ϵ∥2
+
+√vt−1,i + ϵ + θ(1 − β1)2(4 σ2 
+
+> i
+
++ 12 ρ2L2),
+
+where (a) and (b) come from Young’s Inequality and Lemma 3. 
+
+Proof of Theorem 1 JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 13 
+
+Proof. From the update rule of the algorithm and the L-smooth, we have that 
+
+f (xt+1 ) − f (xt)
+
+≤ X
+
+> l∈St
+
+⟨∇ fl(xt), x t+1 ,l − xt,l ⟩ + L
+
+2
+
+X
+
+> l∈St
+
+∥xt+1 ,l − xt,l ∥2
+
+= − η X
+
+> l∈St
+
+⟨∇ fl(xt), mt,l + λx t,l 
+
+√vt,l + ϵ
+
+√vt,l + ϵ ⟩ + η2L
+
+2
+
+X
+
+> l∈St
+
+∥ mt,l + λx t,l 
+
+√vt,l + ϵ
+
+√vt,l + ϵ ∥2
+
+≤ − η
+
+2
+
+X
+
+> l∈St
+
+∥ ∇fl(xt)(vt,l + ϵ)1/4 ∥2 − η
+
+2
+
+X
+
+> l∈St
+
+∥ mt,l + λx t,l 
+
+√vt,l + ϵ
+
+(vt,l + ϵ)1/4 ∥2 + η X
+
+> l∈St
+
+∥ ∇fl(xt) − mt,l 
+
+(vt,l + ϵ)1/4 ∥2 + η X
+
+> l∈St
+
+∥ λx t,l 
+
+√vt,l + ϵ
+
+(vt,l + ϵ)1/4 ∥2
+
++ η2L
+
+2√ϵ
+
+X
+
+> l∈St
+
+∥ mt,l + λx t,l 
+
+√vt,l + ϵ
+
+(vt,l + ϵ)1/4 ∥2
+
+≤ − η
+
+2
+
+X
+
+> l∈St
+
+∥ ∇fl(xt)(vt,l + ϵ)1/4 ∥2 − η
+
+4
+
+X
+
+> l∈St
+
+∥ mt,l + λx t,l 
+
+√vt,l + ϵ
+
+(vt,l + ϵ)1/4 ∥2 + η X
+
+> l∈St
+
+∥ ∇fl(xt) − mt,l 
+
+ϵ1/4 ∥2 + η X
+
+> l∈St
+
+∥ λx t,l 
+
+√vt,l + ϵ
+
+(vt,l + ϵ)1/4 ∥2 (5) where the last inequality comes from η ≤ √ϵ 
+
+> 2L
+
+. Taking Lemma 2 into (5) yields 
+
+f (xt+1 ) − f (xt) ≤ − η
+
+2
+
+X
+
+> l∈St
+
+∥ ∇fl(xt)(vt,l + ϵ)1/4 ∥2 − η
+
+4
+
+X
+
+> l∈St
+
+∥ mt,l + λx t,l 
+
+√vt,l + ϵ
+
+(vt,l + ϵ)1/4 ∥2
+
++ η X
+
+> l∈St
+
+∥ ∇fl(xt) − mt,l 
+
+ϵ1/4 ∥2 + ηv 
+
+√T
+
+X
+
+> l∈St
+
+∥(vt,l + ϵ)1/4∥2 (6) For the terms in the right hand of (6), taking the expectation on the randomness in the layer sampling, we have that 
+
+− η
+
+2 E X
+
+> l∈St
+
+∥ ∇fl(xt)(vt,l + ϵ)1/4 ∥2 ≤ − ηp min 
+
+2 E X
+
+> l∈St
+
+1
+
+pt,l 
+
+∥ ∇fl(xt)(vt,l + ϵ)1/4 ∥2 = − ηp min 
+
+2 E
+
+> d
+
+X
+
+> i=1
+
+|∇ fi(xt)|2
+
+√vt,i + ϵ (7) Similarly, for other terms we have 
+
+− η
+
+4 E X
+
+> l∈St
+
+∥ mt,l + λx t,l 
+
+√vt,l + ϵ
+
+(vt,l + ϵ)1/4 ∥2 + ηE X
+
+> l∈St
+
+∥ ∇fl(xt) − mt,l 
+
+ϵ1/4 ∥2 + ηv 
+
+√T E X
+
+> l∈St
+
+∥(vt,l + ϵ)1/4∥2
+
+≤ − ηp min 
+
+4 E X
+
+> l∈St
+
+1
+
+pt,l 
+
+∥ mt,l + λx t,l 
+
+√vt,l + ϵ
+
+(vt,l + ϵ)1/4 ∥2 + ηE X
+
+> l∈St
+
+1
+
+pt,l 
+
+∥ ∇fl(xt) − mt,l 
+
+ϵ1/4 ∥2 + ηv 
+
+√T E X
+
+> l∈St
+
+1
+
+pt,l 
+
+∥(vt,l + ϵ)1/4∥2
+
+= − ηp min 
+
+4 E
+
+> d
+
+X
+
+> i=1
+
+|mt,i + λx t,i 
+
+√vt,i + ϵ|2
+
+√vt,i + ϵ + ηE
+
+> d
+
+X
+
+> i=1
+
+|fi(xt) − mt,i |2
+
+√ϵ + ηv 
+
+√T E
+
+> d
+
+X
+
+> i=1
+
+pvt,i + ϵ (8) Substituting (7) and (8) into (6) yields that 
+
+E[f (xt+1 )] − f ∗ + ηp min 
+
+4 E
+
+> d
+
+X
+
+> i=1
+
+|mt,i + λx t,i 
+
+√vt,i + ϵ|2
+
+√vt,i + ϵ − η
+
+√ϵ E
+
+> d
+
+X
+
+> i=1
+
+|fi(xt) − mt,i |2
+
+≤E[f (xt)] − f ∗ − ηp min 
+
+2 E
+
+> d
+
+X
+
+> i=1
+
+|∇ fi(xt)|2
+
+√vt,i + ϵ + ηv 
+
+√T E
+
+> d
+
+X
+
+> i=1
+
+pvt,i + ϵ (9) Multiplying η√ϵ(1 −√β1) on both sides of Lemma 5, then substituting the result into (9) yields that 
+
+E[f (xt+1 )] − f ∗ + ηp min 
+
+4 E
+
+> d
+
+X
+
+> i=1
+
+|mt,i + λx t,i 
+
+√vt,i + ϵ|2
+
+√vt,i + ϵ + η√β1
+
+(1 − √β1)√ϵ E
+
+> d
+
+X
+
+> i=1
+
+|fi(xt) − mt,i |2
+
+≤E[f (xt)] − f ∗ + ηp min 
+
+4 E
+
+> d
+
+X
+
+> i=1
+
+|mt−1,i + λx t−1,i 
+
+√vt−1,i + ϵ|2
+
+√vt−1,i + ϵ + η√β1
+
+(1 − √β1)√ϵ E
+
+> d
+
+X
+
+> i=1
+
+|fi(xt−1) − mt−1,i |2
+
+− ηp min 
+
+2 E
+
+> d
+
+X
+
+> i=1
+
+|∇ fi(xt)|2
+
+√vt,i + ϵ + ηv 
+
+√T E
+
+> d
+
+X
+
+> i=1
+
+pvt,i + ϵ + 2ηθ (1 − β1)
+
+√ϵ (4 σ2 
+
+> s
+
++ 12 dρ 2L2), (10) where we use η2 ≤ (1 −β1/41 )(1 −√β1)4β3/41 L2 in the last inequality. The inequality (10) has been already in the similar format to the inequality (7) in “Proof 1” of [39], except some terms scaled by the constant, but does not affect the convergence rate. The JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 14 
+
+rest of the proof completely follows that proof, with the help of the above lemmas. The only difference is that we use 1 − √β1
+
+to replace 1 − θ in inequality (14) of [39] to yield the value of β1.Finally, we obtain that, denote ˆσ2 = max {4σ2 
+
+> s
+
++ 12 dρ 2L2, L(f (x1)−f ∗) 
+
+> T γ 2
+
+} where γ ∈ (0 , 1] . Setting the coefficients as 
+
+1 − √β1 =
+
+q L(f (x1)−f ∗)ˆσ2T , β2 ≤ √β1, ϵ = ˆσ2 
+
+> d
+
+, η = O(
+
+q 1 
+
+> dT
+
+), λ = O( √d   
+
+> (T3ˆσ2)1/4
+
+), initializing the model as ∥x1∥∞ = O( Td ),we could obtain the final convergence rate 
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+E∥∇ f (xt)∥1 = O
+
+ √dT 1/4 +
+
+r dT
+
+
+
+. (11)

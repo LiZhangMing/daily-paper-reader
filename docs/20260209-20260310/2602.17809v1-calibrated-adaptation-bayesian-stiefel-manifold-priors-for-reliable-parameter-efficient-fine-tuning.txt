@@ -1,0 +1,896 @@
+Title: Calibrated Adaptation: Bayesian Stiefel Manifold Priors for Reliable Parameter-Efficient Fine-Tuning
+
+URL Source: https://arxiv.org/pdf/2602.17809v1
+
+Published Time: Mon, 23 Feb 2026 01:06:23 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+## Calibrated Adaptation: Bayesian Stiefel Manifold Priors for Reliable Parameter-Efficient Fine-Tuning 
+
+Ibne Farabi Shihab 1∗ Sanjeda Akter 1∗ Anuj Sharma 21Department of Computer Science, Iowa State University 
+
+> 2
+
+Department of Civil, Construction and Environmental Engineering, Iowa State University 
+
+{ishihab, sanjeda, anujs}@iastate.edu 
+
+> ∗Equal contribution.
+
+Abstract 
+
+Parameter-efficient fine-tuning methods such as LoRA enable practical adaptation of large language models but provide no principled uncertainty estimates, leading to poorly cali-brated predictions and unreliable behavior un-der domain shift. We introduce Stiefel-Bayes Adapters (SBA), a Bayesian PEFT framework that places a Matrix Langevin prior over or-thonormal adapter factors on the Stiefel man-ifold St( k, d ) and performs approximate pos-terior inference via tangent space Laplace ap-proximation with geodesic retraction. Un-like Gaussian priors in flat space projected onto orthogonality constraints, our prior on the manifold naturally encodes the inductive bias that adapter subspaces should be well conditioned and orthogonal, while the poste-rior provides calibrated predictive uncertainty without recalibration. We prove formally that the tangent space approximation strictly avoids the structural variance inflation inher-ent in projecting from ambient space, estab-lishing a rigorous theoretical advantage for intrinsic manifold inference. Across GLUE and SuperGLUE benchmarks on RoBERTa-large, LLaMA-2-7B, LLaMA-2-13B, Mistral-7B, and Qwen2.5-7B, domain shift evalua-tions, selective prediction protocols, and an abstractive summarization task, SBA achieves task performance comparable to LoRA and DoRA while reducing Expected Calibration Error by 18 to 34% over deterministic base-lines, improving selective prediction AUROC by 12 to 25% under domain shift, and outper-forming deep ensembles of five LoRA models on OOD detection at a fraction of the parame-ter cost. Our results demonstrate that where you place uncertainty, on the right geomet-ric structure, matters more than simply adding any Bayesian treatment to adapters. 
+
+1 Introduction 
+
+Large language models adapted via parameter-efficient fine-tuning have become the standard paradigm for task-specific deployment. Methods such as LoRA (Hu et al., 2022), DoRA (Liu et al., 2024), and orthogonal adaptations (Qiu et al., 2023) achieve competitive performance while up-dating only a fraction of model parameters. How-ever, these methods produce point estimates of adapter weights, yielding no principled uncer-tainty quantification. This gap has serious practical consequences. Deployed NLP systems must know when they are likely wrong: clinical NLP models should ab-stain rather than hallucinate diagnoses, and legal document classifiers should flag uncertain predic-tions for human review. Recent work has shown that LLMs are frequently overconfident (Kadavath et al., 2022; Xiong et al., 2025; Chen et al., 2023), and that this miscalibration worsens after prefer-ence alignment (Zhao et al., 2025), making reli-able uncertainty estimation an increasingly urgent problem. Current PEFT methods cannot do this reliably. Post-hoc calibration techniques such as temperature scaling partially address calibration on in-distribution data, but they degrade under do-main shift (Li et al., 2023)—precisely the setting where reliable uncertainty is most needed. A natural remedy is Bayesian inference over adapter parameters. Prior work has explored Gaussian priors over LoRA weights (Yang et al., 2024) and MC-Dropout applied to adapter layers. These approaches treat the adapter weight space as flat Euclidean space, ignoring the geometric struc-ture that successful adapters implicitly exploit: the most effective adapters learn low-rank, well-conditioned subspace transformations that corre-spond to points on or near the Stiefel manifold of orthonormal frames. Recent work has confirmed this empirically: Park et al. (2025) show that op-timizing LoRA’s B matrix on the Stiefel manifold achieves near-perfect orthogonality and full effec-tive rank, dramatically improving parameter effi-ciency, demonstrating that the Stiefel geometry is 
+
+> arXiv:2602.17809v1 [cs.LG] 19 Feb 2026
+
+not merely a theoretical convenience but a practi-cally important structural property of adapter sub-spaces. We argue that geometry-aware Bayesian infer-ence over adapters yields fundamentally better un-certainty estimates than geometry-agnostic alter-natives. By placing a Matrix Langevin distribution as a prior directly on the Stiefel manifold St( k, d ),we obtain a prior that naturally regularizes adapter factors toward orthonormality without hard con-straints, a posterior whose concentration reflects genuine epistemic uncertainty about the adapter subspace, and predictive distributions that are well calibrated without post-hoc adjustments. Our work makes four contributions. First, we introduce Stiefel-Bayes Adapters (SBA), the first PEFT method with a geometry-aware Bayesian prior on the Stiefel manifold for LLM fine-tuning. Second, we develop a scalable inference proce-dure combining tangent space Laplace approx-imation with geodesic retraction, adding fewer than 8% wall-clock overhead over deterministic LoRA, and we prove formally that this geometry-aware approximation completely avoids the sys-tematic variance inflation of the flat-space alterna-tive (Theorem 1). Third, we provide comprehen-sive reliability evaluation across calibration, selec-tive prediction, and OOD detection on five mod-els spanning four architecture families, under both in-distribution and domain shift settings, includ-ing a generative summarization task. Fourth, we demonstrate that manifold-aware priors systemati-cally outperform flat-space Bayesian baselines and even deep ensembles of LoRA models, establish-ing that geometric structure in the prior is the key ingredient for adapter uncertainty. 
+
+2 Background 
+
+We review the three building blocks of our ap-proach: parameter-efficient fine-tuning, the Stiefel manifold, and the Matrix Langevin distribution. These concepts converge naturally in Section 3, where we construct the SBA framework. 
+
+2.1 Parameter-Efficient Fine-Tuning 
+
+Given a pretrained weight matrix W0 ∈ Rd×d,LoRA parameterizes the adapted weight as W =
+
+W0 + BA where B ∈ Rd×k, A ∈ Rk×d, and 
+
+k ≪ d is the adapter rank. The effective up-date therefore lies in a rank-k subspace. Orthogo-nal variants constrain B (or both factors) to have orthonormal columns, i.e., B ∈ Vk(Rd) where 
+
+Vk(Rd) = {U ∈ Rd×k : U ⊤U = Ik} is the Stiefel manifold. This improves conditioning and training stability but remains a point estimate, providing no uncertainty quantification. 
+
+2.2 The Stiefel Manifold 
+
+The Stiefel manifold St( k, d ) is the set of d × k
+
+matrices with orthonormal columns. It is a com-pact Riemannian submanifold of Rd×k with di-mension dk − k(k + 1) /2. The tangent space at U ∈ St( k, d ) is TU St( k, d ) = {∆ ∈ Rd×k :
+
+U ⊤∆ + ∆ ⊤U = 0 }. To map tangent vectors back to the manifold, we use the QR-based geodesic re-traction Retr U (∆) = qf( U + ∆) , where qf( ·) de-notes the Q-factor of a QR decomposition. The compactness of St( k, d ) is important for our purposes: it means that the Matrix Langevin distribution is always normalizable (unlike Gaus-sian distributions on unbounded spaces, which re-quire careful handling of improper priors). The di-mension formula dk − k(k + 1) /2 shows that the manifold has fewer degrees of freedom than the ambient space Rd×k, with the deficit k(k + 1) /2
+
+corresponding to the orthonormality constraints. For typical adapter dimensions ( d = 4096 , k =16 ), the manifold dimension is 65,400 compared to the ambient dimension of 65,536, so the con-straint removes only 136 dimensions—a small fraction, but one that has outsized impact on the posterior geometry as we show in Section 4. 
+
+2.3 The Matrix Langevin Distribution 
+
+The Matrix Langevin distribution on St( k, d ) has density (Chikuse, 2003) 
+
+p(U | F ) = 1
+
+> 0
+
+F1( d 
+
+> 2
+
+; 14 F ⊤F ) exp  tr( F ⊤U ) (1) where F ∈ Rd×k is the parameter matrix and 
+
+> 0
+
+F1 is the hypergeometric function of matrix ar-gument. The mode of this distribution is U ∗ =polar( F ), the closest orthonormal matrix to F ob-tained via polar decomposition F = U ∗S with 
+
+S positive semidefinite. The singular values of 
+
+F control concentration: larger singular values yield a distribution more concentrated around U ∗.This makes the Matrix Langevin an ideal prior for adapter factors, since F encodes both the preferred adapter direction (via its polar factor) and our prior confidence (via its singular values). To build intuition, consider the limiting cases. When F = 0 , the Matrix Langevin reduces to the uniform (Haar) distribution on St( k, d ), express-ing complete ignorance about the adapter sub-space. When ∥F ∥ → ∞ , the distribution con-centrates on a single point U ∗ = polar( F ), re-covering a deterministic adapter. Between these extremes, the singular values of F interpolate smoothly between ignorance and certainty, pro-viding a natural scale for prior confidence that has no analogue in flat-space Gaussian priors. The normalizing constant 0F1( d 
+
+> 2
+
+; 14 F ⊤F ) is a hypergeometric function of matrix argument that does not have a closed form. We use the saddle-point approximation of Kume and Wood, which is accurate to O(d−2) for d ≥ 32 . We validate this approximation empirically in Appendix C. 
+
+3 Method: Stiefel-Bayes Adapters 
+
+We now describe the SBA framework (illustrated in Figure 1): the probabilistic model, the inference procedure, and the computational overhead. 
+
+3.1 Model Specification 
+
+For each adapted layer ℓ, we parameterize the low-rank update as 
+
+∆W (ℓ) = U (ℓ)Σ(ℓ)V (ℓ)⊤ (2) where U (ℓ) ∈ Vk(Rdout ) and V (ℓ) ∈ Vk(Rdin )
+
+are orthonormal factors on Stiefel manifolds, and 
+
+Σ(ℓ) = diag( σ1, . . . , σ k) contains learnable sin-gular values in Rk. We place independent Matrix Langevin priors on each orthonormal factor, 
+
+U (ℓ) ∼ ML( F (ℓ) 
+
+> U
+
+), V (ℓ) ∼ ML( F (ℓ) 
+
+> V
+
+) (3) and a Gaussian prior on the singular values σi ∼N (0 , τ 2). The prior parameters are set via F =
+
+κ0 · Uinit where Uinit is drawn from the Haar mea-sure on St( k, d ) and κ0 controls prior concentra-tion. Low κ0 yields a diffuse prior expressing ig-norance about the adapter subspace, while high κ0
+
+anchors the posterior near the initialization. The SVD parameterization ∆W = U ΣV ⊤ is a deliberate design choice. Unlike the standard LoRA parameterization ∆W = BA where B
+
+and A are unconstrained, our factorization sepa-rates the geometric component (the orthonormal frames U, V that determine the adapter subspace) from the scaling component (the singular values Σ
+
+that determine the magnitude of the update within that subspace). This separation is what enables us to place a geometry-aware prior on the subspace while using a simple Gaussian prior on the scale. The alternative of placing a Matrix Langevin prior directly on the product BA would conflate sub-space uncertainty with scale uncertainty, losing the interpretability and the calibration benefits that come from treating them separately. We note that the number of adapter parameters in SBA is identical to standard LoRA: U has dout ×
+
+k parameters, V has din × k parameters, and Σ has 
+
+k parameters, for a total of (dout + din ) × k + k.The orthonormality constraints reduce the effec-tive degrees of freedom (the manifold dimension is dk − k(k + 1) /2 rather than dk ), but this is a feature, not a bug: the constraints encode the in-ductive bias that adapter subspaces should be well conditioned. For classification with labels y ∈ { 1, . . . , C }
+
+and input features x, the likelihood is p(y |
+
+x, {U (ℓ), Σ(ℓ), V (ℓ)}ℓ) = softmax( fθ(x)) y where 
+
+fθ denotes the forward pass with adapted weights 
+
+W (ℓ)0 + U (ℓ)Σ(ℓ)V (ℓ)⊤.
+
+3.2 Tangent Space Laplace Approximation 
+
+Exact posterior inference on the Stiefel manifold is intractable. We develop a tangent space Laplace approximation that exploits the manifold geom-etry while remaining computationally practical. The procedure has four steps. We first find the MAP estimate ˆU (ℓ) by optimiz-ing the log-posterior using Riemannian SGD, 
+
+ˆU = arg max  
+
+> U∈St( k,d )
+
+h X 
+
+> i
+
+log p(yi | xi, U, . . . )+log p(U | F )
+
+i
+
+,
+
+(4) where the Riemannian gradient is obtained by pro-jecting the Euclidean gradient onto TU St( k, d )
+
+and applying the QR retraction. At the MAP estimate ˆU , we compute the Hessian of the log-posterior restricted to the tangent space 
+
+T ˆU St( k, d ). Using an orthonormal basis {Ei}mi=1 
+
+for T ˆU St( k, d ) (where m = dk − k(k + 1) /2), we form the m × m Hessian matrix Hij =
+
+E⊤ 
+
+> i
+
+∇2St( k,d ) log p( ˆU | D , F ) Ej . For scalability, we use a KFAC approximation to H, computed over a subset of the training data. The Laplace approximation in the tangent space is q(ξ) = N (ξ | 0, (−H)−1) for ξ ∈ T ˆU St( k, d ).To obtain posterior samples on St( k, d ), we draw 
+
+ξ(s) 
+
+> U
+
+∼ q(ξU ) and map back to the manifold via retraction, U (s) = Retr ˆU (ξ(s) 
+
+> U
+
+) = qf( ˆU + ξ(s) 
+
+> U
+
+).Applying this sampling procedure symmetrically to all Bayesian parameters, the predictive distribu-tion is then formed by averaging across samples: 
+
+p(y | x, D) ≈ 1
+
+S
+
+> S
+
+X
+
+> s=1
+
+p(y | x, U (s), Σ(s), V (s)).
+
+(5) 
+
+3.3 Computational Considerations 
+
+The additional cost of SBA over deterministic or-thogonal LoRA has three components: Rieman-nian gradient projection (one matrix multiplica-tion per step, negligible), tangent space Hessian computation (a one-time post-training cost using KFAC over approximately 1000 data points, tak-ing about 5 minutes on a single A100 for LLaMA-2-7B), and S forward passes at inference for the predictive ensemble (Eq. 5). With S = 10 samples and KFAC Hessian, the total overhead is fewer than 8% wall-clock increase during training and roughly 10 × inference cost. For selective predic-tion, even S = 5 samples suffice (Section 5.6). The Hessian is stored in KFAC-factored form, adding fewer than 3% memory and less than 50 MB total storage. All S forward passes are in-dependent and can be batched on a single GPU; in practice, batching S = 10 on a single A100 with LLaMA-2-7B requires approximately 2× the memory of a single forward pass. To further re-duce inference cost, we explore predictive distilla-tion in Section 5.7. 
+
+4 Why Geometry Matters: Formal Analysis 
+
+Before presenting full experiments, we formal-ize why manifold-aware priors outperform flat-space alternatives. A common strategy to combine Bayesian inference with orthogonality is to define a Gaussian posterior N ( ˆW , ΣA) over the ambient space Rd×k and project it to St( k, d ) via polar de-composition. We call this the projection problem: the induced distribution on St( k, d ) concentrates in regions favored by the nonlinear projection map rather than by the data. More precisely, project-ing ambient noise onto a curved manifold does not simply truncate the normal-space variance. Mixed perturbations induce a bilinear coupling be-tween tangent and normal components that acts as a stochastic variance inflator on the projected samples, driving the approximate posterior away from the true manifold posterior and harming cali-bration. The following theorem captures this phe-nomenon formally. 
+
+Theorem 1 (Geometric Variance Inflation & KL Tightness) . Let ˆU ∈ St( k, d ) be the MAP esti-mate of the highly-concentrated target posterior 
+
+ppost . Let qtang be the intrinsic Laplace approx-imation, obtained by pushing forward N (0 , ΣT )
+
+on T ˆU St( k, d ) through a second-order retraction 
+
+ϕ, where ΣT optimally matches the inverse Hes-sian of − log ppost .Let qproj be the ambient approximation, obtained by projecting an ambient Gaussian 
+
+N ( ˆU , ΣA) onto St( k, d ) via the polar projection 
+
+π, where ΣA = Σ T ⊕ ΣN decomposes orthogo-nally into tangent and normal covariances. Then, under a local quadratic approximation of the posterior, the ambient normal noise strictly inflates the intrinsic variance, and the Kullback-Leibler divergences satisfy: 
+
+KL( qtang ∥ppost ) ≤ KL( qproj ∥ppost )−E (Σ T , ΣN )+ O(∥ΣA∥3/2)
+
+(6) 
+
+where E(Σ T , ΣN ) > 0 is a strictly positive penalty governed by the normal variance. Equal-ity holds if and only if the ambient distribution has zero variance in the normal directions ( ΣN = 0 ). Proof. Let W ∼ N ( ˆU , ΣA). We orthogonally decompose W = ˆU + ξT + ξN , where ξT ∈
+
+T ˆU St( k, d ) and ξN ∈ N ˆU St( k, d ). By definition of the normal space, ξN = ˆU S for some symmet-ric matrix S ∈ Rk×k.As rigorously derived in Appendix A, the po-lar projection π(W ) = W (W ⊤W )−1/2 maps the ambient perturbation to the manifold. Taylor ex-panding to second order, the projected sample is: 
+
+Uproj = ˆU +ξT − 12 ˆU ξ ⊤ 
+
+> T
+
+ξT +∆( ξT , ξ N )+ O(∥ξ∥3)
+
+where the first three terms precisely match the intrinsic retraction ϕ(ξT ), and the structural dis-crepancy is ∆( ξT , ξ N ) = −ξT S + 12 ˆU ( ˆU ⊤ξT S −
+
+S ˆU ⊤ξT ). Crucially, ∆ ∈ T ˆU St( k, d ) lies entirely within the tangent space. Because ξT ∼ N (0 , ΣT ) and S are indepen-dent zero-mean variables, ∆ is a zero-mean het-eroskedastic noise term conditionally dependent on ξT . Thus, Uproj represents a conditionally mean-preserving stochastic spread of the optimal tangent sample Utang = ϕ(ξT ).The KL divergence to the posterior decomposes into expected negative log-density (energy) and negative differential entropy. Because ppost is highly concentrated, its local energy is character-ized closely by 12 ∥ ˜ξT ∥2 
+
+> H
+
+, where H = Σ −1 
+
+> T
+
+. The 1.0 0.5 0.0 0.5 1.0         
+
+> U1
+> 1.0
+> 0.5
+> 0.0
+> 0.5
+> 1.0
+> U2
+> Matrix Langevin Prior
+> on Stiefel Manifold
+> ML Prior samples
+> MAP U
+> Posterior samples
+> TUSt
+> 1.5 1.0 0.5 0.0 0.5 1.0 1.5
+> 1.5
+> 1.0
+> 0.5
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> Posterior Geometry:
+> Flat-Space vs Tangent-Space
+> Gauss+Proj (on)
+> Gauss+Proj (off)
+> SBA (all on manifold)
+> In-Dist
+> (correct)
+> In-Dist
+> (wrong)
+> Near-OOD Far-OOD
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Predictive Entropy
+> Uncertainty Decomposition
+> Aleatoric
+> Epistemic
+
+Figure 1: Overview of Stiefel-Bayes Adapters. The Matrix Langevin prior respects the geometry of orthonormal adapter factors, and the tangent space Laplace approximation enables efficient posterior sampling via retraction. 
+
+expected energy of qproj inflates additively: 
+
+Eqproj [ 12 ∥ ˜ξT ∥2 
+
+> H
+
+] ≈ Eqtang [ 12 ∥ξT ∥2 
+
+> H
+
+] + E[ 12 ∥∆∥2 
+
+> H
+
+].
+
+Concurrently, injecting conditional mean-zero noise ∆ | ξT into a Gaussian distribution inher-ently increases its differential entropy. However, by standard information-theoretic expansions of entropy under multiplicative noise mixtures, the entropy gain is bounded tightly by the linear trace term 12 E[∥∆∥2 
+
+> H
+
+], leaving a strictly positive quadratic residual. Consequently, the linear energy penalty strictly outpaces the entropy increase, guaranteeing that the KL divergence grows: 
+
+KL( qproj ∥ppost ) ≈ KL( qtang ∥ppost )+ 14 Etr  (H Cov(∆ | ξT )) 2 .
+
+This excess penalty E is strictly positive whenever both ΣT and ΣN are non-zero, demonstrating that normal-space variance systematically degrades the manifold posterior approximation. The practical implication is clear: any pos-terior variance that leaks into the normal space of St( k, d ) is wasted at best and mathematically harmful at worst, since it introduces systematic variance distortion in the projected samples. The tangent space Laplace approximation avoids this entirely by construction. To quantify the gap empirically, we com-pute both KL( qtang ∥pML ) and KL( qproj ∥pML )
+
+via Monte Carlo estimation ( 10 5 samples) on the MNLI adapter weights after training on LLaMA-2-7B. 
+
+Table 1: Empirical KL gap between tangent space and projected approximations across representative adapter layers (MNLI, LLaMA-2-7B). ∆KL =KL( qproj ∥pML ) − KL( qtang ∥pML ) in nats. Posterior spread is the trace of the tangent space covariance. 
+
+Layer KL( qtang ) KL( qproj ) ∆KL 
+
+Layer 1 (q_proj) 5.2 9.3 4.1 Layer 8 (q_proj) 3.8 6.9 3.1 Layer 16 (v_proj) 4.1 7.3 3.2 Layer 24 (o_proj) 2.9 5.2 2.3 Layer 32 (q_proj) 3.1 5.7 2.6 Mean (all layers) 3.7 6.8 3.1 
+
+Table 1 confirms that the theoretical advan-tage translates to a measurable practical differ-ence. The gap is largest in early layers (4.1 nats at layer 1) where the posterior is most diffuse due to less task-specific signal, and smallest in later lay-ers (2.3 nats at layer 24) where the posterior con-centrates tightly around the MAP. This pattern is consistent with Theorem 1: the excess KL penalty 
+
+E(Σ T , ΣN ) grows with the posterior spread, since wider posteriors have more variance available to leak into the normal space. 
+
+Remark 1 (Choice of retraction) . Theorem 1 holds for any retraction that agrees with the ex-ponential map to second order. We use the QR re-traction for computational efficiency, but the Cay-ley retraction and the exponential map itself would yield the same asymptotic guarantee. In practice, we found no measurable difference in calibration between QR and Cayley retractions (ECE within 0.001 on MNLI), so we use QR throughout for its simplicity. 5 Experiments 
+
+We evaluate SBA across three dimensions of reliability—calibration, selective prediction, and out-of-distribution detection—on two model fam-ilies to confirm that the benefits of geometric pri-ors are not architecture-specific, and we include a generative task to demonstrate applicability be-yond classification. 
+
+5.1 Setup 
+
+We use five base models spanning four archi-tecture families: RoBERTa-large (Liu et al., 2019) (355M parameters, encoder-only), LLaMA-2-7B and LLaMA-2-13B (Touvron et al., 2023) (decoder-only), Mistral-7B (Jiang et al., 2023) (decoder-only with grouped-query attention and sliding window attention), and Qwen2.5-7B (Qwen Team, 2024) (decoder-only with a differ-ent tokenizer, training corpus, and architecture from both LLaMA and Mistral). RoBERTa and LLaMA-2-7B are evaluated on the full benchmark suite; Mistral-7B, Qwen2.5-7B, and LLaMA-2-13B are evaluated on MNLI and SST-2 to vali-date cross-family and cross-scale generalization. Adapters are applied to query, key, value, and out-put projection matrices in all attention layers. The adapter rank is k = 16 unless otherwise noted. All results report mean ± standard deviation across 5 random seeds. We compare against nine baselines spanning de-terministic, Bayesian, ensemble, and post-hoc ap-proaches: LoRA (Hu et al., 2022), DoRA (Liu et al., 2024), OrthoLoRA (Stiefel-constrained fac-tors, deterministic), Laplace-LoRA (Daxberger et al., 2024) (flat-space Laplace over LoRA weights), MC-Drop-LoRA (Gal and Ghahramani, 2016) (MC-Dropout with p = 0 .1), SWAG-LoRA (Maddox et al., 2019) (Stochastic Weight Aver-aging Gaussian), Gauss+Proj (Gaussian prior in 
+
+Rd×k with polar projection to St( k, d )), Deep-Ens-LoRA (Lakshminarayanan et al., 2017) (en-semble of 5 independently trained LoRA models), and temperature scaling (Guo et al., 2017) applied to LoRA as a post-hoc calibration baseline. We assess task performance (accuracy, F1) on GLUE (Wang et al., 2019b) and SuperGLUE (Wang et al., 2019a) benchmarks, calibration (ECE (Naeini et al., 2015) with 15 bins, Brier score, NLL), selective prediction (AUROC of the uncertainty-vs-correctness curve (Akter et al., 2025)), and OOD detection (AUROC using pre-dictive entropy as the scoring function). All methods are trained for 3 epochs with AdamW (lr = 2 × 10 −4), batch size 16, on 4×A100 GPUs. SBA uses Riemannian Adam for manifold parameters with the same learning rate. Prior concentration is set to κ0 = 1 .0 (ablated in Section 5.6). For the Riemannian optimizer, we project the Euclidean gradient onto the tangent space at each step and apply the QR retraction, fol-lowing the standard Riemannian SGD framework of Absil et al. (2008). The KFAC Hessian is com-puted once at the end of training over 1024 ran-domly sampled data points, taking approximately 5 minutes on a single A100. Posterior samples are drawn at inference time and cached for reuse across the evaluation set. 
+
+5.2 In-Distribution Results 
+
+Table 2 shows that SBA achieves task perfor-mance within 0.1–0.3 points of the best determin-istic baselines while substantially improving cali-bration on both model families. On LLaMA-2-7B, SBA reduces ECE by 27–56% relative to LoRA and 18–33% relative to Gauss+Proj. The pattern is consistent on RoBERTa-large, confirming that the benefit of geometric priors is not specific to decoder-only architectures. The comparison against Deep-Ens-LoRA de-serves particular attention. The ensemble uses 5×
+
+the adapter parameters and requires five indepen-dent training runs, yet SBA matches or slightly outperforms it on calibration while using a sin-gle set of adapter weights. This demonstrates that well-placed uncertainty on the right geomet-ric structure can substitute for the brute-force di-versity of ensembles. To validate scaling behavior, we evaluate on LLaMA-2-13B for MNLI and SST-2. On MNLI, SBA achieves accuracy 90 .1±.2 with ECE 
+
+.024 ±.002 , compared to LoRA at 90 .3±.2 with ECE .057 ±.004 and Gauss+Proj at 89 .8±.2 with ECE .033 ±.003 . On SST-2, SBA achieves accu-racy 96 .1±.1 with ECE .012 ±.001 , compared to LoRA at 96 .2±.1 with ECE .028 ±.003 . The rela-tive ECE improvement of SBA over Gauss+Proj is 27% on MNLI at 13B, closely matching the 25% improvement at 7B, confirming that the geomet-ric prior advantage is stable across model scales. The absolute ECE values decrease with scale for all methods (the larger model is inherently better calibrated), but SBA maintains its relative advan-tage. Table 2: In-distribution results on GLUE benchmarks. Results are mean ± std over 5 seeds. Best result in each column is bolded, second best underlined. ↓ indicates lower is better. 
+
+MNLI QQP SST-2 Base Method Acc ↑ ECE ↓ Brier ↓ F1 ↑ ECE ↓ Brier ↓ Acc ↑ ECE ↓ Brier ↓
+
+> RoBERTa
+
+LoRA 87 .8±.2 .058 ±.004 .168 ±.005 88 .1±.2 .055 ±.003 .163 ±.004 94 .7±.2 .030 ±.003 .074 ±.004 
+
+Laplace-LoRA 87 .6±.2 .037 ±.003 .139 ±.004 87 .9±.2 .036 ±.003 .143 ±.004 94 .5±.2 .020 ±.002 .059 ±.003 
+
+Deep-Ens-LoRA 88 .1±.1 .029 ±.002 .125 ±.003 88 .4±.1 .027 ±.002 .130 ±.003 94 .9±.1 .016 ±.002 .050 ±.002 
+
+Gauss+Proj 87 .5±.2 .034 ±.003 .135 ±.004 87 .8±.2 .033 ±.003 .140 ±.004 94 .6±.2 .018 ±.002 .056 ±.003 
+
+SBA (Ours) 87 .9±.2 .025 ±.002 .121 ±.003 88 .2±.2 .022 ±.002 .126 ±.003 94 .8±.2 .013 ±.001 .047 ±.002 
+
+> LLaMA-2
+
+LoRA 89 .2±.2 .061 ±.004 .152 ±.005 88 .7±.2 .058 ±.004 .157 ±.005 95 .3±.2 .032 ±.003 .068 ±.003 
+
+Laplace-LoRA 89 .1±.2 .039 ±.003 .131 ±.004 88 .6±.2 .038 ±.003 .137 ±.004 95 .2±.2 .021 ±.002 .055 ±.003 
+
+Deep-Ens-LoRA 89 .5±.1 .030 ±.002 .120 ±.003 89 .0±.1 .028 ±.002 .125 ±.003 95 .5±.1 .017 ±.002 .048 ±.002 
+
+Gauss+Proj 89 .0±.2 .036 ±.003 .128 ±.004 88 .5±.2 .035 ±.003 .134 ±.004 95 .2±.2 .019 ±.002 .053 ±.003 
+
+SBA (Ours) 89 .4±.2 .027 ±.002 .118 ±.003 88 .9±.2 .024 ±.002 .121 ±.003 95 .4±.2 .014 ±.001 .045 ±.002 
+
+To validate cross-family generalization, we evaluate on Mistral-7B, which uses grouped-query attention and sliding window attention rather than LLaMA’s standard multi-head attention. On MNLI, SBA achieves accuracy 89 .8±.2 with ECE 
+
+.025 ±.002 , compared to LoRA at 89 .9±.2 with ECE .055 ±.004 and Gauss+Proj at 89 .5±.2 with ECE .034 ±.003 . On SST-2, SBA achieves accu-racy 95 .6±.1 with ECE .013 ±.001 , compared to LoRA at 95 .7±.1 with ECE .030 ±.003 . The ECE improvements are consistent with LLaMA-2-7B (26% over Gauss+Proj on MNLI), confirming that SBA’s benefits are not specific to any particular at-tention mechanism or model family. On Qwen2.5-7B, which represents the most re-cent generation of open-weight models with a substantially different tokenizer (151K vocabulary vs. 32K for LLaMA) and training corpus, SBA achieves accuracy 90 .2±.2 with ECE .023 ±.002 on MNLI and accuracy 95 .8±.1 with ECE .012 ±.001 
+
+on SST-2, compared to LoRA at 90 .3±.2 with ECE .052 ±.004 and Gauss+Proj at 89 .9±.2 with ECE .031 ±.003 . The 26% ECE improvement over Gauss+Proj matches the pattern observed across all other models, providing strong evidence that the geometric prior advantage is a fundamental property of the Stiefel manifold structure rather than an artifact of any particular model architec-ture or training procedure. 0.0 0.2 0.4 0.6 0.8 1.0                                              
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Accuracy
+> In-Distribution
+> LoRA
+> ECE=0.061
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Laplace-LoRA
+> ECE=0.039
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Gauss+Proj
+> ECE=0.036
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Deep-Ens
+> ECE=0.030
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> SBA
+> ECE=0.027
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Confidence
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Accuracy
+> Domain Shift
+> LoRA
+> ECE=0.098
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Confidence
+> Laplace-LoRA
+> ECE=0.072
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Confidence
+> Gauss+Proj
+> ECE=0.068
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Confidence
+> Deep-Ens
+> ECE=0.058
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Confidence
+> SBA
+> ECE=0.049
+
+Figure 2: Reliability diagrams on MNLI (in-distribution, top) and MNLI → SNLI (domain shift, bottom). SBA maintains calibration under shift while other methods degrade. 
+
+Figure 2 shows reliability diagrams for the key methods. In-distribution, all Bayesian methods improve over LoRA, but the differences are mod-est. Under domain shift, the gap widens dramat-ically: LoRA and Laplace-LoRA become over-confident in the 0.7–0.9 range, while SBA’s pre-dicted confidences remain well aligned with ob-served accuracy. Deep-Ens-LoRA degrades less than single-model baselines but still shows vis-ible miscalibration in the high-confidence bins, whereas SBA tracks the diagonal throughout. 
+
+5.3 Domain Shift Results 
+
+The most important evaluation for reliability is be-havior under distribution shift, where models en-counter data that differs systematically from the training distribution. We evaluate on three shift scenarios: MNLI → SNLI (natural language infer-ence across dataset boundaries), Amazon → Yelp (sentiment classification across review domains), and SQuAD → AdversarialQA (question answer-ing under adversarial perturbation, evaluated with EM and F1 in addition to calibration). Table 3: Domain shift results on LLaMA-2-7B: calibration (ECE ↓) and selective prediction (Sel. AUROC ↑). Mean ± std over 5 seeds.                                            
+
+> MNLI →SNLI Amz →Yelp SQD →AdvQA ECE ↓Sel. ↑ECE ↓Sel. ↑ECE ↓Sel. ↑
+> LoRA .098 ±.006 .712 ±.012 .121 ±.007 .684 ±.014 .142 ±.008 .658 ±.015
+> Laplace-LoRA .072 ±.005 .768 ±.010 .089 ±.005 .742 ±.011 .108 ±.006 .718 ±.012
+> Gauss+Proj .068 ±.004 .779 ±.009 .084 ±.005 .753 ±.010 .102 ±.006 .729 ±.011
+> Deep-Ens .058 ±.003 .801 ±.007 .071 ±.004 .775 ±.008 .088 ±.005 .756 ±.009
+> Temp. Scal. .064 ±.004 —.079 ±.005 —.097 ±.006 —SBA (Ours) .049 ±.003 .821 ±.007 .058 ±.003 .798 ±.008 .075 ±.004 .782 ±.009
+
+Under domain shift, SBA’s advantage grows substantially (Table 3). Temperature scaling achieves competitive ECE when the shift target is known, but it cannot support selective prediction because it provides no per-example uncertainty signal, and it must be recalibrated for each new domain. Deep-Ens-LoRA is the strongest base-line, yet SBA outperforms it by 2–3 points on se-lective AUROC while using 5× fewer adapter pa-rameters. The 5–7% selective AUROC improve-ment over Gauss+Proj under shift indicates that SBA’s uncertainty estimates degrade more grace-fully, correctly identifying which predictions be-come unreliable after the shift. For the SQuAD → AdversarialQA shift, SBA achieves EM/F1 of 41.2/52.8 compared to 40.8/52.1 for LoRA, showing that the Bayesian treatment does not harm extractive QA perfor-mance while providing substantially better cali-bration (ECE .075 vs. .142). 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0  
+
+> Coverage (fraction of predictions made)
+> 0.82
+> 0.84
+> 0.86
+> 0.88
+> 0.90
+> 0.92
+> 0.94
+> 0.96
+> Accuracy on covered examples
+> 80% coverage 50% coverage
+> Selective Prediction: MNLI SNLI
+> LoRA
+> Laplace-LoRA
+> Gauss+Proj
+> Deep-Ens
+> SBA
+
+Figure 3: Selective prediction on MNLI → SNLI. SBA’s uncertainty estimates enable more effective ab-stention at all coverage levels. 
+
+Figure 3 shows the accuracy-at-coverage curves for the MNLI → SNLI shift. At 80% cover-age (abstaining on the 20% most uncertain exam-ples), SBA achieves 91.2% accuracy compared to 87.8% for LoRA and 89.5% for Deep-Ens-LoRA. At 50% coverage, SBA reaches 95.1% accuracy, demonstrating that its uncertainty estimates re-liably identify the most error-prone predictions. This is the practical payoff of geometry-aware un-certainty: in a deployment scenario where human review is expensive, SBA enables the system to route the right examples to human reviewers. 
+
+5.4 OOD Detection 
+
+Table 4: OOD detection AUROC ( ↑) using predic-tive entropy. In-distribution: SST-2 on LLaMA-2-7B. Mean ± std over 5 seeds. 
+
+Method 20News (far) IMDB (near) LoRA .841 ±.012 .623 ±.018 
+
+Laplace-LoRA .892 ±.008 .694 ±.014 
+
+Gauss+Proj .901 ±.007 .712 ±.013 
+
+Deep-Ens-LoRA .921 ±.005 .738 ±.010 
+
+SBA (Ours) .934 ±.005 .761 ±.009 
+
+SBA achieves the strongest OOD detection across both far-OOD and near-OOD settings (Table 4). The near-OOD setting (SST-2 vs. IMDB) is par-ticularly challenging because both are sentiment datasets. SBA’s 2.3-point improvement over Deep-Ens-LoRA and 4.9-point improvement over Gauss+Proj suggests that the manifold poste-rior captures genuine epistemic uncertainty about domain-specific features, rather than merely re-flecting aleatoric noise. The fact that SBA outper-forms a 5-model ensemble with a single model’s parameters is a strong validation of the geometric prior hypothesis. 
+
+5.5 Generative Task: Abstractive Summarization 
+
+To demonstrate that SBA’s benefits extend be-yond classification, we evaluate on XSum ab-stractive summarization using LLaMA-2-7B. We measure token-level NLL on held-out summaries and sequence-level calibration by binning model confidence (negative mean token log-probability) against ROUGE-L scores. SBA achieves ROUGE-L of 38 .2±0.4 (vs. 
+
+38 .4±0.3 for LoRA, within noise), while re-ducing token-level NLL from 2.41 ±.03 (LoRA) to 2.33 ±.02 and sequence-level ECE from 
+
+.089 ±.006 (LoRA) to .061 ±.004 . Laplace-LoRA achieves NLL 2.37 ±.03 and ECE .074 ±.005 , and Gauss+Proj achieves NLL 2.35 ±.03 and ECE 
+
+.069 ±.005 . The pattern is consistent with classifi-cation: SBA provides the best calibration without sacrificing generation quality, and the geometric prior outperforms the flat-space alternative even in the generative setting where uncertainty manifests at the token level rather than over discrete class labels. We also examine the uncertainty decomposi-tion on XSum. SBA’s predictive entropy decom-poses into aleatoric uncertainty (expected entropy under the posterior, reflecting inherent ambiguity in summarization) and epistemic uncertainty (mu-tual information between parameters and predic-tions, reflecting model ignorance). On held-out summaries, the epistemic component accounts for 35% of total uncertainty on average, but rises to 58% on out-of-domain news articles from a differ-ent time period. This confirms that SBA’s man-ifold posterior captures genuine epistemic uncer-tainty that is informative about distribution shift, even in the generative setting (Figure 4). MNLI       
+
+> (In-Dist)
+> MNLI SNLI
+> (Shift)
+> SST-2
+> (In-Dist)
+> SST-2 IMDB
+> (Near OOD)
+> SST-2 20News
+> (Far OOD)
+> XSum
+> (In-Dist)
+> XSum
+> (Shifted)
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Predictive Entropy (nats)
+> SBA (Ours)
+> Aleatoric
+> Epistemic
+> MNLI
+> (In-Dist)
+> MNLI SNLI
+> (Shift)
+> SST-2
+> (In-Dist)
+> SST-2 IMDB
+> (Near OOD)
+> SST-2 20News
+> (Far OOD)
+> XSum
+> (In-Dist)
+> XSum
+> (Shifted)
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Predictive Entropy (nats)
+> Gauss+Proj
+> Aleatoric
+> Epistemic
+
+Figure 4: Uncertainty decomposition across set-tings. Epistemic uncertainty (mutual information) rises sharply under domain shift and on OOD data, while aleatoric uncertainty remains stable. SBA captures genuine model ignorance that flat-space methods un-derestimate. 
+
+5.6 Ablation Studies 
+
+We conduct ablations on MNLI with LLaMA-2-7B to understand which components of SBA con-tribute most. All ablations report mean ± std over 5 seeds. Varying prior concentration κ0 ∈{0.1, 0.5, 1.0, 2.0, 5.0}, ECE improves monoton-ically from κ0 = 0 .1 to 1.0, then plateaus. Task accuracy remains stable ( ±0.2) across the range. 
+
+Table 5: Ablation: prior concentration κ0 (MNLI, LLaMA-2-7B). Mean over 5 seeds. 
+
+κ0 Acc ↑ ECE ↓ Brier ↓
+
+0.1 89 .2±.2 .041 ±.003 .134 ±.004 
+
+0.5 89 .3±.2 .032 ±.002 .124 ±.003 
+
+1.0 89 .4±.2 .027 ±.002 .118 ±.003 
+
+2.0 89 .3±.2 .027 ±.002 .119 ±.003 
+
+5.0 89 .2±.2 .028 ±.002 .120 ±.003 
+
+The value κ0 = 1 .0 offers the best tradeoff and is used in all other experiments (Table 5). The ro-bustness across κ0 ∈ [0 .5, 5.0] is reassuring: the method is not sensitive to this hyperparameter. Selective prediction AUROC saturates at S = 5 
+
+posterior samples (within 0.3% of S = 50 ), mak-ing SBA practical for deployment. ECE continues to improve slightly up to S = 20 , but the marginal gain from S = 10 to S = 20 is only 0.001, so we use S = 10 as the default. 
+
+Table 6: Ablation: number of posterior samples S
+
+(MNLI, LLaMA-2-7B). Mean over 5 seeds. 
+
+S ECE ↓ Sel. AUROC ↑ NLL ↓ Rel. cost 1 .038 ±.003 .791 ±.009 .412 ±.008 1.0 ×
+
+2 .033 ±.002 .808 ±.008 .398 ±.007 2.0 ×
+
+5 .029 ±.002 .819 ±.007 .389 ±.006 5.0 ×
+
+10 .027 ±.002 .821 ±.007 .385 ±.006 10.0 ×
+
+20 .026 ±.002 .822 ±.007 .384 ±.006 20.0 ×
+
+50 .026 ±.002 .822 ±.007 .383 ±.006 50.0 ×
+
+Table 6 shows the full sample count ablation. The diminishing returns beyond S = 10 are clear: the ECE improvement from S = 10 to S = 50 is only 0.001, while the cost increases 5×. For appli-cations where only selective prediction is needed (not full calibration), S = 5 is sufficient and re-duces the inference overhead to a level comparable with a 5-model ensemble. At adapter rank k = 4 , SBA still outperforms Laplace-LoRA at k = 16 on calibration metrics (ECE .033 vs. .039), suggesting that the geometric prior provides strong regularization even at very low rank (Table 7). Table 7: Ablation: adapter rank k (MNLI, LLaMA-2-7B). Mean over 5 seeds. 
+
+Rank k Acc ↑ ECE ↓ Params Rel. cost 4 88 .9±.3 .033 ±.003 0.26M 1.02 ×
+
+8 89 .2±.2 .029 ±.002 0.52M 1.04 ×
+
+16 89 .4±.2 .027 ±.002 1.05M 1.08 ×
+
+32 89 .4±.2 .026 ±.002 2.10M 1.15 ×
+
+64 89 .5±.2 .026 ±.002 4.19M 1.28 ×
+
+Beyond rank, we examine which components of the adapter benefit most from Bayesian treatment.   
+
+> Table 8: Ablation: Bayesian treatment of differ-ent components (MNLI, LLaMA-2-7B). Mean over 5 seeds.
+
+Bayesian over Acc ↑ ECE ↓ Rel. cost None (OrthoLoRA) 89 .3±.2 .052 ±.003 1.0 ×
+
+Σ only 89 .2±.2 .043 ±.003 1.02 ×
+
+U only 89 .3±.2 .031 ±.002 1.04 ×
+
+U + V 89 .4±.2 .028 ±.002 1.08 ×
+
+U + Σ + V (full) 89 .4±.2 .027 ±.002 1.08 ×
+
+Table 8 reveals that the orthonormal factors U
+
+and V carry the vast majority of the calibration benefit, while the singular values Σ contribute only marginally. Making only U Bayesian cap-tures 85% of the calibration gain at 60% of the inference cost, offering a favorable tradeoff for compute-constrained settings. This aligns with our thesis: the geometric structure of the adapter subspace, not its scale, is what matters for uncer-tainty. We also ablate the choice of Hessian approx-imation. Replacing KFAC with a diagonal Hes-sian (cheaper to compute and store) degrades ECE from .027 to .031, a modest loss that may be ac-ceptable when memory is constrained. Using the full (non-factored) Hessian is intractable for d > 
+
+256 but on a small-scale experiment ( d = 128 ,
+
+k = 8 ) yields ECE .026, confirming that KFAC captures most of the curvature information. Finally, we examine the sensitivity to the num-ber of Hessian data points. Using 256 points (in-stead of 1024) degrades ECE from .027 to .029, while using 4096 points yields .027, suggesting that 1024 is sufficient and the Hessian estimate is stable. 
+
+5.7 Predictive Distillation 
+
+To address the S× inference cost, we train a de-terministic OrthoLoRA model to match SBA’s av-eraged predictive distribution via KL-divergence minimization on the training set.   
+
+> Table 9: Predictive distillation results (MNLI, LLaMA-2-7B). The distilled model retains most of SBA’s cali-bration at 1×inference cost.
+
+Method ECE ↓ Sel. ↑ NLL ↓ Cost OrthoLoRA .052 ±.003 .731 ±.011 .452 ±.009 1.0 ×
+
+SBA ( S=10) .027 ±.002 .821 ±.007 .385 ±.006 10 ×
+
+SBA-Distilled .032 ±.002 .798 ±.008 .401 ±.007 1.0 ×
+
+Under shift (MNLI → SNLI): 
+
+OrthoLoRA .087 ±.005 .731 ±.011 — 1.0 ×
+
+SBA ( S=10) .049 ±.003 .821 ±.007 — 10 ×
+
+SBA-Distilled .059 ±.004 .785 ±.009 — 1.0 ×
+
+The distilled model retains 80% of the calibra-tion improvement at 1× inference cost (Table 9). Under domain shift (MNLI → SNLI), the distilled model achieves ECE .059 (vs. .049 for SBA and .087 for OrthoLoRA), showing that the calibration knowledge transfers even to shifted distributions. This makes SBA practical for latency-critical de-ployments: train with SBA, distill, and deploy the deterministic student. 
+
+6 Related Work 
+
+Our work sits at the intersection of Bayesian PEFT, orthogonal adapters, calibration in NLP, and Riemannian methods. Yang et al. (2024) apply variational inference to LoRA weights with Gaussian priors, and Onal et al. (2024) explore Laplace approximations for adapters. Both operate in flat Euclidean space, ignoring the geometric structure of the adapter parameter space. More recently, Daxberger et al. (2024) introduced Laplace-LoRA, apply-ing a post-hoc Laplace approximation to LoRA parameters with strong calibration results, and Lin et al. (2025) demonstrated that effective un-certainty quantification can be achieved in very low-dimensional parameter subspaces. Sharma et al. (2025) scale Bayesian LoRA via stochas-tic variational subspace inference, and Meo et al. (2025) combine Bayesian gates with rank selec-tion to jointly optimize adapter structure and un-certainty. All of these methods operate in flat Euclidean space. Our work demonstrates that manifold-aware priors yield fundamentally better uncertainty estimates, as evidenced by the consis-tent gap between SBA and Gauss+Proj across all evaluation settings and both model families. The Gauss+Proj baseline is the most informative com-parison in our experiments, since it uses the same computational budget and the same manifold con-straint at the MAP, differing only in the prior ge-ometry. The consistent 18–33% ECE improve-ment of SBA over Gauss+Proj isolates the effect of the prior geometry from all other factors. OFT (Qiu et al., 2023), Cayley-parameterized LoRA, and orthonormal LoRA (Wang et al., 2024) enforce orthogonality but remain deterministic. Hao et al. (2024) apply Riemannian precondi-tioning to LoRA optimization, improving conver-gence but not providing uncertainty estimates, and Muqeeth et al. (2025) develop parametrization-independent optimizers for low-rank adapters on the fixed-rank manifold. SBA subsumes these as the MAP-only special case, extending them with principled uncertainty quantification. Post-hoc calibration methods such as temperature scal-ing (Guo et al., 2017; Platt, 1999) and isotonic re-gression are widely used but require held-out cal-ibration data from the target domain. Ensemble methods (Lakshminarayanan et al., 2017) provide uncertainty but at N × the parameter cost; our re-sults show that SBA matches or outperforms 5-model LoRA ensembles within a single model’s parameter budget. This is a significant practical advantage, since ensembles require N indepen-dent training runs and N × the storage and serving cost. The broader Laplace approximation frame-work for deep learning (Daxberger et al., 2021) provides the foundation for our tangent space ap-proach, though we extend it from flat Euclidean space to the Stiefel manifold. Other PEFT vari-ants such as AdaLoRA (Zhang et al., 2023) and QLoRA (Dettmers et al., 2023) focus on efficiency rather than uncertainty, and are complementary to our approach. Optimization on Stiefel manifolds has been ex-plored for various ML problems (Absil et al., 2008; Bécigneul and Ganea, 2019). Our contribu-tion is not the Riemannian optimization machin-ery per se, but rather the formal connection be-tween manifold priors and PEFT uncertainty (The-orem 1), showing that the choice of prior geometry has a direct and measurable impact on downstream reliability. To our knowledge, this is the first result establishing that the KL divergence of a manifold-aware posterior approximation strictly avoids the cross-coupled structural deterioration inherent to projected flat-space approximations for compact Riemannian submanifolds. More broadly, the question of how to cer-tify the reliability of LLM outputs has received growing attention. Akter et al. (2025) develop information-lift statistics for selective risk cer-tification of LLM generations, achieving strong coverage-risk tradeoffs that complement the se-lective prediction framework we evaluate. Shi-hab et al. (2026) use Fisher-aligned subspace di-agnostics for knowledge-aware LLM compres-sion, demonstrating that subspace structure in the parameter space carries meaningful information about model behavior, a finding that resonates with our thesis that subspace geometry matters for uncertainty. Shihab et al. (2025b) propose dif-ferentiable entropy regularization for complexity-aware neural optimization, providing a comple-mentary perspective on how entropy-based objec-tives can improve model reliability. More broadly, Bayesian posterior methods have been shown to be practical even in sequential decision-making settings with LLM-derived priors (Shihab et al., 2025a), suggesting that the scalable posterior in-ference techniques we develop here have applica-tions beyond PEFT. 
+
+7 Conclusion 
+
+We introduced Stiefel-Bayes Adapters, a Bayesian PEFT framework that places Matrix Langevin pri-ors on the Stiefel manifold of orthonormal adapter factors. Our tangent space Laplace approxima-tion enables scalable posterior inference with min-imal overhead, and we proved formally that this geometry-aware approximation completely avoids the structural variance inflation and geometric bias of the flat-space alternative. The central finding is that geometric structure in the prior matters: SBA consistently outper-forms flat-space Bayesian alternatives and deep ensembles on calibration, selective prediction, and OOD detection across two model families, with the largest gains appearing under domain shift. The benefits extend to generative tasks and sur-vive predictive distillation, making SBA practical for deployment. Looking forward, we see several promising di-rections. The tangent space Laplace framework is not specific to the Stiefel manifold; it could be applied to any Riemannian manifold used as a parameter space, such as the Grassmannian (for subspace-valued adapters) or the manifold of pos-itive definite matrices (for covariance-structured adapters). The predictive distillation approach could be extended to preserve the full uncertainty decomposition, not just the averaged predictions, by training the student to match both the mean and variance of the teacher’s predictive distribu-tion. Finally, combining SBA with active learn-ing could yield PEFT methods that not only know when they are uncertain but actively seek out the most informative examples for fine-tuning. 
+
+Limitations 
+
+SBA introduces inference-time overhead from posterior sampling ( S forward passes). While predictive distillation mitigates this (Section 5.7), the distilled model does not retain the full uncer-tainty decomposition into aleatoric and epistemic components. Our experiments cover RoBERTa-large, LLaMA-2-7B, and LLaMA-2-13B; the con-sistent relative gains across these three scales sug-gest the geometric advantage persists, though be-havior on 70B+ models remains to be validated. The tangent space Laplace approximation is local and may underestimate uncertainty far from the MAP; Riemannian MCMC methods could address this at higher computational cost. We validated the saddle-point approximation to the hypergeo-metric normalizing constant empirically and found relative error below 2% for the concentration val-ues encountered during training ( κ0 ≤ 5.0), but extreme concentrations may require more sophis-ticated approximations. Finally, our evaluation focuses on English-language tasks; the behavior of SBA under multilingual fine-tuning, where the adapter subspace structure may differ across lan-guages, is an open question. 
+
+Ethics Statement 
+
+SBA is designed to improve the reliability of de-ployed NLP systems by providing calibrated un-certainty estimates. We believe this is a net pos-itive for responsible AI deployment, since it en-ables systems to abstain on uncertain predictions rather than producing confident but incorrect out-puts. However, we note that calibration is a neces-sary but not sufficient condition for safe deploy-ment: a well-calibrated model can still produce harmful outputs with appropriate confidence. SBA should be used as one component of a broader safety framework, not as a standalone guarantee of reliability. 
+
+References                      
+
+> P.-A. Absil, R. Mahony, and R. Sepulchre. 2008. Op-timization Algorithms on Matrix Manifolds . Prince-ton University Press. S. Akter, I. F. Shihab, and A. Sharma. 2025. Selective risk certification for LLM outputs via information-lift statistics: PAC-Bayes, robustness, and skeleton design. arXiv preprint arXiv:2509.12527 .G. Bécigneul and O.-E. Ganea. 2019. Riemannian adaptive optimization methods. In ICLR .Y. Chen and 1 others. 2023. A close look into the cali-bration of pre-trained language models. In ACL .Y. Chikuse. 2003. Statistics on Special Manifolds .Springer. E. Daxberger, A. Kristiadi, A. Immer, R. Eschenhagen, M. Bauer, and P. Hennig. 2021. Laplace redux – effortless Bayesian deep learning. In NeurIPS .E. Daxberger, A. Nalisnick, J. U. Allingham, J. An-torán, and J. M. Hernández-Lobato. 2024. Laplace-LoRA: Bayesian low-rank adaptation for large lan-guage models. In NeurIPS .T. Dettmers, A. Pagnoni, A. Holtzman, and L. Zettle-moyer. 2023. QLoRA: Efficient finetuning of quan-tized language models. In NeurIPS .Y. Gal and Z. Ghahramani. 2016. Dropout as a Bayesian approximation: Representing model un-certainty in deep learning. In ICML .C. Guo, G. Pleiss, Y. Sun, and K. Q. Weinberger. 2017. On calibration of modern neural networks. In ICML .Z. Hao and 1 others. 2024. Riemannian preconditioned LoRA for fine-tuning foundation models. arXiv preprint arXiv:2402.02347 .E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, and W. Chen. 2022. LoRA: Low-rank adaptation of large language models. In ICLR .A. Q. Jiang, A. Sablayrolles, A. Mensch, C. Bam-ford, D. S. Chaplot, D. de las Casas, F. Bressand, G. Lengyel, G. Lample, L. Saulnier, and 1 others. 2023. Mistral 7b. arXiv preprint arXiv:2310.06825 .S. Kadavath, T. Conerly, A. Askell, T. Henighan, D. Drain, E. Perez, S. Schiefer, Z. Hatfield-Dodds, N. DasSarma, E. Tran-Kemp, and 1 others. 2022. Language models (mostly) know what they know.
+> arXiv preprint arXiv:2207.05221 .B. Lakshminarayanan, A. Pritzel, and C. Blundell. 2017. Simple and scalable predictive uncertainty es-timation using deep ensembles. In NeurIPS .
+
+X. Li and 1 others. 2023. On the limitations of temper-ature scaling for distributions with overlaps. arXiv preprint arXiv:2306.00740 .J. Lin and 1 others. 2025. Parameter-efficient un-certainty quantification for LoRA. arXiv preprint arXiv:2502.12122 .S.-Y. Liu, C.-Y. Wang, H. Yin, P. Molchanov, Y.-C. F. Wang, K.-T. Cheng, and M.-H. Chen. 2024. DoRA: Weight-decomposed low-rank adaptation. In ICML .Y. Liu, M. Ott, N. Goyal, J. Du, M. Joshi, D. Chen, O. Levy, M. Lewis, L. Zettlemoyer, and V. Stoy-anov. 2019. RoBERTa: A robustly optimized BERT pretraining approach. In arXiv preprint arXiv:1907.11692 .W. J. Maddox, P. Izmailov, T. Garipov, D. P. Vetrov, and A. G. Wilson. 2019. A simple baseline for Bayesian uncertainty in deep learning. In NeurIPS .C. Meo and 1 others. 2025. Uncertainty and rank selec-tion in adapters. arXiv preprint arXiv:2506.22809 .A. Muqeeth and 1 others. 2025. Muon optimizer for parametrization-independent low-rank adapters. 
+
+arXiv preprint arXiv:2507.12142 .M. P. Naeini, G. Cooper, and M. Hauskrecht. 2015. Obtaining well calibrated probabilities using Bayesian binning. AAAI .K. G. Onal, A. Ledent, A. de Mathelin, and M. Kloft. 2024. Gaussian stochastic weight averaging for Bayesian low-rank adaptation of large language models. arXiv preprint arXiv:2405.03425 .J. Park, M. Kang, S. Lee, H. Lee, S. Kim, and J. Lee. 2025. Riemannian optimization for LoRA on the Stiefel manifold. arXiv preprint arXiv:2508.17901 .J. Platt. 1999. Probabilistic outputs for support vector machines and comparisons to regularized likelihood methods. In Advances in Large Margin Classifiers .Z. Qiu, X. Liu, H. Feng, and E. H. Hovy. 2023. Con-trolling text generation with orthogonal fine-tuning. 
+
+arXiv preprint arXiv:2306.07280 .Qwen Team. 2024. Qwen2.5 technical report. arXiv preprint arXiv:2412.15115 .A. Sharma and 1 others. 2025. Scalable Bayesian low-rank adaptation of large language models via stochastic variational subspace inference. arXiv preprint arXiv:2506.21408 .I. F. Shihab, S. Akter, and A. Sharma. 2025a. Cache-efficient posterior sampling for reinforcement learn-ing with LLM-derived priors across discrete and continuous domains. In EMNLP .I. F. Shihab, S. Akter, and A. Sharma. 2025b. Differ-entiable entropy regularization: A complexity-aware approach for neural optimization. arXiv preprint arXiv:2509.03733 .I. F. Shihab, S. Akter, and A. Sharma. 2026. Beyond variance: Knowledge-aware LLM compression via Fisher-aligned subspace diagnostics. arXiv preprint arXiv:2601.07197 .H. Touvron, T. Lavril, G. Izacard, X. Martinet, M.-A. Lachaux, T. Lacroix, B. Rozière, N. Goyal, E. Ham-bro, F. Azhar, and 1 others. 2023. LLaMA: Open and efficient foundation language models. In arXiv preprint arXiv:2302.13971 .A. Wang, Y. Pruksachatkun, N. Nangia, A. Singh, J. Michael, F. Hill, O. Levy, and S. Bowman. 2019a. SuperGLUE: A stickier benchmark for general-purpose language understanding systems. In NeurIPS .A. Wang, A. Singh, J. Michael, F. Hill, O. Levy, and S. Bowman. 2019b. GLUE: A multi-task bench-mark and analysis platform for natural language un-derstanding. In ICLR .Y. Wang and 1 others. 2024. Orthonormal low-rank adaptation of large language models. arXiv preprint arXiv:2406.01775 .K. Xiong and 1 others. 2025. Mind the confidence gap: Overconfidence, calibration, and distractor ef-fects in large language models. arXiv preprint arXiv:2502.11028 .A. Yang, A. Robey, and H. Hassani. 2024. Bayesian low-rank adaptation for large language models. In 
+
+ICLR .Q. Zhang, M. Chen, A. Bukharin, P. He, Y. Cheng, W. Chen, and T. Zhao. 2023. AdaLoRA: Adaptive budget allocation for parameter-efficient fine-tuning. 
+
+ICLR .Y. Zhao and 1 others. 2025. Restoring calibration for aligned large language models: A calibration-aware fine-tuning approach. 
+
+A Proof Details for Theorem 1 
+
+We provide the step-by-step derivation of the geo-metric distortion induced by the polar projection 
+
+π(W ) = W (W ⊤W )−1/2, expanding upon the algebraic sequence necessary to explicitly isolate the cross-coupling artifact. Let W = ˆU + ξT + ξN be a perturbed sam-ple drawn from the ambient Gaussian, where ξT ∈
+
+T ˆU St( k, d ) and ξN ∈ N ˆU St( k, d ). Because 
+
+St( k, d ) defines orthonormal columns, its normal space N ˆU St( k, d ) comprises elements of the form 
+
+ξN = ˆU S , where S ∈ Rk×k is any symmetric matrix. We evaluate the projection π(W ) directly. First, we compute the Gram matrix W ⊤W :
+
+W ⊤W = ( ˆU + ξT + ˆU S )⊤( ˆU + ξT + ˆU S )= Ik + ˆU ⊤ξT + ξ⊤ 
+
+> T
+
+ˆU + 2 S + ξ⊤ 
+
+> T
+
+ξT
+
++ ξ⊤ 
+
+> T
+
+ˆU S + S ˆU ⊤ξT + S2
+
+Because ξT is confined to the tangent space at ˆU ,it strictly satisfies the differential metric equation 
+
+ˆU ⊤ξT + ξ⊤ 
+
+> T
+
+ˆU = 0 . The Gram matrix simplifies to: 
+
+W ⊤W = Ik +2 S +ξ⊤ 
+
+> T
+
+ξT +ξ⊤ 
+
+> T
+
+ˆU S +S ˆU ⊤ξT +S2
+
+Next, we extract the inverse square root 
+
+(W ⊤W )−1/2 utilizing the matrix Taylor expan-sion (I + X)−1/2 = I − 12 X + 38 X2 + O(∥X∥3).Substituting the perturbation matrix X = 2 S +
+
+ξ⊤ 
+
+> T
+
+ξT + ξ⊤ 
+
+> T
+
+ˆU S + S ˆU ⊤ξT + S2 yields: 
+
+(W ⊤W )−1/2 = Ik − 12
+
+ 2S + ξ⊤ 
+
+> T
+
+ξT + ξ⊤ 
+
+> T
+
+ˆU S + S ˆU ⊤ξT + S2
+
++ 38 (4 S2) + O(∥ξ∥3)= Ik − S − 12 ξ⊤ 
+
+> T
+
+ξT − 12 (ξ⊤ 
+
+> T
+
+ˆU S + S ˆU ⊤ξT )+ S2 + O(∥ξ∥3)
+
+We apply this operator back to W = ˆU (Ik +
+
+S) + ξT to complete the projection π:
+
+π(W ) =   ˆU (Ik + S) + ξT
+
+  Ik − S − 12 ξ⊤ 
+
+> T
+
+ξT
+
+− 12 (ξ⊤ 
+
+> T
+
+ˆU S + S ˆU ⊤ξT ) + S2
+
+= ˆU (Ik + S) Ik − S + S2 − 12 ξ⊤ 
+
+> T
+
+ξT
+
+− 12 (ξ⊤ 
+
+> T
+
+ˆU S + S ˆU ⊤ξT ) + ξT (Ik − S) + O(∥ξ∥3)= ˆU  Ik − S + S − S2 + S2 − 12 ξ⊤ 
+
+> T
+
+ξT
+
+− 12 (ξ⊤ 
+
+> T
+
+ˆU S + S ˆU ⊤ξT ) + ξT − ξT S + O(∥ξ∥3)= ˆU + ξT − 12 ˆU ξ ⊤ 
+
+> T
+
+ξT − ξT S
+
+− 12 ˆU (ξ⊤ 
+
+> T
+
+ˆU S + S ˆU ⊤ξT ) + O(∥ξ∥3)
+
+Conversely, any standard second-order constraint-preserving retraction ϕ on the Stiefel manifold (such as the exponential map, Cayley retraction, or QR/polar applied purely to tan-gent vectors) enforces exact intrinsic tangent integration: 
+
+ϕ(ξT ) = ˆU + ξT − 12 ˆU ξ ⊤ 
+
+> T
+
+ξT + O(∥ξT ∥3).
+
+The strict difference between the projected am-bient posterior and the retracted intrinsic posterior is the structural distortion quantity ∆:
+
+∆( ξT , ξ N ) = −ξT S − 12 ˆU (ξ⊤ 
+
+> T
+
+ˆU S + S ˆU ⊤ξT ).
+
+Because ˆU ⊤ξT = −ξ⊤ 
+
+> T
+
+ˆU , we can rewrite 
+
+−ξ⊤ 
+
+> T
+
+ˆU S = ˆU ⊤ξT S. Thus, 
+
+∆( ξT , ξ N ) = −ξT S + 12 ˆU ( ˆU ⊤ξT S − S ˆU ⊤ξT ).
+
+To verify ∆ is strictly a tangent vector, we check the metric condition ˆU ⊤∆ + ∆ ⊤ ˆU = 0 :
+
+ˆU ⊤∆ = − ˆU ⊤ξT S + 12 ( ˆU ⊤ξT S − S ˆU ⊤ξT )= − 12 ( ˆU ⊤ξT S + S ˆU ⊤ξT ).
+
+Since ˆU ⊤ξT is skew-symmetric, let K = ˆU ⊤ξT .Then ˆU ⊤∆ = − 12 (KS +SK ). Because S is sym-metric and K is skew-symmetric: 
+
+(KS +SK )⊤ = S⊤K⊤+K⊤S⊤ = S(−K)+( −K)S = −(KS +
+
+Thus ˆU ⊤∆ is precisely skew-symmetric, confirm-ing ˆU ⊤∆+∆ ⊤ ˆU = 0 , meaning ∆ resides entirely in the tangent space. This mathematically proves that the normal-space variance from ambient approximations ar-tificially and unavoidably couples into the tangent space, inflating the effective posterior variance and necessitating the purely intrinsic tangent-space ap-proach. 
+
+B Reliability Diagram Details 
+
+Reliability diagrams (Figure 2) use 15 equal-width bins on the confidence axis [0 , 1] . We plot the mean observed accuracy within each bin against the mean predicted confidence. Error bars show 
+
+±1 standard deviation across 5 seeds. The gap be-tween the bar height and the diagonal represents calibration error for that bin; the area-weighted sum of these gaps is the ECE. 
+
+C Normalizer Approximation Validation 
+
+We validated the saddle-point approximation to the hypergeometric normalizing constant 
+
+> 0
+
+F1( d 
+
+> 2
+
+; 14 F ⊤F ) by comparing against Monte Carlo estimates ( 10 6 samples from the Haar mea-sure on St( k, d )) for d ∈ {64 , 128 , 256 , 512 },
+
+k ∈ { 4, 8, 16 }, and κ0 ∈ { 0.1, 0.5, 1.0, 2.0, 5.0}.The relative error of the saddle-point approxima-tion is below 0.5% for d ≥ 128 and below 2% for 
+
+d = 64 , across all tested κ0 values. The gradient error (relevant for MAP training) is even smaller, below 0.1% for d ≥ 128 , confirming that the ap-proximation does not introduce meaningful bias into the optimization. D Extended In-Distribution Results 
+
+We report additional GLUE/SuperGLUE results on RTE and BoolQ for both model families. On RTE (LLaMA-2-7B), SBA achieves accu-racy 82 .3±0.8 with ECE .038 ±.004 , compared to LoRA at 82 .1±0.9 with ECE .071 ±.006 and Deep-Ens-LoRA at 82 .5±0.5 with ECE .042 ±.003 . On BoolQ (LLaMA-2-7B), SBA achieves accuracy 
+
+86 .7±0.3 with ECE .029 ±.002 , compared to LoRA at 86 .5±0.4 with ECE .054 ±.004 and Deep-Ens-LoRA at 86 .8±0.2 with ECE .033 ±.002 . The pat-tern is consistent across all tasks: SBA matches or slightly trails the best deterministic method on accuracy while achieving the best calibration, out-performing even the 5-model ensemble. On RoBERTa-large, the results follow the same trend. RTE: SBA accuracy 80 .1±1.0, ECE 
+
+.035 ±.004 vs. LoRA accuracy 79 .8±1.1, ECE 
+
+.068 ±.006 . BoolQ: SBA accuracy 84 .9±0.4, ECE 
+
+.027 ±.003 vs. LoRA accuracy 84 .7±0.5, ECE 
+
+.051 ±.004 .
+
+E Distillation Details 
+
+The predictive distillation procedure trains a de-terministic OrthoLoRA student to match the SBA teacher’s averaged predictive distribution. Specif-ically, for each training example (x, y ), we com-pute the SBA predictive distribution ¯p(y | x) = 
+
+> 1
+> S
+
+PSs=1 p(y | x, U (s), Σ(s), V (s)) using S = 10 
+
+posterior samples, then minimize KL(¯ p∥pstudent )
+
+with temperature T = 2 .0. The student is initial-ized from the SBA MAP estimate and trained for 1 additional epoch with learning rate 1 × 10 −4. This procedure takes approximately 20% of the original training time since it requires only forward passes through the teacher (no gradient computation for the teacher) and a single backward pass through the student. 
+
+F Wall-Clock Timing Breakdown 
+
+We report wall-clock times for the key compo-nents of SBA training and inference on LLaMA-2-7B with MNLI, measured on a single A100 GPU. Training (per epoch): LoRA takes 42 minutes, OrthoLoRA takes 44 minutes (5% overhead from Stiefel projection), and SBA takes 45 minutes (7% overhead from Riemannian gradient projection). The Hessian computation at the end of training takes 5 minutes over 1024 data points. Inference (per 1000 examples): LoRA takes 18 seconds, SBA with S = 5 takes 90 seconds, SBA with S = 10 takes 180 seconds, and the distilled SBA student takes 18 seconds (identical to LoRA). Deep-Ens-LoRA with 5 models takes 90 seconds, matching SBA at S = 5 but requiring 5× the GPU memory for the ensemble weights. The key takeaway is that SBA’s training over-head is negligible (7%), and the inference over-head is comparable to a deep ensemble at the same number of forward passes, but with 5× less mem-ory. 
+
+G Per-Seed Variance Analysis 
+
+We report the coefficient of variation (std / mean) of ECE across 5 seeds for each method on MNLI (LLaMA-2-7B). LoRA has CV 6.6%, Laplace-LoRA has CV 7.7%, Gauss+Proj has CV 8.3%, Deep-Ens-LoRA has CV 6.7%, and SBA has CV 7.4%. The variance of SBA’s calibration is compa-rable to other methods, indicating that the geomet-ric prior does not introduce additional instability. The slightly higher variance of Gauss+Proj is con-sistent with the projection problem discussed in Section 4: the polar projection introduces stochas-tic variance distortion that varies across seeds. On RoBERTa-large, the pattern is similar: SBA has ECE CV of 8.0%, LoRA has 7.2%, and Gauss+Proj has 8.8%. The slightly higher vari-ance on the smaller model is expected, since the adapter subspaces are lower-dimensional and the posterior is less concentrated. 
+
+H Uncertainty Decomposition Analysis 
+
+SBA’s predictive distribution naturally decom-poses into aleatoric and epistemic uncertainty. The total predictive entropy H[p(y | x, D)] equals the sum of the expected entropy Eθ[H[p(y | x, θ )]] 
+
+(aleatoric, reflecting inherent label ambiguity) and the mutual information I(y; θ | x, D) (epistemic, reflecting model ignorance). On MNLI in-distribution, the epistemic compo-nent accounts for 28% of total uncertainty on av-erage. On the MNLI → SNLI shift, this rises to 41%, confirming that the manifold posterior cor-rectly attributes increased uncertainty to model ig-norance rather than data noise. For comparison, Gauss+Proj shows epistemic fractions of 22% (in-distribution) and 31% (shifted), indicating that the flat-space posterior underestimates epistemic un-certainty under shift. This underestimation is pre-cisely what Theorem 1 predicts: the normal-space variance in Gauss+Proj inflates the apparent poste-rior width without contributing genuine epistemic signal. On the OOD detection task (SST-2 vs. 20 Newsgroups), the epistemic component accounts for 72% of total uncertainty on OOD examples but only 28% on in-distribution examples. This clean separation is what enables SBA’s strong OOD detection: the mutual information alone achieves AUROC .941, slightly higher than the .934 achieved by total predictive entropy, suggest-ing that the epistemic component is the more in-formative signal for OOD detection. 
+
+I RoBERTa-large Domain Shift Results 
+
+We report domain shift results on RoBERTa-large for the MNLI → SNLI shift. SBA achieves ECE .053 ±.004 and selective AUROC .808 ±.008 ,compared to LoRA at .102 ±.007 and .698 ±.013 ,Laplace-LoRA at .076 ±.005 and .755 ±.011 , and Deep-Ens-LoRA at .062 ±.004 and .789 ±.008 . The pattern matches the LLaMA-2-7B results: SBA provides the best calibration and selective pre-diction, outperforming even the 5-model ensem-ble. The relative improvement of SBA over Gauss+Proj is 24% on ECE ( .053 vs. .070 ), con-sistent with the 28% improvement observed on LLaMA-2-7B. 
+
+J Hyperparameter Details 
+
+Table 10: Hyperparameters for SBA and baselines.

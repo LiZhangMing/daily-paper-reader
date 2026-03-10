@@ -1,0 +1,794 @@
+Title: Parameter-Efficient Fine-Tuning of LLMs with Mixture of Space Experts
+
+URL Source: https://arxiv.org/pdf/2602.14490v1
+
+Published Time: Tue, 17 Feb 2026 02:37:04 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# Parameter-Efficient Fine-Tuning of LLMs with Mixture of Space Experts 
+
+Buze Zhang 1 Jinkai Tao 2 Zilang Zeng 3 Neil He 4 Ali Maatouk 5 Menglin Yang 3 Rex Ying 5
+
+## Abstract 
+
+Large Language Models (LLMs) have achieved remarkable progress, with Parameter-Efficient Fine-Tuning (PEFT) emerging as a key technique for downstream task adaptation. However, exist-ing PEFT methods mainly operate in Euclidean space, fundamentally limiting their capacity to capture complex geometric structures inherent in language data. While alternative geometric spaces, like hyperbolic geometries for hierarchi-cal data and spherical manifolds for circular pat-terns, offer theoretical advantages, forcing repre-sentations into a single manifold type ultimately limits expressiveness, even when curvature param-eters are learnable. To address this, we propose 
+
+Mixture of Space (MoS ), a unified framework that leverages multiple geometric spaces simul-taneously to learn richer, curvature-aware repre-sentations. Building on this scheme, we develop 
+
+MoSLoRA , which extends Low-Rank Adapta-tion (LoRA) with heterogeneous geometric ex-perts, enabling models to dynamically select or combine appropriate geometric spaces based on input context. Furthermore, to address the com-putational overhead of frequent manifold switch-ing, we develop a lightweight routing mechanism. Moreover, we provide empirical insights into how curvature optimization impacts training stability and model performance. Our experiments across diverse benchmarks demonstrate that MoSLoRA consistently outperforms strong baselines, achiev-ing up to 5.6% improvement on MATH500 and 15.9% on MAWPS. 
+
+> 1
+
+School of Software Engineering, Xi’an Jiaotong University, China 2School of Information, Central University of Finance and Economics, Beijing, China 3Department of Artificial In-telligence, Hong Kong University of Science and Technology (Guangzhou), Guangzhou, Guangdong, China 4Department of Computer Science, University of Illinois Urbana-Champaign, Ur-bana, IL, USA 5Department of Computer Science, Yale univer-sity, New Haven, CT, USA. Correspondence to: Menglin Yang 
+
+<menglin.yang@outlook.com >.
+
+Preprint. February 17, 2026. 
+
+## 1. Introduction 
+
+Large Language Models (LLMs) have recently demon-strated impressive performance across a wide range of appli-cations, including translation, comprehension, dialogue, and reasoning (Achiam et al., 2023; Jaech et al., 2024; Dubey et al., 2024; Yang et al., 2024a). With the aid of post-training techniques such as instruction tuning, they can be further adapted to diverse downstream tasks with notable gains in ef-fectiveness (Hu et al., 2023; Han et al., 2024). Despite these advances, most existing approaches rely on a Euclidean as-sumption, modeling all embeddings in flat Euclidean space, which are often inadequate to capture the semantic diversity and contextual complexity of natural language (Bronstein et al., 2017; Park et al., 2024; He et al., 2025b). Semantic structures in language often display geometric patterns: hierarchical relationships where broad and gen-eral concepts naturally encompass finer subcategories and distinct entities; circular patterns among synonymous ex-pressions or co-referential terms (such as the days of the week, e.g., Monday, ..., Sunday, and months of a year) (En-gels et al., 2024); and complex multi-level dependencies that resist simple linear organization. These patterns are largely overlooked and constrained under Euclidean representations, leaving open the question of how to effectively leverage such naturally occurring structures within embedding spaces to unlock richer representational capacity? 
+
+Recently, growing attention has shifted toward non-Euclidean constant-curvature spaces as alternatives to Eu-clidean space for improving model performance (Peng et al., 2021; Yang et al., 2024c; Pal et al., 2024; Loshchilov et al., 2024). From an embedding perspective, it has been observed that tokens associated with higher-level and more general se-mantics often occupy regions of lower norm, whereas tokens tied to more concrete and specific meanings are distributed in regions of higher norm (Yang et al., 2024b). Hyperbolic space, with its negative curvature and exponential growth capacity, offers an effective means of embedding complex hierarchical information in lower dimensions compared to Euclidean space. Building on these advantages, Yang et al. (2024b) explored combining LoRA with hyperbolic geome-try, enabling efficient fine-tuning of pretrained LLMs while reducing embedding distortion. Similarly, spherical man-ifolds have shown promise for capturing intrinsic circular 1
+
+> arXiv:2602.14490v1 [cs.LG] 16 Feb 2026
+
+patterns and normalized representations, as demonstrated by Loshchilov et al. (2024) who reformulated Transformers as hyperspherical models (nGPT) by enforcing embeddings to lie on the unit sphere. 
+
+Limitations of Existing Methods. However, real-world language data exhibits complex, heterogeneous structural re-lationships that cannot be adequately captured by constrain-ing representations to a single geometric space. For instance, a single sentence may contain both hierarchical semantic re-lationships (e.g., category-subcategory structures) and circu-lar patterns (e.g., synonymous expressions or co-referential terms), requiring different geometric inductive biases simul-taneously. Furthermore, existing non-Euclidean approaches face significant computational challenges. Prior work often employs exponential and logarithmic maps to transition be-tween non-Euclidean and Euclidean spaces (Ganea et al., 2018; Yang et al., 2022), incurring substantial computational overhead at each model layer. These repeated mappings are difficult to scale to larger models and greater depth, creating a practical barrier to widespread adoption. To address these fundamental limitations, we propose a unified Mixture of Space (MoS) scheme that integrates three types of constant-curvature spaces (hyperbolic, spheri-cal, and euclidean), capturing diverse geometric structures within a single model simultaneously. Rather than constrain-ing all representations to a single geometric paradigm, our approach allows different tokens to reside in the geometric space most suited to their structural properties: hierarchical concepts in hyperbolic space, circular patterns in spherical space, and flat relational structures in Euclidean space. Building upon this framework, we introduce MoSLoRA ,which combines the MoS paradigm with Low-Rank Adap-tation (LoRA) for efficient fine-tuning of large language models. MoSLoRA employs a lightweight token routing mechanism that dynamically assigns each token to its opti-mal geometric expert, avoiding the computational overhead of repeated space transformations while maintaining the rep-resentational benefits of multiple geometries. This design enables the model to adapt its geometric inductive biases on-the-fly, matching the heterogeneous structural require-ments of real-world language data. Our contributions can be summarized as follows: • We introduce a unified architecture that integrates three distinct constant-curvature spaces, and combine it with Mixture-of-Experts (MoE) and LoRA to form a novel and efficient fine-tuning framework for LLMs. • We design a lightweight token routing mechanism that efficiently directs tokens among geometric spaces to overcome high-overhead space transformation. • We provide an in-depth analysis of the training dy-namics of space selection and routing strategies, along with optimizing geometric space integration during fine-tuning. • We evaluate the proposed method on benchmarks in-cluding natural language understanding and mathe-matical reasoning, where it consistently outperforms several strong baselines. 
+
+## 2. Related Work 
+
+2.1. Mixture of LoRA Experts 
+
+MoE introduces multiple expert networks and a gating net-work that selects experts based on different data characteris-tics (Jacobs et al., 1991; Shazeer et al., 2017), to improve the capacity and computational efficiency of large-scale models through combinations of experts. Recent work has begun to equip PEFT with MoE-style spar-sity, yielding a line of LoRA-based mixture methods (Man-grulkar et al., 2022; Gao et al., 2022; Zadouri et al., 2024; Feng et al., 2024; Wu et al., 2024b;a). Representative ones include MELoRA (Ren et al., 2024), which constructs mul-tiple LoRA experts by diagonal partitioning, HydraLoRA (Tian et al., 2024), which shares one LoRA factor ( WA)across experts while keeping multiple expert-specific factors (WB ), and HMoRA (Liao et al., 2025), which introduces hierarchical routing for multi-task settings. Despite their gains, these methods typically rely on homogeneous LoRA experts and often face a practical trade-off between perfor-mance and efficiency: stronger accuracy tends to require activating more experts (or higher effective rank), which increases compute and dilutes the sparsity benefits. In con-trast, we extend LoRA experts to heterogeneous geometric spaces, improving expressiveness per activated parameter and thus achieving a better accuracy - efficiency balance. 
+
+2.2. Non-Euclidean and Curvature-Aware Modeling 
+
+Recent research increasingly emphasized the importance of non-Euclidean geometry for representation learning, aiming to overcome the limitations of standard Euclidean embed-ding spaces (Shimizu et al., 2020; Peng et al., 2021; Pal et al., 2024; He et al., 2025c;b). Early attempts focused on constructing neural networks that operated fully in hyper-bolic space. For example, Chen et al. (2022) formalized all operations as Lorentz transformations, thereby avoiding the reliance on tangent-space approximations. Beyond purely hyperbolic models, Skopek et al. (2020) introduced mixed-curvature variational autoencoders, whose latent spaces were composed of multiple constant-curvature manifolds, enabling generative models to benefit from diverse geomet-ric structures simultaneously. More recently, Yang et al. (2024c) explored an efficient Transformer architecture in the Lorentz model of hyperbolic space, providing hyper-bolic counterparts for essential modules such as positional encodings, layer normalization, and residual connections. Parallel to architectural advances, Yang et al. (2024b) inves-tigated fine-tuning Euclidean LLMs directly in hyperbolic space, demonstrating improved downstream performance by leveraging the inherent hierarchical structure of token embeddings. Building on this line of work, He et al. (2025a) introduced Hyperbolic LLMs with a Mixture-of-Curvature Experts design, where each expert resided in a hyperbolic manifold of distinct curvature, allowing flexible encoding of input sequences and showcasing the scalability of curvature-aware modeling in large-scale pretraining. These methods still use single geometry for LLMs while we aim to go beyond that to multiple geometries simultaneously. 
+
+## 3. Preliminary 
+
+3.1. Mixture of LoRA Experts 
+
+Mixture of LoRA Experts consists of a group of N uniform experts {Ei}Ni=1 , where each features a parameter-efficient LoRA module to store updated parameters while fine-tuning. Each expert Ei has the following forward process: 
+
+Ei = BiAiX, (1) where X ∈ Rdin ×d denotes the input, tunable weight matri-ces Ai ∈ Rr×din , Bi ∈ Rdout ×r , and r ≪ min {din , d out } is the maximum rank attainable by the trainable matrix, with matrix Ai randomly initialized and matrix Bi set to all zero. The forward process can be formulated as follows: 
+
+O = W X +
+
+> N
+
+X
+
+> i=1
+
+R(X)iEi = W X +
+
+> N
+
+X
+
+> i=1
+
+R(X)iBiAiX, 
+
+where W is the frozen pretrained weight of the feed-forward neural network (FFN) block, R(X) is the token router in the MoE module which routes each token into several distinct experts (e.g., top-K experts for sparse MoE (Fedus et al., 2022)) among all N experts. 
+
+3.2. Lorentz Model of Hyperbolic Space Lorentz Model. The Lorentz model, also called the hyper-boloid model, provides one of the isometric realizations of the hyperbolic space as a Riemannian manifold. Formally, an n-dimensional Lorentz model with constant negative curvature κ < 0 is defined as: 
+
+Ln,κ = x ∈ Rn+1 ⟨x, x⟩L = 1 /κ, x t > 0 ,
+
+where x = [ xt; xs]⊤ with xt ∈ R and xs ∈ Rn, and the Lorentzian inner product is given by: 
+
+⟨x, y⟩L = −xtyt + x⊤ 
+
+> s
+
+ys = x⊤diag( −1, 1, . . . , 1) y.
+
+Geometrically, Ln,κ corresponds to the upper sheet of a two-sheeted hyperboloid embedded in (n + 1) -dimensional Minkowski space, with the distinguished coordinate xt rep-resenting the time-like axis and the remaining n coordinates forming the space-like axes. This construction not only aligns with the terminology of special relativity (Resnick, 1991) but ensures numerical stability in optimization tasks. 
+
+Tangent Space and Maps. For each point x ∈ Ln,κ , tan-gent space TxLn,κ is defined as the Lorentz-orthogonal com-plement of x and constitutes a smooth Euclidean subspace of Rn+1 . Tangent space provides a local linear approxima-tion of the curved manifold for optimization and representa-tion learning. The transition between the manifold and its tangent space is realized through exponential and logarith-mic maps. The exponential map exp κ 
+
+> x
+
+: TxLn,κ → Ln,κ 
+
+takes a tangent vector u ∈ T xLn,κ and projects it onto the manifold along the geodesic starting at x, which is: 
+
+exp κ
+
+> x
+
+(u) = cosh 
+
+p |κ|∥ u∥L
+
+
+
+x +sinh 
+
+p|κ|∥ u∥L
+
+p|κ|∥ u∥L
+
+u.
+
+(2) Conversely, the logarithmic map log κ 
+
+> x
+
+: Ln,κ → T xLn,κ 
+
+takes a point y ∈ Ln,κ and returns the unique tangent vector at x that corresponds to the geodesic connecting x and y:
+
+log κ
+
+> x
+
+(y) = cosh −1 κ⟨x, y⟩L
+
+
+
+sinh   cosh −1(κ⟨x, y⟩L) (y − κ⟨x, y⟩Lx) .
+
+(3) These two maps establish a rigorous correspondence be-tween the locally Euclidean tangent space and the globally curved hyperbolic manifold. 
+
+## 4. Mixture of Space Experts Framework 
+
+In this section, we propose our Mixture of Space tuning scheme that adapts the model to the implicit curvature of semantic subspaces while autonomously exploring and tran-sitioning between different constant curvatures within the same subspace, and also across distinct subspaces. 
+
+4.1. Mixture of Space Scheme 
+
+We explore three constant-curvature spaces with positive, negative, and zero curvature, commonly modeled as spher-ical S, hyperbolic H, and Euclidean E spaces. For a n-dimensional hyperbolic space Hnκ with constant negative curvature κ, each point x ∈ Rn+1 in Hnκ should satisfy: 
+
+Hnκ := {x ∈ Rn+1 | ⟨ x, x⟩L = 1 /κ, κ < 0}, (4) where Hnκ is defined by the Lorentz inner product 
+
+⟨x, x⟩L = −x21 + Pn+1  
+
+> i=2
+
+x2 
+
+> i
+
+, and x = [ x1, x 2, . . . , x n+1 ] = [xtime , xspace ] denotes an arbitrary point with time-like component x1 and space-like component [x2, . . . , x n+1 ].In Lorentz model of hyperbolic space, the volume VκFigure 1. The MoSLoRA architecture contains heterogeneous geometric experts unified in our MoS scheme, with various curvatures. Three geometric expert groups are embedded into the FFN layer and labeled in different colored blocks. The grouped auxiliary balancing enforces balanced routing within each space group while allowing free inter-space transitions, and remains fully reversible and differentiable. 
+
+grows exponentially with its radius r as Vκ(r) ≍
+
+exp  (n − 1) √−κ r . Thus, the larger the magnitude of 
+
+κ, the greater the curvature and the faster the volume expan-sion, allowing the space to accommodate more hierarchical structures with higher representational capacity. For spheri-cal spaces with curvature κ > 0, each point should satisfy: 
+
+Snκ := {x ∈ Rn+1 | ⟨ x, x⟩2 = 1 /κ, κ > 0}, (5) where ⟨· , ·⟩ 2 is the Euclidean inner product and ⟨x, x⟩2 =
+
+Pn+1  
+
+> i=1
+
+x2 
+
+> i
+
+. Unlike hyperbolic spaces, which are suitable for representing complex hierarchical structures, volume in spherical spaces grows more slowly than Euclidean space with respect to radius, hence they are especially suitable for modeling cyclic, periodic, or bounded structures, where global capacity is limited but dense local clustering and an-gular relationships (e.g., directions, orientations) are crucial. To unify the three aforementioned spaces and associated constraints, we introduce a differentiable scheme, Mixture of Space (MoS ), which preserves the local degrees of free-dom and the flexibility of transformations across all three spaces. The formal definition is given as follows: G(x) = 
+
+ p ∥s∥2 · sgn (−κ) + φ(κ)
+
+s
+
+
+
+=
+
+ ξ′
+
+s
+
+
+
+(6) 
+
+sgn (κ) := 
+
+(
+
+−1, κ < 0,
+
+1, κ ≥ 0, φ(κ) := 
+
+(
+
+1/|κ|, κ̸ = 0 ,
+
+0, κ = 0 .
+
+where point x = ( ξ; sT )T ∈ Rn+1 , ξ, ξ ′ ∈ R, s ∈ Rn,and G(x) denotes the unified space transformation from different geometries with different signs of the curvature 
+
+κ. We restrict transformation to the space-like component, as Lorentz geometry in Rn+1 provides only n degrees of freedom, yielding better numerical stability. While main-taining the original space definitions, we further extend vectors in the Euclidean space with an additional dimen-sion, enabling seamless coupling among the three spaces. This differentiable scheme enables embeddings to be jointly learned across manifolds, capturing complementary struc-tural information and maintaining geometric consistency. 
+
+4.2. Unified Stereographic Projection 
+
+While existing mapping schemes are capable of strictly pre-serving hierarchical structures (Chen et al., 2021; Bdeir et al., 2023; Yang et al., 2024b), they depend on computa-tionally expensive and GPU-unfriendly operations, such as exponential and logarithmic maps in Eq. (2) , and therefore lack a unified, end-to-end differentiable formulation. To ad-dress this challenge, we propose a unified stereographic pro-jection, as illustrated in the middle of Fig.1, which projects inputs from the input space into three constant-curvature spaces and subsequently maps them back to the output space. In our unified stereographic projection, each point x (from input space) will be firstly transmitted into a projected space through stereographic conformal inverse projection ρ−1 
+
+> κ
+
+(·)
+
+in Eq. (7) to (ξ; sT )T ∈ Rn+1 , where κ ∈ R is the curvature of the projected embedding space: 
+
+ρ−1 
+
+> κ
+
+(x) = 1
+
+p|κ|
+
+1 − κ∥x∥22
+
+1 + κ∥x∥22
+
+, 2x
+
+1 + κ∥x∥22
+
+!T
+
+=
+
+ ξ
+
+s
+
+
+
+(7) Then, after model-related transformation from (ξ; sT )T into 
+
+(ξ′; s′T )T , tokens will be projected back to the original space by stereographic projection: 
+
+ρκ(( ξ′; s′T )T ) = s′/(1 + p|κ|ξ′), (8) To guarantee constraint satisfaction and numerical stability, we apply a scaling factor prior to the inverse projection and rescale the output afterward. As formalized in Lemma 4.1, this procedure is theoretically equivalent to the original formulation, with a detailed proof provided in Appendix C. 
+
+Lemma 4.1 (Scale-Invariant Equivalence of the Unified Projection) . Let κ̸ = 0 and let c > 0 be a variable scaling constant. Consider the unified projection and MoS transfor-mation as Fκ(·) defined in Eq. (6) , (7) , and (8) . Applying a scaling factor γ to the input before the inverse projection and rescaling the output by the same factor yields: 
+
+Fκ(x) = 1 /γ · Fκ/γ 2 (γx ).
+
+To that end, our unified stereographic projection enables consistent and efficient bidirectional transformations across all subspaces within a single cohesive architecture. 
+
+4.3. Mixture of Space Parameters-Efficient Tuning 
+
+Building upon the unified geometric formulation introduced earlier in Eq. (6) , we now specialize it to a mixture-of-experts PEFT setting and introduce our MoSLoRA . Specifically, given a projected embedding (ξi; sTi )T ∈ Rn+1 of token xi,we treat the space-like component si ∈ Rn as the routing unit for MoSLoRA within each layer’s FFN block W , as is illustrated in Figure 1. Each space expert is defined as: G(W, xi) = 
+
+ p ∥W si∥2 · sgn (−κ) + φ(κ)
+
+W si
+
+
+
+=
+
+ ξ′
+
+> i
+
+s′
+
+> i
+
+
+
+The output tokens (ξ′
+
+> i
+
+; s′ 
+
+> iT
+
+)T ∈ Rn+1 from the top-K geo-metric experts, each operating on distinct curved spaces and capturing various relations, are projected back into Euclidean space, where these relations are preserved and merged together. The non-Euclidean feed-forward output is formulated as follows: 
+
+oi =
+
+> N
+
+X
+
+> i=1
+> Q
+
+X
+
+> j=1
+
+R (xj )i ρκi (( ξj ; s′Tj )T ), (9) where ρκi (( ·; ·)) is the stereographic projection to map points (token embeddings) from the curved space back to the output space, κi is the curvature of the i-th geometric ex-pert, R(xj )i is the routing value for token xj and i-th expert. On top of this, we propose a new grouped auxiliary loss (in Fig. 1) to balance top-K routing within each heterogeneous geometric expert group to encourage balancing among ex-perts in the same space instead of among different spaces. It is worth noting that the curvature κ of each expert is a learn-able parameter, allowing the model to independently adjust the sub-space of each expert to approach the optimal geom-etry. Additionally, from an efficiency perspective, the stere-ographic mapping and the associated routing strategy used here require neither complex exponential/logarithmic space operations nor prior knowledge of the latent embedding space, thereby yielding higher efficiency in both training and inference. We formally prove that our MoSLoRA frame-work admits uniformly bounded gradients across different geometric curvatures, ensuring training stability; detailed proofs are deferred to the Appendix B. 
+
+Separated Optimizers. Considering that curvature, as a geometric parameter, differs fundamentally from other capacity-related model weights, we assign it an inde-pendent optimizer to encourage further exploration of the curvature of the latent space while reducing the risk of overfitting to local data patterns. Formally, Θ =
+
+{κ(1) , . . . , κ (K), θ (1) , . . . , θ (M )} consists of curvature pa-rameters κ(j) and capacity-related parameters θ(m). To that end, we have: 
+
+w ← w −
+
+> N
+
+X
+
+> j=1
+
+η(j) 
+
+> κ
+
+1w∈κ(j) · g(j) 
+
+> κ
+
+(w)
+
+−
+
+> M
+
+X
+
+> m=1
+
+η(m) 
+
+> θ
+
+1w∈θ(m) · g(m) 
+
+> θ
+
+(w), (10) where η(j) 
+
+> κ
+
+and η(m) 
+
+> θ
+
+denote their respective learning rates, 
+
+g(j) 
+
+> κ
+
+(·) and g(m) 
+
+> θ
+
+(·) are the corresponding gradients, and 1(·)
+
+is an indicator function selecting the parameter group. 
+
+## 5. Experiments 
+
+5.1. Experiment Setting Dataset and Benchmarks. To explore the utility of our method, we evaluate our approach on both natural language understanding (Wang et al., 2018) and mathematical rea-soning datasets. For NLP tasks, we adopt the Microsoft Research Paraphrase Corpus (MRPC) (Dolan & Brockett, 2005), Recognizing Textual Entailment (RTE) (Bowman et al., 2015) and the Corpus of Linguistic Acceptability (CoLA) (Warstadt et al., 2019). For mathematical reason-ing, we employ GSM8K (Cobbe et al., 2021), MAWPS (Koncel-Kedziorski et al., 2016), SVAMP (Patel et al., 2021), and AQuA (Ling et al., 2017), alongside the MATH500 by OpenAI (Lightman et al., 2023), a curated challenging subset of the MATH benchmark (Hendrycks et al., 2021). For commonsense resaonsing, we include OpenBookQA (OBQA) (Mihaylov et al., 2018) and CommonsenseQA (CSQA) (Talmor et al., 2019). The training set is constructed by uniformly sampling from the mathematical datasets ex-cept MATH500, which is reserved for evaluating zero-shot and few-shot performance on unseen problems. Table 1. Performance comparison of different tuning methods across different natural language understanding and mathematical reasoning benchmarks. Avg. column reports the average score, and rank ↑ indicates that a larger rank parameter is used compared to other methods. 
+
+Methods COLA MRPC GSM8k MATH500 MAWPS SVAMP AQuA Avg. Base (Qwen2-1.5B) 32.41 69.16 33.13 0.0 43.85 54.33 31.10 37.71 
+
+LoRA 87.25 87.30 44.58 15.60 63.85 63.33 28.35 55.75 
+
+DoRA 87.15 87.19 42.53 14.20 62.12 62.33 30.71 55.18 
+
+LoRA rank ↑ 83.51 86.43 46.85 13.60 61.92 60.33 33.46 55.16 
+
+AdaLoRA 82.45 79.77 51.33 16.60 62.50 58.67 23.23 53.51 
+
+MELoRA 86.96 86.55 44.96 16.40 62.69 65.67 32.28 56.50 
+
+HMoRA 66.63 66.49 12.28 2.60 54.23 46.00 24.41 38.95 
+
+HypLoRA 85.91 87.71 45.56 14.60 62.88 64.67 27.95 55.61 
+
+HydraLoRA 87.54 88.17 43.67 16.80 62.88 62.67 28.35 55.73 
+
+MoSLoRA (Ours) 87.63 88.23 47.76 18.00 74.62 64.33 31.50 58.87 0 2k 4k 6k 8k 10k 
+
+> Steps
+> 1.0
+> 0.5
+> 0.0
+> 0.5
+> 1.0
+> Curvature
+> Hyperbolic
+> Euclidean
+> Spherical
+
+(a) Layer-1 0 2k 4k 6k 8k 10k  
+
+> Steps
+> 1.0
+> 0.5
+> 0.0
+> 0.5
+> 1.0
+> Curvature
+> Hyperbolic
+> Euclidean
+> Spherical
+
+(b) Layer-10 0 2k 4k 6k 8k 10k  
+
+> Steps
+> 1.0
+> 0.5
+> 0.0
+> 0.5
+> 1.0
+> Curvature
+> Hyperbolic
+> Euclidean
+> Spherical
+
+(c) Layer-15 0 2k 4k 6k 8k 10k  
+
+> Steps
+> 1.0
+> 0.5
+> 0.0
+> 0.5
+> 1.0
+> Curvature
+> Hyperbolic
+> Euclidean
+> Spherical
+
+(d) Layer-20 
+
+Figure 2. Curvature dynamics of each geometric expert of different layers during training. 
+
+Base Model and Baselines. We include Qwen2-1.5B (Yang et al., 2024a), Qwen2.5-3B (Qwen et al., 2025), and Gemma2-2B-it (Team et al., 2024) as our base models. For parameter-efficient fine-tuning methods, we compare our method with LoRA (Hu et al., 2022), AdaLoRA (Zhang et al., 2023), DoRA (Liu et al., 2024), MELoRA (Ren et al., 2024), HMoRA (Liao et al., 2025), HydraLoRA (Tian et al., 2024) and HypLoRA (Yang et al., 2024b). These methods share the same training settings as ours, and some also incor-porate architectures related to the MoE design. In this work, we adopt an asymmetric architecture similar to Tian et al. (2024), minimizing the activated parameters while verifying the effectiveness of our proposed scheme. 
+
+Training Settings. All models are trained for three epochs on the same dataset using NVIDIA A100 and H800 GPUs. To ensure fairness, we control the number of activated pa-rameters across methods. More detailed information can be found in Appendix A.1. 
+
+5.2. Baselines Comparison 
+
+We compare our methods with other baselines using 8 dis-tinct experts with top-4 routing. In MoSLoRA, three ex-perts are allocated for each non-Euclidean space group and two for the Euclidean group, with curvatures initialized to –1 for negative curvature and 1 for positive curvature spaces. To keep the number of activated parameters com-parable across methods, we vary the LoRA rank from 8 to 64 (0.45%–3.53% of activated parameters), while fix-ing the rank at 8 for all other baselines. Due to their fully activated computation, HMoRA and HydraLoRA yield 2.26% and 2.54% activated parameters, respectively, whereas MoSLoRA requires only 1.31%. 
+
+Main Results. As shown in Table 1, our MoSLoRA 
+
+achieves higher average performance than existing state-of-the-art methods across tasks in both natural language understanding and mathematical reasoning benchmarks. In particular, it obtains the best results on most mathematical reasoning benchmarks, including the challenging MATH500 dataset. Since our training data is uniformly sampled from other mathematical reasoning datasets, these results fur-ther demonstrate the superior generalization ability of our 
+
+MoSLoRA when tackling previously unseen reasoning problems. We observe that our method achieves particularly notable improvements on mathematical reasoning bench-marks compared to existing baselines. We attribute this to the introduction of the mixed-curvature framework, where hyperbolic space is especially well suited for representing hierarchical numerical and logical structures (Yang et al., 2024b), while spherical space can better capture cyclic prop-erties such as equivalence relations commonly present in mathematics. Consequently, unlike Euclidean baselines that rely solely on a flat embedding space, our approach provides clear advantages in handling large-number computations and symbolic operations. We also scale to 3B model (and other architecture in Appendix D) and more benchmarks to further validate the effectiveness. As is shown in Table 2, our MoSLoRA demonstrates strong competitiveness across all evaluated benchmarks, substantially outperforming exist-Table 2. Performance comparison on math and commonsense reasoning, and language understanding benchmarks based on Qwen2.5-3B. 
+
+Methods GSM8k MATH500 MAWPS SVAMP AQuA MRPC CoLA RTE CSQA OBQA Avg. 
+
+Base 59.06 0.40 60.19 74.67 50.00 56.41 62.80 51.62 32.40 32.40 47.99 LoRA 65.50 25.60 65.58 76.33 38.98 87.71 69.13 89.53 82.80 87.00 68.81 HydraLoRA 64.52 22.40 65.77 75.33 42.91 88.46 85.91 89.89 82.56 89.20 70.69 HypLoRA 64.67 26.40 65.77 78.67 41.34 88.23 87.34 90.25 79.85 87.80 71.03 
+
+MoSLoRA 63.68 29.60 81.73 78.00 39.37 88.41 86.19 90.97 82.47 89.00 72.94 
+
+Table 3. Performance of different optimizer choices across different MATH and general reasoning benchmarks. U NI and S EP denote using a unified optimizer and separated optimizers, respectively. 
+
+Methods COLA MRPC GSM8k MATH500 MAWPS SVAMP AQuA Avg. MoSLoRA UNI 87.15 87.19 46.85 17.80 74.62 64.33 29.13 58.15 
+
+MoSLoRA SEP 87.63 88.23 47.76 18.00 74.62 64.33 31.50 58.87 10 0 10 1 10 2 10 3 10 4 10 5
+
+> Token Frequency (log scale)
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> Token Count (log scale)
+> = 0.66
+> Token Frequency Distribution
+
+(a) MATH Token Freq. 0.5 0.6 0.7 0.8 0.9  
+
+> Token Norm
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> 10 4
+> 10 5
+> Token Count (log scale)  Token Norm Distribution
+
+(b) MATH Token Norm 10 0 10 1 10 2 10 3 10 4 
+
+> Token Frequency (log scale)
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> Token Count (log scale)
+> = 0.78
+> Token Frequency Distribution
+
+(c) CSQA Token Freq. 0.5 0.6 0.7 0.8 0.9  
+
+> Token Norm
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> 10 4
+> 10 5
+> Token Count (log scale)  Token Norm Distribution
+
+(d) CSQA Token Norm 
+
+Figure 3. Token norm distribution and token frequency distribution of math reasoning and commonsenseQA datasets. 
+
+(a) Increasing layer dimensions. (b) Increasing model layers. 
+
+Figure 4. Efficiency comparison between exp/log and our MoS. 
+
+ing methods on several tasks, and achieving the best overall average performance among all baselines. 
+
+5.3. Tuning Dynamics Curvature Dynamics of Distinct Space Experts. In our 
+
+MoSLoRA , the curvature parameter κ, different from other capacity parameters θ, serving as a key geometric property that simultaneously characterizes both the input space and the model’s embedding space. As shown in Figure 2, we track the evolution of embedding spaces for geometric ex-perts across model layers. Distinct colors denote different space types, with varying intensities representing spaces with different curvatures. To provide stable Euclidean em-beddings, two Euclidean experts with fixed curvature were included in all experiments. During training, the geometric experts progressively selected the curvature spaces that min-imized the loss, and after approximately 6k–8k steps these selections stabilized, suggesting that the model had automat-ically identified the optimal mixture of embedding spaces under the given training configuration. We also observed interesting dynamic behaviors, such as recurrent switching across curvature spaces and transitions between geometric spaces. For instance, in Fig. 2d, one spherical expert in the 20th layer temporarily shifted into the hyperbolic space around step 4k, but subsequently returned to the spherical space and ultimately converged to a positive curvature near 0.2. These dynamics indicate that the model can adaptively adjust combinations of geometric experts across spaces, highlighting the flexibility and stability of our MoS architec-ture as a foundation for MoSLoRA . Furthermore, layer-wise trends reveals that lower layers, particularly the first layer, exhibit more stable but slower convergence compared to higher layers. This aligns with observations in MoE-related literature (Dai et al., 2024; Muennighoff et al., 2024): early layers primarily capture task-agnostic token-level informa-tion, leading to smoother geometry selection, while higher layers encode task-specific information, resulting in more pronounced cross-space transitions and dynamic curvature patterns, thereby underscoring the necessity of incorporating non-Euclidean geometry for downstream tasks. 
+
+Optimizer for Space Experts. We observed that when us-ing a unified optimizer, the curvature κ fail to adjust along-side other parameters, resulting in nearly static values and relatively poor task performance (in Table 3). Therefore, we Table 4. Performance comparison of geometric-expert mixture recipes across mathematical and general reasoning benchmarks.                                              
+
+> Methods Space COLA MRPC GSM8k MATH500 MAWPS SVAMP AQuA Avg. MoSLoRA-S Spherical 86.86 87.77 44.50 17.60 72.69 64.33 28.35 57.44
+> MoSLoRA-H Hyperbolic 85.81 89.33 45.34 17.80 73.46 63.67 34.25 58.52
+> MoSLoRA-E Euclidean 87.15 87.19 42.23 16.20 70.77 61.67 31.89 56.73
+> MoSLoRA (Ours) Mixture 87.63 88.23 47.76 18.00 74.62 64.33 31.50 58.87
+
+assign independent optimizers and learning rates to κ of all geometric experts, enabling the model to adjust latent geo-metric spaces more flexibly without being constrained by the optimization trajectory of other capacity-related parame-ters. Empirically, this setting leads to improved performance on downstream tasks. 
+
+Token Frequency Distribution. To further quantify and analyze the underlying geometric relationships from the perspective of token-level statistics, in Figure 3, we exam-ine the token norm and frequency distributions produced by the tokenizers of Qwen2.5 models. We observe that the token frequency distribution exhibits a scale-free behav-ior, reflecting the latent hyperbolic characteristics of the underlying training corpus. Meanwhile, the token-norm distribution shows an exponential growth pattern on the right tail, whereas the left side deviates from such behav-ior. Prior work has partially observed similar phenomena (Yang et al., 2024b) , but their analysis focuses primarily on hyperbolic space, which is particularly well-suited for mod-eling power-law structures—yet less capable of capturing the broader range of non-Euclidean geometries that emerge across different contexts and domains. 
+
+Geometric Mapping Efficiency. In Figure 4, we compare the runtime on GPUs between our proposed lightweight space mapping method and the conventional approach based on exp-log mappings. Figure 4a further illustrates how com-putation time scales with the increasing FFN dimension, while Figure 4b shows the corresponding trend related to the number of model layers. The results show that our method achieves significant speedups up to 4 × over the standard exp–log scheme, and this relative acceleration remains con-sistent as the network depth increases and the embedding dimension grows. Refer to Appendix E for detailed memory overhead and time comparison. 
+
+5.4. Ablation Study Different Space-Mix of Experts. To obtain a more fine-grained understanding of how different geometric expert mixture configuration affect performance, we conducted an ablation study by restricting MoSLoRA to use only a single type of expert. For example, in the hyperbolic-only setting, each expert is initialized with a negative curvature (e.g., –1), and during the training stage, curvatures are learn-able so that the model can dynamically adjust the underly-ing embedding space for inputs. All other configurations follow our default setup, including the unified framework, lightweight routing strategy, top-4 out of 8 expert selection, and the auxiliary load-balancing loss. As shown in Ta-ble 4, on average, MoSLoRA with mixed-geometric experts consistently outperforms all single-space variants. Never-theless, specific single-space configurations achieved strong results on certain datasets. For instance, the hyperbolic-only variant MoSLoRA-H achieves accuracies of 17.80% on MATH500, 34.25% on AQuA, and 89.33% on MRPC, matching or surpassing all competing methods, suggest-ing that hyperbolic embeddings are particularly well-suited for these benchmarks. The strong performance of hyper-bolic experts on MATH500 further indicates their ability to generalize effectively in zero-shot settings to previously unseen reasoning problems. On the other hand, the Eu-clidean variant MoSLoRA-E outperforms others on CoLA (87.15%), while the spherical variant MoSLoRA-S achieves the best results on SVAMP (64.33%), highlighting that cer-tain datasets benefit more from specific geometries. To-gether, these findings confirm the necessity of combining multiple spaces, as MoSLoRA effectively integrates the complementary strengths of different embedding geome-tries to achieve superior overall performance. 
+
+## 6. Conclusion 
+
+This paper first introduces MoS, a unified framework that integrates distinct geometric spaces and enables flexible transformations among three constant-curvature spaces: Hy-perbolic, Euclidean, and Spherical spaces. Building on this framework, we further propose MoSLoRA, an efficient fine-tuning technique for LLMs that combines mixture-of-space experts. This design allows LLMs to dynamically adjust the curvature of each expert’s underlying space during fine-tuning and to flexibly reconfigure combinations of different spaces based on the input. In addition, to address the compu-tational overhead of exponential and logarithmic operations commonly adopted in existing non-Euclidean models, we develop a lightweight routing and space-mapping strategy that improves the efficiency of space transitions. Experi-mental results demonstrate that our approach consistently outperforms strong baselines and provides new insights into geometric representation learning. Nevertheless, further investigation can assess its applicability to industrial-scale settings, as well as to reinforcement learning frameworks. Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+## References 
+
+Achiam, J., Adler, S., Agarwal, S., Ahmad, L., Akkaya, I., Aleman, F. L., Almeida, D., Altenschmidt, J., Altman, S., Anadkat, S., et al. Gpt-4 technical report. arXiv preprint arXiv:2303.08774 , 2023. Bdeir, A., Schwethelm, K., and Landwehr, N. Fully hyper-bolic convolutional neural networks for computer vision. 
+
+arXiv preprint arXiv:2303.15919 , 2023. Bowman, S. R., Angeli, G., Potts, C., and Manning, C. D. A large annotated corpus for learning natural language inference. In Proceedings of the 2015 Conference on Empirical Methods in Natural Language Processing ,pp. 632–642. Association for Computational Linguis-tics, 2015. doi: 10.18653/v1/D15-1075. URL https: //aclanthology.org/D15-1075/ .Bronstein, M. M., Bruna, J., LeCun, Y., Szlam, A., and Van-dergheynst, P. Geometric deep learning: going beyond euclidean data. IEEE Signal Processing Magazine , 34(4): 18–42, 2017. Chen, W., Han, X., Lin, Y., Zhao, H., Liu, Z., Li, P., Sun, M., and Zhou, J. Fully hyperbolic neural networks. arXiv preprint arXiv:2105.14686 , 2021. Chen, W., Han, X., Lin, Y., Zhao, H., Liu, Z., Li, P., Sun, M., and Zhou, J. Fully hyperbolic neural networks. arXiv preprint arXiv:2105.14686 , 2022. doi: 10.48550/arXiv. 2105.14686. ACL 2022 Main Conference. Cobbe, K., Kosaraju, V., Bavarian, M., Chen, M., Jun, H., Kaiser, L., Plappert, M., Tworek, J., Hilton, J., Nakano, R., et al. Training verifiers to solve math word problems. 
+
+arXiv preprint arXiv:2110.14168 , 2021. Dai, D., Deng, C., Zhao, C., Xu, R., Gao, H., Chen, D., Li, J., Zeng, W., Yu, X., Wu, Y., Xie, Z., Li, Y., Huang, P., Luo, F., Ruan, C., Sui, Z., and Liang, W. DeepSeekMoE: Towards ultimate expert specialization in mixture-of-experts language models. In Proceedings of the 62nd Annual Meeting of the Association for Com-putational Linguistics (Volume 1: Long Papers) , pp. 1280–1297. Association for Computational Linguistics, 2024. doi: 10.18653/v1/2024.acl-long.70. URL https: //aclanthology.org/2024.acl-long.70/ .Dolan, B. and Brockett, C. Automatically constructing a corpus of sentential paraphrases. In Third international workshop on paraphrasing (IWP2005) , 2005. Dubey, A., Jauhri, A., Pandey, A., Kadian, A., Al-Dahle, A., Letman, A., Mathur, A., Schelten, A., Yang, A., Fan, A., et al. The llama 3 herd of models. arXiv e-prints , pp. arXiv–2407, 2024. Engels, J., Michaud, E. J., Liao, I., Gurnee, W., and Tegmark, M. Not all language model features are one-dimensionally linear. arXiv preprint arXiv:2405.14860 ,2024. Fedus, W., Zoph, B., and Shazeer, N. Switch transformers: Scaling to trillion parameter models with simple and ef-ficient sparsity. Journal of Machine Learning Research ,23(120):1–39, 2022. Feng, W., Hao, C., Zhang, Y., Han, Y., and Wang, H. Mixture-of-loras: An efficient multitask tuning for large language models. arXiv preprint arXiv:2403.03432 ,2024. Ganea, O., B ´ecigneul, G., and Hofmann, T. Hyperbolic neu-ral networks. Advances in neural information processing systems , 31, 2018. Gao, Z.-F., Liu, P., Zhao, W. X., Lu, Z.-Y., and Wen, J.-R. Parameter-efficient mixture-of-experts architec-ture for pre-trained language models. arXiv preprint arXiv:2203.01104 , 2022. Han, Z., Gao, C., Liu, J., Zhang, J., and Zhang, S. Q. Parameter-efficient fine-tuning for large models: A com-prehensive survey. arXiv preprint arXiv:2403.14608 ,2024. He, N., Anand, R., Madhu, H., Maatouk, A., Krishnaswamy, S., Tassiulas, L., Yang, M., and Ying, R. Helm: Hy-perbolic large language models via mixture-of-curvature experts. arXiv preprint arXiv:2505.24722 , 2025a. doi: 10.48550/arXiv.2505.24722. He, N., Liu, J., Zhang, B., Bui, N., Maatouk, A., Yang, M., King, I., Weber, M., and Ying, R. Position: Be-yond euclidean–foundation models should embrace non-euclidean geometries. arXiv preprint arXiv:2504.08896 ,2025b. He, N., Yang, M., and Ying, R. Lorentzian residual neural networks. In Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.1 , KDD ’25, pp. 436–447. Association for Computing Machinery, 2025c. ISBN 9798400712456. Hendrycks, D., Burns, C., Kadavath, S., Arora, A., Basart, S., Tang, E., Song, D., and Steinhardt, J. Measuring math-ematical problem solving with the math dataset. arXiv preprint arXiv:2103.03874 , 2021. Hu, E. J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L., Chen, W., et al. Lora: Low-rank adaptation of large language models. ICLR , 1(2):3, 2022. Hu, Z., Wang, L., Lan, Y., Xu, W., Lim, E.-P., Bing, L., Xu, X., Poria, S., and Lee, R. K.-W. Llm-adapters: An adapter family for parameter-efficient fine-tuning of large lan-guage models. arXiv preprint arXiv:2304.01933 , 2023. Jacobs, R. A., Jordan, M. I., Nowlan, S. J., and Hinton, G. E. Adaptive mixtures of local experts. Neural Computation ,1991. Jaech, A., Kalai, A., Lerer, A., Richardson, A., El-Kishky, A., Low, A., Helyar, A., Madry, A., Beutel, A., Car-ney, A., et al. Openai o1 system card. arXiv preprint arXiv:2412.16720 , 2024. Koncel-Kedziorski, R., Roy, S., Amini, A., Kushman, N., and Hajishirzi, H. Mawps: A math word problem reposi-tory. In Proceedings of the 2016 conference of the north american chapter of the association for computational lin-guistics: human language technologies , pp. 1152–1157, 2016. Liao, M., Chen, W., Shen, J., Guo, S., and Wan, H. Hmora: Making llms more effective with hierarchical mixture of lora experts. In The Thirteenth International Conference on Learning Representations , 2025. Lightman, H., Kosaraju, V., Burda, Y., Edwards, H., Baker, B., Lee, T., Leike, J., Schulman, J., Sutskever, I., and Cobbe, K. Let’s verify step by step. In The Twelfth International Conference on Learning Representations ,2023. Ling, W., Yogatama, D., Dyer, C., and Blunsom, P. Program induction by rationale generation : Learning to solve and explain algebraic word problems, 2017. URL https: //arxiv.org/abs/1705.04146 .Liu, S.-Y., Wang, C.-Y., Yin, H., Molchanov, P., Wang, Y.-C. F., Cheng, K.-T., and Chen, M.-H. Dora: Weight-decomposed low-rank adaptation. In Forty-first Interna-tional Conference on Machine Learning , 2024. Loshchilov, I., Hsieh, C.-P., Sun, S., and Ginsburg, B. ngpt: Normalized transformer with representation learning on the hypersphere. arXiv preprint arXiv:2410.01131 , 2024. Mangrulkar, S., Gugger, S., Debut, L., Belkada, Y., Paul, S., and Bossan, B. PEFT: State-of-the-art parameter-efficient fine-tuning methods. https://github. com/huggingface/peft , 2022. Mihaylov, T., Clark, P., Khot, T., and Sabharwal, A. Can a suit of armor conduct electricity? a new dataset for open book question answering. In Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing , pp. 2381–2391. Association for Computational Linguistics, 2018. doi: 10.18653/v1/ D18-1260. URL https://aclanthology.org/ D18-1260/ .Muennighoff, N., Soldaini, L., Groeneveld, D., Lo, K., Mor-rison, J., Min, S., Shi, W., Walsh, P., Tafjord, O., Lambert, N., et al. Olmoe: Open mixture-of-experts language models. arXiv preprint arXiv:2409.02060 , 2024. Pal, A., van Spengler, M., di Melendugno, G. M. D., Fla-borea, A., Galasso, F., and Mettes, P. Compositional entailment learning for hyperbolic vision-language mod-els. arXiv preprint arXiv:2410.06912 , 2024. Park, K., Choe, Y. J., Jiang, Y., and Veitch, V. The geometry of categorical and hierarchical concepts in large language models. arXiv preprint arXiv:2406.01506 , 2024. Patel, A., Bhattamishra, S., and Goyal, N. Are nlp models really able to solve simple math word problems? arXiv preprint arXiv:2103.07191 , 2021. Peng, W., Varanka, T., Mostafa, A., Shi, H., and Zhao, G. Hyperbolic deep neural networks: A survey. IEEE Trans-actions on pattern analysis and machine intelligence , 44 (12):10023–10044, 2021. Qwen, :, Yang, A., Yang, B., Zhang, B., Hui, B., Zheng, B., Yu, B., Li, C., Liu, D., Huang, F., Wei, H., Lin, H., Yang, J., Tu, J., Zhang, J., Yang, J., Yang, J., Zhou, J., Lin, J., Dang, K., Lu, K., Bao, K., Yang, K., Yu, L., Li, M., Xue, M., Zhang, P., Zhu, Q., Men, R., Lin, R., Li, T., Tang, T., Xia, T., Ren, X., Ren, X., Fan, Y., Su, Y., Zhang, Y., Wan, Y., Liu, Y., Cui, Z., Zhang, Z., and Qiu, Z. Qwen2.5 technical report, 2025. URL https: //arxiv.org/abs/2412.15115 .Ren, P., Shi, C., Wu, S., Zhang, M., Ren, Z., de Rijke, M., Chen, Z., and Pei, J. Melora: Mini-ensemble low-rank adapters for parameter-efficient fine-tuning. arXiv preprint arXiv:2402.17263 , 2024. Resnick, R. Introduction to special relativity . John Wiley & Sons, 1991. Shazeer, N., Mirhoseini, A., Maziarz, K., Davis, A., Le, Q., Hinton, G., and Dean, J. Outrageously large neural networks: The sparsely-gated mixture-of-experts layer. In International Conference on Learning Representations ,2017. Shimizu, R., Mukuta, Y., and Harada, T. Hyperbolic neural networks++. arXiv preprint arXiv:2006.08210 , 2020. Skopek, O., Ganea, O.-E., and B ´ecigneul, G. Mixed-curvature variational autoencoders. In International Conference on Learning Representations , 2020. doi: 10.48550/arXiv.1911.08411. Talmor, A., Herzig, J., Lourie, N., and Berant, J. Com-monsenseQA: A question answering challenge target-ing commonsense knowledge. In Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Pa-pers) , pp. 4149–4158. Association for Computational Linguistics, 2019. doi: 10.18653/v1/N19-1421. URL 
+
+https://aclanthology.org/N19-1421/ .Team, G., Riviere, M., Pathak, S., Sessa, P. G., Hardin, C., Bhupatiraju, S., Hussenot, L., Mesnard, T., Shahri-ari, B., Ram ´e, A., et al. Gemma 2: Improving open language models at a practical size. arXiv preprint arXiv:2408.00118 , 2024. Tian, C., Shi, Z., Guo, Z., Li, L., and Xu, C.-Z. Hydralora: An asymmetric lora architecture for efficient fine-tuning. 
+
+Advances in Neural Information Processing Systems , 37: 9565–9584, 2024. Wang, A., Singh, A., Michael, J., Hill, F., Levy, O., and Bowman, S. R. Glue: A multi-task benchmark and anal-ysis platform for natural language understanding. arXiv preprint arXiv:1804.07461 , 2018. Warstadt, A., Singh, A., and Bowman, S. R. Neural net-work acceptability judgments. Transactions of the As-sociation for Computational Linguistics , 2019. doi: 10. 1162/tacl a 00290. URL https://aclanthology. org/Q19-1040/ .Wu, T., Wang, J., Zhao, Z., and Wong, N. Mixture-of-subspaces in low-rank adaptation. In Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing , 2024a. Wu, X., Huang, S., and Wei, F. Mixture of loRA experts. In The Twelfth International Conference on Learning Representations , 2024b. Yang, A., Yang, B., Hui, B., Zheng, B., Yu, B., Zhou, C., Li, C., Li, C., Liu, D., Huang, F., Dong, G., Wei, H., Lin, H., Tang, J., Wang, J., Yang, J., Tu, J., Zhang, J., Ma, J., Yang, J., Xu, J., Zhou, J., Bai, J., He, J., Lin, J., Dang, K., Lu, K., Chen, K., Yang, K., Li, M., Xue, M., Ni, N., Zhang, P., Wang, P., Peng, R., Men, R., Gao, R., Lin, R., Wang, S., Bai, S., Tan, S., Zhu, T., Li, T., Liu, T., Ge, W., Deng, X., Zhou, X., Ren, X., Zhang, X., Wei, X., Ren, X., Liu, X., Fan, Y., Yao, Y., Zhang, Y., Wan, Y., Chu, Y., Liu, Y., Cui, Z., Zhang, Z., Guo, Z., and Fan, Z. Qwen2 technical report. 2024a. URL 
+
+https://arxiv.org/abs/2407.10671 .Yang, M., Zhou, M., Li, Z., Liu, J., Pan, L., Xiong, H., and King, I. Hyperbolic graph neural networks: Areview of methods and applications. arXiv preprint arXiv:2202.13852 , 2022. Yang, M., Feng, A., Xiong, B., Liu, J., King, I., and Ying, R. Hyperbolic fine-tuning for large language models. arXiv preprint arXiv:2410.04010 , 2024b. Yang, M., Verma, H., Zhang, D. C., Liu, J., King, I., and Ying, R. Hypformer: Exploring efficient hyperbolic trans-former fully in hyperbolic space. In Proceedings of the 2024 ACM SIGKDD International Conference on Knowl-edge Discovery and Data Mining , 2024c. Zadouri, T., ¨Ust ¨un, A., Ahmadian, A., Ermis, B., Locatelli, A., and Hooker, S. Pushing mixture of experts to the limit: Extremely parameter efficient moe for instruction tuning. In The Twelfth International Conference on Learning Representations , 2024. Zhang, Q., Chen, M., Bukharin, A., Karampatziakis, N., He, P., Cheng, Y., Chen, W., and Zhao, T. Adalora: Adaptive budget allocation for parameter-efficient fine-tuning. arXiv preprint arXiv:2303.10512 , 2023. A. Training Details 
+
+A.1. Training hyperparameters 
+
+Table 5 presents the hyperparameters used to fine-tune the models with MoSLoRA on language understanding, commonsense reasoning and mathematical reasoning. The same hyperparameter settings are applied across all tasks. Each experiment is conducted independently, with a single run for each model. The final model trained is used for evaluation. For the baseline methods, the same hyperparameter configuration is reused.               
+
+> Table 5. Hyperparameters for MoSLoRA.
+> Hyperparameter Value
+> Num Train Epoch 3Optimizer AdamW Weight Decay 0.01 Warmup Ratio 0.1 Learning Rate 3×10 −4
+> Projection Scaling γ0.001 Target Modules gate proj ,down proj ,up proj
+
+A.2. Statistics of the language understanding dataset 
+
+We conduct experiments using a subset of the General Language Understanding Evaluation (GLUE) dataset (Wang et al., 2018), a benchmark for for training, evaluating, and analyzing natural language understanding systems. Specifically, we selected datasets Microsoft Research Paraphrase Corpus (MRPC) (Dolan & Brockett, 2005), Corpus of Linguistic Acceptability (CoLA) (Warstadt et al., 2019) and Recognizing Textual Entailment (RTE) (Bowman et al., 2015). As shown in Table 6, this dataset consists of consist of various training and testing examples, each designed to evaluate specific linguistic tasks,including semantic equivalence and grammatical acceptability.              
+
+> Table 6. The detailed statistics of language understanding datasets.
+> Dataset Train Test Task Description
+> MRPC 3,668 1,725 Determine if a pair of sentences are semantically equivalent CoLA 8,551 1,043 Evaluate the grammatical acceptability of English sentences RTE 2,490 277 Recognize if a hypothesis is entailed by text
+
+A.3. Statistics of mathematical reasoning datasets 
+
+As illustrated in the Table 7, we have constructed a mathematical reasoning training set consisting of a mix of four datasets, totaling 13,262 examples. These datasets include GSM8K (Cobbe et al., 2021), MAWPS (Koncel-Kedziorski et al., 2016), SVAMP (Patel et al., 2021), and subset of AQuA (Ling et al., 2017), each focusing on different aspects of mathematical reasoning. To control the contribution of AQuA, we do not use its full training split; instead, we uniformly sample 4,000 examples from AQuA’s training set using a fixed random seed (42). Additionally, we have incorporated MATH500 (Lightman et al., 2023) into the test set to further evaluate the model’s performance.                
+
+> Table 7. The detailed statistics of mathematical reasoning datasets.
+> Dataset Data Number Task Type
+> Train 13,262 Mixed Test GSM8K 1,319 Question-Answering MAWPS 520 Question-Answering SVAMP 300 Question-Answering MATH500 500 Question-Answering AQuA 254 Option
+
+A.4. Statistics of commonsense reasoning datasets 
+
+Also, to extend the scope of our experiments beyond mathematical reasoning and language understanding, we further evaluate our approach on commonsense reasoning tasks. As shown in Table 8, we construct the commonsense reasoning training set using two widely adopted multiple-choice benchmarks: OpenBookQA (OBQA) (Mihaylov et al., 2018) and CommonsenseQA (CSQA) (Talmor et al., 2019). For training, we use the official training splits of both datasets. Evaluation is conducted on their respective validation and test sets to ensure consistency with prior work.           
+
+> Table 8. The detailed statistics of language understanding datasets.
+> Dataset Train Test Task Description
+> OBQA 4,957 500 Answer science questions using provided facts plus commonsense CSQA 9,742 1,221 Choose correct option requiring diverse commonsense knowledge
+
+## B. Gradient bound Analysis 
+
+The following presents a gradient analysis of our MoSLoRA framework, demonstrating that the gradients in our design remain bounded. 
+
+Bound on the gradient w.r.t. u. Let u = ϕ(z) and define the lifting coordinate 
+
+aκ(u) = psgn( −κ) ∥u∥2 + φ(κ), φ(κ) = 
+
+(1/|κ|, κ̸ = 0 ,
+
+0, κ = 0 .
+
+A direct differentiation gives 
+
+∇uaκ(u) = sgn( −κ) u
+
+psgn( −κ) ∥u∥2 + φ(κ) , ∇uaκ(u) = ∥u∥
+
+psgn( −κ) ∥u∥2 + φ(κ) . (11) 
+
+Case κ < 0 (hyperbolic). Here sgn( −κ) = 1 and φ(κ) = 1 /|κ|. Hence 
+
+∇uaκ(u) = ∥u∥
+
+p∥u∥2 + 1 /|κ| ≤ 1 for all u, 
+
+so aκ is globally 1-Lipschitz in u.
+
+Case κ > 0 (spherical). Now sgn( −κ) = −1 and the domain requires ∥u∥2 ≤ 1/|κ|. Let R = sup ∥u∥ < 1/p|κ|, which can be enforced by a bounded activation together with scaling/projection. Then, from (11), 
+
+∇uaκ(u) = ∥u∥
+
+p1/|κ| − ∥ u∥2 ≤ R
+
+p1/|κ| − R2 =: Cu(κ, R ) < ∞.
+
+Therefore, as long as u stays at a fixed margin from the boundary (e.g., R = (1 − ε)/p|κ| with ε > 0), the gradient is uniformly bounded. 
+
+## C. Scale Equivariance of the Unified Geometric Expert 
+
+We consider the full non-Euclidean feed-forward mapping defined by the composition 
+
+Fκ(x) := ρκ(G(W, x )) ,
+
+where the mapping consists of the inverse stereographic projection, the unified geometric expert transformation, and the final projection back to Euclidean space. We show that this mapping is scale-equivariant under a coupled rescaling of the input and curvature. Claim. For any scalar γ > 0 and nonzero curvature κ̸ = 0 ,
+
+Fκ(x) = 1
+
+γ Fκ/γ 2 (γx ).
+
+Proof. We denote the rescaled curvature by 
+
+˜κ := κγ2 .
+
+Step 1: Scaling behavior of the space-like component (Eq. (5)). The space-like component produced by the inverse stereographic projection is 
+
+sκ(x) = 2x
+
+1 + κ∥x∥2 .
+
+Evaluating this expression at the rescaled input γx with curvature ˜κ, we obtain 
+
+s˜κ(γx ) = 2( γx )1 + ˜ κ∥γx ∥2
+
+= 2γx 
+
+1 + ( κ/γ 2) γ2∥x∥2
+
+= 2γx 
+
+1 + κ∥x∥2
+
+= γ s κ(x).
+
+Applying the linear transformation W yields 
+
+s′
+
+> ˜κ
+
+(γx ) = W s ˜κ(γx ) = γ W s κ(x) = γ s ′
+
+> κ
+
+(x).
+
+Step 2: Scaling behavior of the time-like component. The time-like coordinate is defined as 
+
+ξ′ = p∥s′∥2 sgn( −κ) + φ(κ), φ(κ) = 1
+
+|κ| .
+
+Note that 
+
+sgn( −˜κ) = sgn( −κ), φ(˜ κ) = 1
+
+|˜κ| = γ2
+
+|κ| = γ2φ(κ).
+
+Therefore, 
+
+ξ′
+
+> ˜κ
+
+(γx ) = 
+
+q
+
+∥s′
+
+> ˜κ
+
+(γx )∥2 sgn( −κ) + φ(˜ κ)= pγ2∥s′
+
+> κ
+
+(x)∥2 sgn( −κ) + γ2φ(κ)=
+
+q
+
+γ2 ∥s′
+
+> κ
+
+(x)∥2 sgn( −κ) + φ(κ)
+
+= γ ξ ′
+
+> κ
+
+(x).
+
+Step 3: Scaling behavior of the projection. The final projection is given by 
+
+ρκ(ξ′, s ′) = s′
+
+1 + p|κ| ξ′ .
+
+Substituting the scaled quantities yields 
+
+F˜κ(γx ) = ρ˜κ(ξ′
+
+> ˜κ
+
+(γx ), s ′
+
+> ˜κ
+
+(γx )) = γ s ′
+
+> κ
+
+(x)1 + p|˜κ| γ ξ ′
+
+> κ
+
+(x)= γ s ′
+
+> κ
+
+(x)1 + p|κ| ξ′
+
+> κ
+
+(x)= γ ρ κ(ξ′
+
+> κ
+
+(x), s ′
+
+> κ
+
+(x)) = γ F κ(x).Table 9. Comparison of parameter-efficient fine-tuning methods across reasoning and language understanding benchmarks. All results are reported on the same backbone model.                                                                                          
+
+> Method GSM8k MATH500 MAWPS SVAMP AQuA MRPC CoLA RTE Avg.
+> LoRA 52.24 13.80 71.33 65.19 32.68 89.39 84.66 90.25 62.44 AdaLoRA 46.70 7.20 64.23 62.67 20.08 84.17 83.03 87.36 56.93 DoRA 48.60 11.20 71.67 64.62 31.89 89.45 85.33 89.89 61.58 MELoRA 48.90 11.80 63.85 70.00 28.35 88.75 84.08 88.81 60.57 HypLoRA 45.34 10.80 64.23 66.33 27.56 87.25 84.08 87.36 59.12 HydraLoRA 51.18 14.80 65.38 71.33 28.35 88.58 86.29 90.97 62.11
+> MoSLoRA 47.53 14.40 81.35 73.00 31.50 88.63 85.43 89.17 63.88
+> Table 10. Runtime and memory consumption comparison between MoS and Exp/Log geometric mappings. Results are reported for both forward and backward passes.
+> Method Total Time (ms) Phase Avg Time (ms) Avg Memory (MB)
+> MoS 57.4 Forward 2.1 277.2 Backward 2.1 324.0 Exp/Log 135.0 Forward 2.6 565.6 Backward 8.6 396.0
+
+Dividing both sides by γ yields 
+
+Fκ(x) = 1
+
+γ Fκ/γ 2 (γx ),
+
+which completes the proof. □
+
+Remark. The above scale-equivariance property does not hold if the curvature κ is kept fixed while scaling the input x.This is due to the non-homogeneous dependence on κ in both the inverse stereographic projection denominator and the curvature-dependent offset φ(κ).
+
+## D. Main Results on Gemma2 
+
+To verify that the proposed method is not limited to a specific architectural design, we evaluate its performance across multiple parameter-efficient fine-tuning variants under the same backbone model Gemma2-2b-it, as is shown in Table 9. This allows us to examine the robustness and generality of our approach across different architectural configurations. 
+
+## E. Efficiency 
+
+We evaluate the computational efficiency of the proposed MoS framework by comparing it against the standard exponen-tial/logarithmic (Exp/Log) mapping. For each method, we report the total execution time, as well as the average runtime and memory consumption for both forward and backward passes. All measurements are conducted under identical hardware and batch-size settings to ensure fair comparison. As shown in Table 10, MoS substantially reduces the overall conversion time compared to the Exp/Log mapping. In particular, MoS achieves a total runtime of 57 .46 ms, less than half of the 135 .08 ms required by Exp/Log. In terms of memory usage, MoS demonstrates significantly improved efficiency during the forward pass, consuming approximately 277 MB, compared to 566 MB for Exp/Log. During the backward pass, MoS requires around 324 MB of memory, which is comparable to the baseline. Overall, these results indicate that MoS not only accelerates geometric transformations but also maintains competitive or lower memory consumption, especially in the forward pass, thereby offering superior computational efficiency.

@@ -1,0 +1,1594 @@
+Title: Linearization Explains Fine-Tuning in Large Language Models
+
+URL Source: https://arxiv.org/pdf/2602.08239v1
+
+Published Time: Tue, 10 Feb 2026 02:57:23 GMT
+
+Number of Pages: 24
+
+Markdown Content:
+# Linearization Explains Fine-Tuning in Large Language Models 
+
+Zahra Rahimi Afzal ∗ a Tara Esmaeilbeig ∗ a,b Mojtaba Soltanalian a Mesrob I. Ohannessian aaUniversity of Illinois Chicago bNokia Bell Labs 
+
+> a
+
+{zrahim2, msol, mesrob}@uic.edu 
+
+> b
+
+tara.esmaeilbeig@nokia.com 
+
+## Abstract 
+
+Parameter-Efficient Fine-Tuning (PEFT) is a popular class of techniques that strive to adapt large models in a scalable and resource-efficient manner. Yet, the mech-anisms underlying their training performance and generalization remain underex-plored. In this paper, we provide several insights into such fine-tuning through the lens of linearization. Fine-tuned models are often implicitly encouraged to re-main close to the pretrained model. By making this explicit, using an ℓ2-distance inductive bias in parameter space, we show that fine-tuning dynamics become equivalent to learning with the positive-definite neural tangent kernel (NTK). We specifically analyze how close the fully linear and the linearized fine-tuning op-timizations are, based on the strength of the regularization. This allows us to be pragmatic about how good a model linearization is when fine-tuning large lan-guage models (LLMs). When linearization is a good model, our findings reveal a strong correlation between the eigenvalue spectrum of the NTK and the per-formance of model adaptation. Motivated by this, we give spectral perturbation bounds on the NTK induced by the choice of layers selected for fine-tuning. We empirically validate our theory on Low Rank Adaptation (LoRA) on LLMs. These insights not only characterize fine-tuning but also have the potential to enhance PEFT techniques, paving the way to better informed and more nimble adaptation in LLMs. 
+
+## 1 Introduction 
+
+Foundational large language models (LLMs) [1,2] have emerged as general-purpose models that are then adapted to various NLP tasks through fine-tuning. Due to the enormous number of trainable pa-rameters in these models, full fine-tuning can be expensive in terms of time and other computational resources [3]. Parameter-Efficient Fine-tuning (PEFT) [4–8] is a particularly popular set of tech-niques that strive to tackle this computational burden. They aim to reduce the effective number of trained parameters, making choices such as focusing on certain layers only or applying rank-limited updates, all while maintaining how well the model adapts to the task. However, these methods often lack a fundamental understanding of the dynamics behind these choices, making informed exploration of the algorithmic space difficult. In this paper, we introduce linearized fine-tuning, which establishes a foundation for rigorously un-derstanding adaptation in large models through the lens of Neural Tangent Kernel (NTK) regression. Said simply, linearizing the fine-tuning process reduces the problem to one closely aligned with NTK regression. This, in turn, allows us to predict the performance of various fine-tuning decisions using the properties of the NTK kernel. Linearization can be achieved by regularizing fine-tuning to 
+
+> ∗
+
+Equal contribution. 
+
+> †
+
+Our code is publicly available at https://github.com/zahrahimi/linearization .39th Conference on Neural Information Processing Systems (NeurIPS 2025). 
+
+> arXiv:2602.08239v1 [cs.LG] 9 Feb 2026
+
+remain close to the original model, which is empirically found to be non-restrictive, because most methods already encourage this proximity between the fine-tuned and original models [9]. Linearized approximations to guide fine-tuning have previously been explored in [10–14]. In [10], a linearized approximation is used to introduce two scores for selecting models from a zoo of models to be fine-tuned for a specific task. In [11], a linear model is constructed that combines network activation with the gradient features. In [12], it is demonstrated that linearized models, governed by the NTK, outperform their nonlinear counterparts in fine-tuning. All these works, however, do not quantify the closeness of fine-tuning dynamics to the linear approximation. Instead, they only hypothesize that the model will remain close to the pretrained model and that, therefore, the fine-tuning dynamics can be approximated by a Taylor expansion of the model around the pretrained parameters. This shortcoming motivates the present paper to introduce an explicit inductive bias that enables quantifying the extent to which linearity is preserved during fine-tuning. In particular, we provide a theoretical upper bound on the distance between the fine-tuned model and its linearized approximation, which in turn firmly supports predictions of fine-tuning performance based on lin-earization. The work in [13] explores the loss landscape in the NTK regime; however, it does not determine under what conditions fine-tuning falls within this regime. In contrast, our work proves both theoretically and empirically that, although necessarily in the NTK (linearization) regime, fine-tuning can be constrained to it by regularizing the process towards the pretrained model. Our work builds on prior results that establish conditions under which linearity holds. Jacot et al. [15] showed that in the infinite width limit, the network function follows a linear differential equation during training. Moreover, they proved that for wide networks, the NTK remains constant during training; hence, they called this regime lazy training. Later, Bach et al. [16] suggested that lazy training is not limited to infinite-width networks. More recently, and of particular relevance here, Malladi et al. in [17] extended the NTK theory to characterize kernel-based dynamics specifically for fine-tuning language models. They adapted infinite-width analysis to account for pretrained initialization and proved that prompt-based fine-tuning in complex architectures like transformers can exhibit kernel behavior under certain condi-tions. They demonstrated the critical role of meaningful prompts in achieving kernel behavior and explained how these dynamics describe fine-tuning trajectories. Additionally, they proved the ef-fectiveness of Low Rank Adaptation (LoRA) by bounding the difference between the kernel of full fine-tuning and the kernel of LoRA. In [17], the authors assume that fine-tuning can be explained by linearization, and their results also confirm that linearization does not always appear in fine-tuning (see Fig. 1 of [17]). In our work, however, by introducing an explicit inductive bias for fine-tuning, which is essentially a weight decay toward the original model parameter, we induce lazy training. Consequently, the fine-tuning performance can be approximated by the linearized model [9,18]. The evolution of the model is described by the neural tangent kernel (NTK), which stays constant during fine-tuning. This property makes it possible to study the generalization properties of a fine-tuned model based on the spectral properties of the NTK. Specifically, our main contributions are: • We show that having an explicit inductive bias toward the pretrained model results in lin-earized fine-tuning; more precisely, it brings fine-tuned and linearized models closer. • Leveraging the linearization of fine-tuning, we formulate the fine-tuning problem as a neu-ral tangent kernel regression and use the eigenvalue decomposition of the neural tangent kernel to derive bounds on the empirical risk of the end result of fine-tuning, prior to its execution. • We provide bounds on the spectral perturbation on the NTK when a set of trainable param-eters is added to fine-tuning. In particular, to the best of our knowledge, we present the first spectrum perturbation results due to layer selection and introduce an algorithm that provides new insights to guide fine-tuning design. • Through extensive experiments, we validate our theoretical results. We evaluate the condi-tion number of NTK as an at-initialization metric to anticipate the performance of LoRA before training. Even though our experiments focus on LoRA, the technical tools we intro-duce could be equally used in the context of other PEFT methods. The paper is organized as follows. In §2, we present the problem formulation and notation. In §3, we detail the linearization framework. In §4, we give an NTK regression formulation for the linearized 2fine-tuning and related performance to the kernel’s spectrum. In §5, we show how layer choices affect this spectrum. We then validate our findings through experiments in §6 and conclude in §7. 
+
+## 2 Problem Formulation 
+
+In the fine-tuning problem, we are given a pretrained model fθ0 (·), a target task dataset DT =(xi, Yi)ni=1 for the downstream task, and a loss function L(·, ·) : R × R → R. The most basic fine-tuning solution is to minimize the target empirical risk via gradient descent, when initialized at fθ0 (·). This implicitly finds solutions close to the pretrained model. In this paper, we make this explicit via an inductive bias toward the pretrained model. We denote the regularized fine-tuned model by fθ⋆ (·) : Rd → R, and we define it as minimizing the regularized empirical risk. 
+
+θ⋆ = minimize 
+
+> θ
+
+˜R(θ) + λ
+
+2 ‖θ − θ0‖22, where (1) 
+
+˜R(θ) = 
+
+> n
+
+∑
+
+> i=1
+
+L(fθ (xi), yi). (2) 
+
+θ denotes the trainable fine-tuning parameters, θ0 denotes the parameters of the pretrained model, 
+
+˜R(θ) the original objective function, and λ the regularization strength hyperparameter. When θ0 =0, (1) reduces to an ordinary weight decay. This regularization reduces the deviation between the fine-tuned and pretrained models, and is a simple instance of proximal methods often used in fine-tuning. We assume L(·, ·) is the squared loss, and thus the risk is the MSE. By representing DT =(xi, yi)ni=1 as X = [ x1, x2, . . . , xn]⊤ ∈ Rn×d, and Y = [ y1, y2, . . . , yn] ∈ R1×n, we write the risk as 
+
+˜R(θ) = ‖fθ(X) − Y‖2, (3) where fθ(X) = [ fθ(x1), . . . , f θ(xn)] ∈ R1×n. We split the optimization (1) using gradient descent at step t with learning rate η into two steps: 
+
+˜θt = θt−1 − η ∇ ˜R(θt−1)⊤, (4) 
+
+θt = ˜θt − λ η 
+
+( ˜θt − θ0
+
+)
+
+, (5) where the first step is the gradient descent on ˜R(θ) and the second step is the gradient descent on the regularization term λ 
+
+> 2
+
+‖θ − θ0‖2.
+
+## 3 Proximity to the Pretrained Model Promotes Linearity 
+
+F
+
+H fθ0
+
+fθ∗
+
+¯f¯θt
+
+∇θfθ0
+
+Figure 1: The NTK defines a linear function space 
+
+H tangent to the non-linear function space F defined by the model. Regularized fine-tuning in the lazy regime is close to kernel regression on the tangent space. 
+
+fθ⋆ (x) is the fine-tuned model obtained by empirical risk minimization. If fine-tuning remains in the lin-earized regime, then after T steps of training fθ⋆ (x) ≈
+
+fθ0 (x) + 〈∇θ fθ0 (x), ¯θT − θ0
+
+〉 is a good approxima-tion. 
+
+We first justify why we regularize for proxim-ity to the pretrained model by showing that this promotes similarity between the final fine-tuned solution and its linearized counterpart. For any (x, y) ∈ D T , the latter is defined as 
+
+¯f ¯θt (x) = fθ0 (x) + 〈∇fθ0 (x), ¯θt − θ0
+
+〉 , (6) where ¯θ denotes the parameters of the lin-earized model. We set ¯θ0 = θ0 and, therefore, for any x ∈ D T , ¯f ¯θ0 (x) = fθ0 (x).We list and discuss our main theorems toward this goal, and defer the proofs to the appendix. In Theorem 1, we provide conditions for mono-tonicity of updates in regularized fine-tuning, and use it to slightly modify gradient descent to ensure monotonicity. In Theorem 2, we de-rive an upper bound on the distance between the parameters at a step t of the regularized 3fine-tuned model and the pretrained model, i.e., 
+
+‖θt − θ0‖. In Theorem 3, we find the distance between the inference of the regularized fine-tuned model fθ(X) and the linearized model ¯f ¯θ(X)
+
+i.e., ‖fθ(X) − ¯f ¯θ(X)‖, which is the primary contribution of this section. 
+
+Theorem 1. Under the squared loss, for any t > 0, if λ > 0 and ∇θ ˜R(θt) ( θt − θ0) ≥ 0, then 
+
+d
+
+dt ‖fθt (X) − Y‖2 ≤ 0. (7) 
+
+Moreover, if ∇θ ˜R(θt) ( θt − θ0) < 0, then λ = 0 is a sufficient condition for (7) to hold. Proof. See Appendix B. 
+
+In fine-tuning, the objective in (1) is non-convex in the parameters. However, according to Theo-rem 1, a sufficient condition for regularized fine-tuning to have non-increasing ‖fθt (X) − Y‖22, is that at step t, we have ∇θt ˜R(θt) ( θt − θ0) ≥ 0 or λ = 0 . Therefore, we modify the regularization step in (5) as 
+
+θt =
+
+{ ˜θt − λ η 
+
+( ˜θt − θ0
+
+)
+
+if ∇θt ˜R(θt) ( θt − θ0) ≥ 0,
+
+˜θt if ∇θt ˜R(θt) ( θt − θ0) < 0 . (8) This is a selective regularization scheme, which decides on regularization of each trainable parameter based on the direction of its gradient. Intuitively, the inner product ∇θt ˜R(θt) ( θt − θ0) reflects how aligned the current progress is with the negative gradient update direction. A negative inner product signals consistent improvement in loss, while a positive value suggests movement toward a higher-loss region. As a result, in order to have non-increasing loss at step t, (8) regularizes only the trainable parameters with positive inner product values [9]. 
+
+Theorem 2. Consider the selectively regularized fine-tuning solution, under squared loss. Denote the instantaneous value of the regularization parameter by λt, which can be either 0 or λ. If fθ(X)
+
+is Lip (f )-Lipschitz in an ℓ2-ball of radius r around pretrained parameters θ0, we have 
+
+‖θt − θ0‖ ≤ 2 Lip (f ) ‖fθ0 (X) − Y‖
+
+∫ t
+
+> 0
+
+e−(Λ t−Λs ) ds, where Λt =
+
+∫ t
+
+> 0
+
+λsds. (9) 
+
+In the special case when λt = λ (remains constant), we obtain 
+
+‖θt − θ0‖ ≤ 2 Lip (f )‖fθ0 (X) − Y‖ 1 − e−λt 
+
+λ . (10) 
+
+Proof. See Appendix C. 
+
+Intuitively, one can think of (9) as placing the “average” λ, 1 
+
+> t
+
+Λt in (10). In what follows, we adhere to (10), for simplicity. Note that in conventional fine-tuning, λ = 0 . Since lim λ→0 1−e−λt  
+
+> λ
+
+= t the bound in (10) recovers 
+
+‖θt − θ0‖ ≤ 2 Lip (f ) ‖fθ0 (X) − Y‖ t, (11) which follows Theorem 2.3 in [16], in the case when the rescaling parameter is one. In other words, regularization and rescaling both manifest the lazy training phenomenon, but regularization main-tains much closer proximity, since 1−e−λt  
+
+> λ
+
+is bounded, unlike t.Theorem 2 is primarily a building block for Theorem 3; it simply says that while the solution may deviate from the origin under regularization, we can bound that deviation. Theorems 3 and 4 show that we can jump from a deviation from the initialization bound, which is the direct objective of regularization, to a bound on how far the NTK solution and the regularized fine-tuning solutions are, i.e., the indirect but main benefit of regularization. This is what allows us to place the approximation of Section §4 on a stronger footing than prior works [10–13] that assume that such proximity simply holds. For simplicity, we consider the λ constant case to prove Theorems 3 and 4. 4Theorem 3. Under the squared loss, if fθ (X) and ∇fθ (X) are Lip (f )-Lipschitz and Lip (∇f )-Lipschitz in an ℓ2-ball of radius r around θ0 respectively, we have 
+
+‖fθt (X) − ¯f ¯θt (X)‖ ≤ b
+
+(
+
+t − 1 − e−λt 
+
+λ
+
+)
+
+, where (12) 
+
+b = 2 Lip (f )2‖fθ0 (X) − Y‖
+
+( 4
+
+λ Lip (∇f )‖fθ0 (X) − Y‖ + 1 
+
+)
+
+. (13) 
+
+Proof. See Appendix D. 
+
+In the following theorem, we show that, for a proper choice of the regularization parameter λ, lin-earization of fine-tuning only depends on the local properties of fθ (X) around θ0.
+
+Theorem 4. Let the loss be the squared loss, fθ(X) and ∇fθ(X) be Lip (f )-Lipschitz and Lip (∇f )-Lipschitz, respectively, in an ℓ2-ball of radius r around θ0. Define 
+
+λ◦ = 2‖fθ0 (X) − Y‖ Lip (f )
+
+r .
+
+• If λ ≥ λ◦, then for all t, the following holds. 
+
+• If λ < λ ◦, then the following holds for t ≤ 1 
+
+> λ
+
+ln 1
+
+> 1−λ/λ ◦
+
+‖fθt (X) − ¯f ¯θt (X)‖ ≤ 2 Lip (f )2‖Y(0) − Y‖
+
+( 4
+
+λ Lip (∇f )‖Y(0) − Y‖ + 1 
+
+)
+
+t. 
+
+In particular, for λ ≥ λ◦, the bound from Theorem 3 always holds and simplifies to: 
+
+‖fθt (X) − ¯f ¯θt (X)‖ ≤ 2 Lip (f ) ˜R(θ0) (2 rLip (∇f ) + Lip (f )) t. 
+
+Proof. See Appendix E. 
+
+While the distance between the pretrained and fine-tuned models can be substantial, the results illustrate that this gap can be effectively constrained through regularization. Under this condition, fine-tuning can be modeled by NTK regression [15], as discussed in the following section. The takeaway of Theorem 4 is that the regularization determines the time scale at which the approxi-mation holds, as well as how tight the approximation is. Theorem 4, at first glance, seems to suggest that a larger value of λ is better to bring NTK and regularized trajectories together. However, a larger λ means that we effectively force ourselves to remain in an even smaller ball around θ0 and may suffer in terms of fine-tuning performance (see λ = 50 in Table 1). The “sweet spot” regular-ization parameter can be read from Theorem 4. It should be proportional to the smoothness of f , the pretrained error, and inversely proportional to the radius where the smoothness assumptions hold. While λ◦ is in terms of Lip (f ), Theorem 3 and (13) show that there are also diminishing returns for pushing λ beyond Lip (∇f ), due to the +1 in this term. 
+
+## 4 Fine-Tuning Meets Neural Tangent Kernel Regression 
+
+We formally define the fine-tuning problem as a regularized function estimation in the reproducing kernel Hilbert space (RKHS), H, generated by the NTK, k(x, x′) = ∇fθ (x)∇fθ (x′)⊤.As shown in the previous section, regularized fine-tuning is in the linearized regime. Therefore, 
+
+fθ⋆ (·) can be approximated by its dual in the tangent space, as shown in Figure 1. We can interpret the linearized model as a kernel method with a feature map given by φ(x) = ∇θ fθ0 (x). The corre-sponding kernel induced by this feature map is the NTK. Jacot et al. in [15], showed that gradient descent with an infinitesimally small learning rate is equivalent to performing kernel regression with the fixed NTK. Thus, the empirical risk minimization (1) is approximated by kernel regression when the kernel is the NTK [15]. Despite the fact that NTK analysis often considers the entire model, it is straightforward to specialize it to the fine-tuning case, which we do here for completeness. When using mean squared error, 5fine-tuning with the linear model is similarly equivalent to solving the kernel regression problem presented in (14). Let H be the reproducing kernel Hilbert space (RKHS) endowed with a positive definite kernel function k(·, ·), i.e., 
+
+H =
+
+{
+
+f (·) = 
+
+> n
+
+∑
+
+> i=1
+
+αik(·, xi)
+
+}
+
+.
+
+Assuming the solution lies in or close to this Hilbert space, then as an alternative to (1), we solve minimize  
+
+> f∈H
+
+1
+
+n
+
+∑
+
+> (x,y)∈D T
+
+‖f (x) − y‖2 + σ‖f ‖2
+
+> H
+
+, (14) where ‖ · ‖ H is the norm corresponding to the inner product 〈· , ·〉 H defined on the RKHS H. The parameter σ > 0 regularizes the problem toward minimum-norm solutions and is qualitatively in-versely related to the number of gradient descent steps in the original problem. We thus effectively formulate the fine-tuning problem as a regularized function estimation in the RKHS, H, generated by the NTK, k(x, x′) = ∇fθ0 (x)∇fθ0 (x′)⊤. According to the representer theorem [19], the problem (14) on training dataset DT = {xi, yi}ni=1 possesses the closed-form solution 
+
+f ∗(·) = 
+
+> n
+
+∑
+
+> i=1
+
+αik (·, xi) = α⊤K(·, X), (15) where K(·, X) = [ k(·, x1), . . . , k(·, xn)] ∈ R1×n . Substituting (15) in (14), we have minimize  
+
+> α
+
+E(x,y)∼D T
+
+∥∥α⊤K(·, X) − Y∥∥2 + σ‖f ‖2
+
+> H
+
+, (16) which is a convex problem with α∗ = [ K (X,X) + σI]−1 Y as the solution. Equivalently, 
+
+f ∗(·) = K (·, X) [ K (X,X) + σI]−1 Y, (17) where [K(X, X)] i,j = k(xi, xj ). For the sake of brevity, hereafter, we use K(X, X) and K inter-changeably. Under linearity, we now show through Theorem 5 that the spectrum of the NTK directly affects the empirical risk, making it a tool that can be used for making fine-tuning decisions. 
+
+Theorem 5. The empirical risk is bounded as 
+
+( σ ‖Y‖
+
+σ + λmax (K)
+
+)2
+
+≤ R (θ) ≤
+
+( σ ‖Y‖
+
+σ + λmin (K)
+
+)2
+
+, (18) 
+
+where λmin (K) and λmax (K) are the minimum and maximum eigenvalues of K(X, X), respectively. Proof. See Appendix F. 
+
+Theorem 5 motivates us to study the regularized condition number κ(K + σI) = λmax (K)+ σ  
+
+> λmin (K)+ σ
+
+as an at-initialization metric for predicting the performance of fine-tuning. To show how this can be useful, for example, in selecting what subset of parameters to tune, we next study the randomized kernel specifically for fine-tuning, which enables us to investigate the training dynamics based on the influence of each individual trainable parameter on the bounds in Theorem 5. 
+
+## 5 Spectral Perturbation of Layers 
+
+We have shown that (i) regularized fine-tuning is well-approximated by its fully linearized counter-part, (ii) that optimizing the linearized fine-tuning is equivalent to NTK kernel regression, and (iii) that the kernel’s spectrum is predictive of the fine-tuning performance. To put these facts to use, in this section, we study the effect of layer selection on the spectrum of the NTK, and consequently on the empirical risk of fine-tuning. Let θl be the parameters of the layer l from the pretrained model and θ = {θ1, . . . , θL} be the set of parameters of the L layers from the pretrained model. The NTK, 6when the parameters in θ are chosen for fine-tuning, is [K]i,j = ∑Ll=1 ∇θl fθ (xi) ∇θl fθ (xj )⊤. The kernel induced by θl is Sl ∈ Rn×n, where 
+
+[Sl]i,j = ∇θl fθ (xi) ∇θl fθ (xj )⊤. (19) One can infer that the NTK induced by all layers is K = ∑Ll=1 Sl.The following theorems quantify the effect of adding a set of trainable parameters on the spectrum of the NTK. 
+
+Theorem 6. Let K be the NTK with respect to the set of selected fine-tuning parameters, and S be the kernel with respect to the parameters of the candidate layers, to add to the fine-tuning parameters. Then 
+
+(1 − η)λi(K) ≤ λi(K + S) ≤ (1 + η)λi(K), (20) 
+
+where η = ‖K−1/2S K −1/2‖.Proof. See Appendix G. 
+
+The spectral perturbation bounds of Theorem 6 can interact with the risk bounds given by Theorem 5, to help us further understand the relative merits of parameter choices. We denote by R(θ) and 
+
+R(θ ∪ ˆθ), respectively, the empirical risk of the model fine-tuned with parameters θ and θ ∪ ˆθ.
+
+Theorem 7. Let K be the NTK induced by the trainable parameters in θ, then if κ(K + σI) ≤ c,we have 
+
+λmax (K + S + σI)
+
+aλ max (K + σI) ≤
+
+(
+
+R(θ ∪ ˆθ)
+
+R(θ)
+
+) 1
+
+> 2
+
+≤ aλ max (K + S + σI)
+
+λmax (K + σI) , (21) 
+
+where a = c 
+
+> (1 −η)2
+
+, η = ‖K−1/2SK −1/2‖ and S is the kernel induced by ˆθ with [S]i,j =
+
+∇ ˆθ fθ (xi) ∇ ˆθ fθ(xj )⊤.Proof. See Appendix H. 
+
+The above result implies that, by incorporating an additional layer to the parameters being fine-tuned, one can expect 1 
+
+> 2
+
+log R(θ∪ ˆθ) 
+
+> R(θ)
+
+∈
+
+[
+
+log λmax (K+S)+ σ  
+
+> λmax (K)+ σ
+
+− log a, log λmax (K+S)+ σ  
+
+> λmax (K)+ σ
+
++ log a
+
+]
+
+.
+
+Corollary 1. When we have two candidate layers ˆθ1 and ˆθ2, mutatis mutandis, we have 
+
+λmax (K + S1 + σI)
+
+bλ max (K + S2 + σI) ≤
+
+(
+
+R(θ ∪ ˆθ1)
+
+R(θ ∪ ˆθ2)
+
+) 1
+
+> 2
+
+≤ bλ max (K + S1 + σI)
+
+λmax (K + S2 + σI) , (22) 
+
+where b = a1a2, al = c  
+
+> (1 −ηl)2
+
+, ηl = ‖K−1/2Sl K−1/2‖ for l ∈ { 1, 2}, and Sl is the kernel induced by ˆθl with [Sl]i,j = ∇ ˆθl fθ (xi) ∇ ˆθl fθ(xj )⊤.
+
+As such, one can evaluate the candidacy of layers for fine-tuning based on Corollary 1. In order to anticipate the empirical risk of fine-tuning, at initialization we look at a confined interval, i.e.,  
+
+> 1
+> 2
+
+log R(θ∪ ˆθ1)  
+
+> R(θ∪ˆθ2)
+
+∈
+
+[
+
+log λmax (K+S1)+ σ  
+
+> λmax (K+S2)+ σ
+
+− log b, log λmax (K+S1)+ σ  
+
+> λmax (K+S2)+ σ
+
++ log b
+
+]
+
+.
+
+## 6 Experiments 
+
+We now demonstrate that insights from our theory apply in practice, despite moving from squared loss to cross-entropy and from gradient descent to the AdamW optimizer, which we use for all fine-tuning in conjunction with the selective regularization (8). In our experiments, we implement LoRA on RoBERTa base and evaluate its performance on the General Language Understanding Evaluation (GLUE) benchmark [20], IMDb [21], and Yelp [22] datasets. 7Dataset Hyper-Parameter λ 50 10 5 2 1 0.5 0.1 0.0                                                                                   
+
+> CoLA
+> ‖θt−θ0‖20.280 0.350 0.404 0.5263 0.6148 0.6946 0.8223 0.960
+> ‖fθt(X)−¯f¯θt(X)‖21.06 1.12 1.39 1.25 1.27 1.32 1.28 1.47
+> KL Divergence 0.1060 0.1377 0.200 0.1613 0.1788 0.1961 0.1599 0.210
+> Evaluation Accuracy of fθt(x)74.59 79.57 80.44 79.38 80.24 80.15 80.15 79.67
+> SST-2
+> ‖θt−θ0‖20.292 0.336 0.369 0.424 0.520 0.700 1.589 2.519
+> ‖fθt(X)−¯f¯θt(X)‖21.712 2.303 2.635 2.957 3.217 3.331 3.397 2.791
+> KL Divergence 0.320 0.433 0.476 0.517 0.545 0.560 0.578 0.540
+> Evaluation Accuracy of fθt(x)89.3 91.2 91.5 92.4 92.8 93.0 92.4 91.6
+
+Table 1: Sweep over the hyperparameter ( λ). Increasing regularization strength, i.e., larger λ, reduces the deviation between the regularized fine-tuning and linearized models at one snapshot of fine-tuning at step t.Accuracy is largely unaffected by regularization. 
+
+6.1 Model, Datasets and Optimizer 
+
+RoBERTa base incorporates several key modifications to the pretraining process, such as using larger batch sizes, longer sequences, and more diverse data than its antecedents like BERT [23]. Despite its relatively compact size of 125 M parameters, RoBERTa base has proven to be one of the most powerful models for various NLP tasks, including text classification, question answering, and named entity recognition, especially on the GLUE benchmark. The GLUE benchmark is a collection of diverse tasks that test a model’s natural language under-standing abilities. The tasks included in our experiments are linguistic acceptability judgment (CoLA [24]) and sentiment analysis (SST-2 [25]). The GLUE benchmark provides a comprehen-sive evaluation of a model’s performance across various NLP challenges, assessing its ability to understand and reason about language in different contexts. The IMDb dataset is a large dataset for binary sentiment classification, containing 50 k highly pop-ular movie reviews from the Internet Movie Database (IMDb). The Yelp dataset contains customer reviews from Yelp, a popular platform for crowd-sourced reviews about businesses, primarily restau-rants. This dataset originally contains reviews with ratings from 1 to 5. To convert it into a binary classification task, we consider reviews with ratings less than 3 as label 0 (negative sentiment) and those with ratings greater than or equal to 3 as label 1 (positive sentiment). Table 9 in Appendix N shows specific hyperparameters for RoBERTa base across various bench-marks, including GLUE tasks (CoLA, SST-2), Yelp, and IMDb. For all experiments, we use LoRA on the RoBERTa-base model from the Hugging Face transformers library [26], and report its perfor-mance on different tasks. We implemented our code on NVIDIA Tesla V100 GPUs. Following Hu et al. ( 2022 ), we mostly use the weights of the query and value layers, Wq ∈ Rm×p and Wv ∈ Rm×p
+
+for fine-tuning. In our experiments, we apply LoRA with r = 8 , which has (m+p)×r = 2 ×768 ×8
+
+trainable parameters per selected layer for each of the query, key, and value projection matrices in the self-attention mechanism in the RoBERTa base model.                                                                                                       
+
+> Dataset Selected Layers Selected Parameters Condition Number Train Loss Evaluation Loss Evaluation Accuracy
+> CoLA
+> {0} {Wq,Wv}11,618 0.5271 0.5265 73.15
+> {0,11} {Wq,Wv}9,490 0.5174 0.5293 73.15
+> {0,5,11} {Wq,Wv}7,503 0.5093 0.5272 73.44
+> {0,5,11} {Wk}2,320 0.5128 0.5357 73.25
+> SST-2
+> {0} {Wq,Wv}5,195 0.4794 0.3871 83.48
+> {0,11} {Wq,Wv}6,413 0.4677 0.3916 82.79
+> {0,5,11} {Wq,Wv}6,792 0.5078 0.3913 82.68
+> {0,5,11} {Wk}450.64 0.4717 0.3893 83.60
+> Yelp
+> {0} {Wq,Wv}274 0.29 0.2597 88.20
+> {0,11} {Wq,Wv}4,167 0.2882 0.2596 88.24
+> {0,5,11 }{Wq,Wv}1,336 0.2885 0.2596 88.21
+> {0,5,11} {Wk}39.33 0.2865 0.2596 88.23
+> IMDb
+> {0} {Wq,Wv}179 0.3512 0.2702 89.56
+> {0,11} {Wq,Wv}5,899 0.3597 0.2717 89.50
+> {0,5,11 }{Wq,Wv}1,277 0.3709 0.2727 89.49
+> {0,5,11} {Wk}9.605 0.3642 0.2719 89.49
+
+Table 2: RoBERTa-base model’s performance on GLUE tasks, condition number of the NTK, train loss, and evaluation loss at one snapshot of the training at 10 -th epoch. LoRA with r = 8 is used for fine-tuning. The condition number is calculated as κ(K + σI) = λmax (K)+ σ  
+
+> λmin (K)+ σ
+
+, and σ = 1 e−4 is fixed among all tasks. 
+
+80    0   
+
+> E
+> 0
+> 0
+> 0
+> 0
+> 0
+>  
+> 
+>  
+>   
+> 
+
+(a) Train loss over 10 epochs      
+
+> C    
+> D 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+>      
+
+(b) Condition number        
+
+> C     
+> D
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+>           
+> 
+> 
+> 
+> 
+> 
+>      
+
+(c) Evaluation accuracy and Condi-tion number 
+
+Figure 2: (a)-(b) Illustrate the positive correlation between the convergence rate of optimization steps of LoRA over 10 epochs and κ(K + σI) of NTK at initialization. {Wq , Wv } of layers {0, 5, 11 } are fine-tuned. (c) Illustrates the negative correlation between evaluation accuracy after 10 epochs of training and the condition number of NTK. LoRA with r = 8 is used to fine-tune {Wk } of the layers {0, 5, 11 }.
+
+6.2 Linearization of Fine-Tuning 
+
+In Table 1, we analyze how regularization impacts the fine-tuning of models on the CoLA and SST-2 datasets, using several metrics, including the deviation of fine-tuned parameters from the pretrained parameters, ‖θt − θ0‖, KL divergence between predictions of the regularized fine-tuned model and its linearized counterpart, the ℓ2 norm ‖fθt (X) − ¯f ¯θt (X)‖2, evaluation accuracy. The results indicate that increasing the regularization strength, λ, reduces both the deviation in parameters and prediction divergence, measured by KL divergence and ‖fθt (X) − ¯f ¯θt (X)‖, implying that stronger regularization keeps the fine-tuning behavior closer to its linearized approximation. Conversely, as regularization weakens, λ → 0, parameter deviations and divergences from linearization increase, suggesting a more significant departure from the linear regime. This is well aligned with the bounds in Theorems 2 and 4. Notably, the overall accuracy remains largely unaffected by the regularization, and its fluctuations are within the error margin for λ up to 10. The key takeaways from Table 1 are that, as long as we don’t overregularize ( λ not too large, e.g., smaller than 50), we simultaneously: (1) encourage the model not to deviate (the direct objective of regularization), (2) encourage the NTK solution and the regularized fine-tuning solutions to become closer (the indirect main objective of regularization), and (3) do not sacrifice much on performance. We conjecture that the reason we don’t sacrifice much on performance is that the fine-tuning solution is already relatively close to the initial model and that there are equivalently good NTK solutions in the same neighborhood. (The choice of λ is similar to searching for solutions within sequentially smaller neighborhoods around the initialization, as λ increases.) The trifecta of easy implementa-tion, no performance sacrifice, and theoretical compatibility with the NTK framework makes our proposed regularization an especially attractive choice. 
+
+6.3 NTK Evaluation 
+
+We verify our proposition that by calculating the condition number of the NTK matrix for the LoRA model at initialization, we can predict the generalization error, including evaluation loss and accu-racy. Table 2 presents training loss, evaluation loss, accuracy, condition number of the NTK before fine-tuning, based on the snapshot at epoch 10. We vary LoRA parameters across different layers ({0}, {11}, {0,11}, {0,5,11}) for query and value parameters, and layers {0,5,11} for key parame-ters, across various tasks and datasets. We collected X = [ x1, x2, . . . , xn]⊤ using n = 32 samples, randomly selected from the training datasets and computed k(xi, xj ) with respect to trainable pa-rameters, A and B of LoRA. The final empirical NTK matrix is K(X, X) ∈ R32 ×32 . Our work is not specifically studying optimal sketching of the kernel matrix; however, in Appendix I, we empir-ically illustrate that our numerical results are robust to the choice of NTK samples. Note that the number of samples used for calculation of the empirical NTK is orders of magnitude smaller than the training dataset for sampling. This shows that the results remain valid even with a sketch of the full kernel. This finding highlights the great potential of kernel methods for large language models (LLMs), particularly in terms of efficiency. At first glance, in Table 2, the highest condition number does not correspond to the lowest accuracy. However, one may notice that this is an issue primarily when the nature (query/value vs. key) and number of parameters change . When this is the case, the effective complexity of the fine-9tuned model changes, and since the NTK parameter σ is inversely proportional to the complexity, it affects the regularized condition number. In the table, we have fixed σ and so this change is not being reflected and it is only fair to compare instead cases where the nature and number of parameters are the same, e.g., fixing a layer and varying tasks among CoLA, SST2, IMDB, YeLP. The correlation is perfect for {0, 11 }, but also mostly tracks for other fixed choices. This also holds when varying the same number of layers like {0, 7}, {0, 11 } for CoLA and SST2 in Fig. 3. It would be very interesting to factor the change of σ into the layer selection methodology, but that is a great direction for future research. More extensive numerical results for decoder-only models, such as GPT-2 and OPT-125M, are provided in Appendix J. Training time and NTK calculation time are reported in Table 3 for fine-tuning {Wk} in layers 
+
+{0, 5, 11 }. For this scenario, the number of total trainable parameters (TTPs) is 0.628 M, and the number of chosen NTK parameters is 36 .8k. As shown in the table, fine-tuning, even with just 
+
+10 epochs, has significantly higher computational overhead than computing the NTK. This finding supports the advantage of the present approach in terms of time complexity when comparing the risks of different datasets without training. Additionally, since Yelp and IMDb are larger datasets, it is evident that fine-tuning on them requires more time compared to the others. Figure 2(a)-(b) illustrates the positive correlation between the condition number of the NTK matrix at initialization and training loss for different tasks. In all datasets, the attention parameters of layers {0, 5, 11 }
+
+are fine-tuned, and evaluation accuracy was reported. Although for CoLA, it is customary to report Matthew’s correlation coefficients [27], we adhere to reporting the evaluation accuracy for all tasks in Figure 2(c), to maintain consistency in the evaluation metric across different datasets. Figure 2(c) starkly illustrates an inverse relationship between the condition number of the NTK and the model’s evaluation accuracy. In our experiments, we observed that λmin (K) is almost always close to zero and the regularized condition number, κ(K + σI), is tracing the spectral norm or λmax (K). For in-stance, the CoLA task, which exhibits the highest training loss, also shows the largest condition num-ber. This suggests that by computing the NTK matrix before training, we can identify which tasks are well-conditioned, i.e., a lower condition number indicates lower training and evaluation loss.           
+
+> Dataset Fine-tuning Time NTK Calculation Time
+> CoLA 187 33
+> SST-2 794 63
+> Yelp 46,096 245
+> IMDb 1,541 55
+
+Table 3: Fine-tuning time(s), NTK calculation time(s),        
+
+> {Wk}of layers {0,5,11 }are fine-tuned. In all datasets, only 32 random samples from the training set are used calculating the NTK.
+
+Figure 3 in Appendix L evaluates the bounds of Theorem 7, where θ represents the weights 
+
+{Wk} of layer {0}, and ˆθ denotes the candi-date layers. The empirical risk ratio and maxi-mum eigenvalue ratio closely follow each other in most cases. Theorem 4 conveys that the spec-trum of the NTK directly affects the empirical risk. Therefore, we propose to select the lay-ers based on the eigenvalues they induce in the NTK. For instance, as seen in Figure 3, for the CoLA dataset, the eigenvalue analysis at-initialization suggests that layers {0, 7} should be selected for fine-tuning, and it also shows the least empirical risk compared to others. Similarly, for SST-2, {0, 5, 11 } is the optimal choice by eigenvalues and is once again consistent with the empirical risk after fine-tuning. 
+
+## 7 Conclusion and Limitations 
+
+In this paper, we tackled the challenge of guiding design decisions in parameter-efficient fine-tuning by offering insights through linearization. Fine-tuned models are often implicitly close to the pre-trained model. We made this proximity explicit and showed that it results in a model that remains close to the linearization of the pre-trained model. We used the linear model’s NTK regression formulation to show that the NTK kernel spectrum can be a predictor of fine-tuning performance, at-initialization (before actual tuning). We then analyzed how this spectrum is affected through layer selection and showed how this can experimentally guide the decision of which layers to tune, saving valuable time and computational resources. Some of the limitations of the theory are that it applies to squared loss and gradient descent, though the experiments show that the insights carry to other losses (such as cross-entropy) and stochastic solvers (such as AdamW). The experiments on RoBERTa with LoRA across multiple datasets (GLUE, IMDb, and Yelp tasks) demonstrate reason-able correspondence between theory and practice, despite some theoretical assumptions differing from experimental conditions. Discussion on the implications of the assumptions is provided in Appendix M. 10 Acknowledgments and Disclosure of Funding 
+
+This paper is based upon work supported in part by the National Science Foundation, through the NSF CAREER Program under Award No. CCF-2146334 (From Rare Events to Competitive Learn-ing Algorithms), the NSF HDR TRIPODS Phase II Program under Award No. ECCS-2217023 (IDEAL Institute). Computational infrastructure was supported in part by the NSF MRI Program Award No. CNS-1828265 (COMPaaS DLV). 11 References 
+
+[1] H. Touvron, T. Lavril, G. Izacard, X. Martinet, M.-A. Lachaux, T. Lacroix, B. Rozière, N. Goyal, E. Hambro, F. Azhar et al. , “LLaMA: Open and efficient foundation language mod-els,” arXiv preprint arXiv:2302.13971 , 2023. [2] A. Chowdhery, S. Narang, J. Devlin, M. Bosma, G. Mishra, A. Roberts, P. Barham, H. W. Chung, C. Sutton, S. Gehrmann et al. , “PaLM: Scaling language modeling with pathways,” 
+
+Journal of Machine Learning Research , vol. 24, no. 240, pp. 1–113, 2023. [3] J. Howard and S. Ruder, “Universal language model fine-tuning for text classification,” Asso-ciation for Computational Linguistics , pp. 328–339, 2018. [4] E. Ben-Zaken, S. Ravfogel, and Y. Goldberg, “BitFit: Simple parameter-efficient fine-tuning for transformer-based masked language-models,” Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics (Volume 2: Short Papers) , pp. 1–9, 2022. [5] N. Houlsby, A. Giurgiu, S. Jastrzebski, B. Morrone, Q. De Laroussilhe, A. Gesmundo, M. At-tariyan, and S. Gelly, “Parameter-efficient transfer learning for NLP,” International conference on machine learning , pp. 2790–2799, 2019. [6] N. Ding, Y. Qin, G. Yang, F. Wei, Z. Yang, Y. Su, S. Hu, Y. Chen, C.-M. Chan, W. Chen et al. ,“Parameter-efficient fine-tuning of large-scale pre-trained language models,” Nature Machine Intelligence , vol. 5, no. 3, pp. 220–235, 2023. [7] B. Lester, R. Al-Rfou, and N. Constant, “The power of scale for parameter-efficient prompt tuning,” Proceedings of the 2021 Conference on Empirical Methods in Natural Language Pro-cessing , pp. 3045–3059, 2021. [8] A. Tomihari and I. Sato, “Understanding linear probing then fine-tuning language models from ntk perspective,” arXiv preprint arXiv:2405.16747 , 2024. [9] J. Tian, C. Huang, and Z. Kira, “Rethinking weight decay for robust fine-tuning of foundation models,” in The Thirty-eighth Annual Conference on Neural Information Processing Systems .[10] A. Deshpande, A. Achille, A. Ravichandran, H. Li, L. Zancato, C. Fowlkes, R. Bhotika, S. Soatto, and P. Perona, “A linearized framework and a new benchmark for model selection for fine-tuning,” arXiv preprint arXiv:2102.00084 , 2021. [11] F. Mu, Y. Liang, and Y. Li, “Gradients as features for deep representation learning,” in Interna-tional Conference on Learning Representations .[12] G. Ortiz-Jimenez, A. Favero, and P. Frossard, “Task arithmetic in the tangent space: Improved editing of pre-trained models,” Advances in Neural Information Processing Systems , vol. 36, pp. 66 727–66 754, 2023. [13] U. Jang, J. D. Lee, and E. K. Ryu, “LoRA training in the NTK regime has no spurious local minima,” Forty-first International Conference on Machine Learning , 2024. [14] Z. R. Afzal, T. Esmaeilbeig, M. Soltanalian, and M. I. Ohannessian, “Can the spectrum of the neural tangent kernel anticipate fine-tuning performance?” in Adaptive Foundation Models: Evolving AI for Personalized and Efficient Learning .[15] A. Jacot, F. Gabriel, and C. Hongler, “Neural tangent kernel: Convergence and generalization in neural networks,” Advances in neural information processing systems , vol. 31, 2018. [16] L. Chizat, E. Oyallon, and F. Bach, “On lazy training in differentiable programming,” Advances in neural information processing systems , vol. 32, 2019. [17] S. Malladi, A. Wettig, D. Yu, D. Chen, and S. Arora, “A kernel-based view of language model fine-tuning,” International Conference on Machine Learning , pp. 23 610–23 641, 2023. [18] L. Xuhong, Y. Grandvalet, and F. Davoine, “Explicit inductive bias for transfer learning with convolutional networks,” in International conference on machine learning . PMLR, 2018, pp. 2825–2834. [19] B. Ghojogh, A. Ghodsi, F. Karray, and M. Crowley, “Reproducing kernel Hilbert space, Mer-cer’s theorem, eigenfunctions, Nyström method, and use of kernels in machine learning: Tuto-rial and survey,” CoRR , vol. abs/2106.08443, 2021. 12 [20] A. Wang, A. Singh, J. Michael, F. Hill, O. Levy, and S. Bowman, “GLUE: A multi-task bench-mark and analysis platform for natural language understanding,” Association for Computa-tional Linguistics , pp. 353–355, 2018. [21] A. L. Maas, R. E. Daly, P. T. Pham, D. Huang, A. Y. Ng, and C. Potts, “Learning word vec-tors for sentiment analysis,” Proceedings of the 49th annual meeting of the association for computational linguistics: Human language technologies , pp. 142–150, 2011. [22] X. Zhang, J. Zhao, and Y. LeCun, “Character-level convolutional networks for text classifica-tion,” Advances in neural information processing systems , vol. 28, pp. 649–657, 2015. [23] J. Devlin, M.-W. Chang, K. Lee, and K. Toutanova, “BERT: Pre-training of deep bidirectional transformers for language understanding,” Association for Computational Linguistics , 2019. [24] A. Warstadt, A. Singh, and S. R. Bowman, “Neural network acceptability judgments,” Trans-actions of the Association for Computational Linguistics , vol. 7, pp. 625–641, 2019. [25] R. Socher, A. Perelygin, J. Wu, J. Chuang, C. D. Manning, A. Y. Ng, and C. Potts, “Recursive deep models for semantic compositionality over a sentiment treebank,” Proceedings of the 2013 conference on empirical methods in natural language processing , pp. 1631–1642, 2013. [26] T. Wolf, L. Debut, V. Sanh, J. Chaumond, C. Delangue, A. Moi, P. Cistac, T. Rault, R. Louf, M. Funtowicz et al. , “Transformers: State-of-the-art natural language processing,” Proceed-ings of the 2020 Conference on Empirical Methods in Natural Language Processing: System Demonstrations , pp. 38–45, 2020. [27] B. W. Matthews, “Comparison of the predicted and observed secondary structure of T4 phage lysozyme,” Biochimica et Biophysica Acta (BBA)-Protein Structure , vol. 405, no. 2, pp. 442– 451, 1975. [28] M.-Y. Chung, J. Fan, H. Ye, Q. Wang, W.-C. Shen, C.-M. Yu, P.-Y. Chen, and S.-Y. Kuo, “Model reprogramming demystified: A neural tangent kernel perspective,” arXiv preprint arXiv:2506.00620 , 2025. [29] R. Mathias, “Spectral perturbation bounds for positive definite matrices,” SIAM Journal on Matrix Analysis and Applications , vol. 18, no. 4, pp. 959–980, 1997. [30] Y. Chen, E. N. Epperly, J. A. Tropp, and R. J. Webber, “Randomly pivoted cholesky: Practical approximation of a kernel matrix with few entry evaluations,” Communications on Pure and Applied Mathematics , vol. 78, no. 5, pp. 995–1041, 2025. [31] L. Bottou, F. E. Curtis, and J. Nocedal, “Optimization methods for large-scale machine learn-ing,” SIAM review , vol. 60, no. 2, pp. 223–311, 2018. [32] S. Borade and L. Zheng, “Euclidean information theory,” in International Zurich Seminar on Communications . IEEE, 2008, pp. 14–17. [33] D. Savostianova, E. Zangrando, G. Ceruti, and F. Tudisco, “Robust low-rank training via approximate orthonormal constraints,” Advances in Neural Information Processing Systems ,vol. 36, pp. 66 064–66 083, 2023. 13 A Definitions and Lemmas 
+
+In all the following proofs, we apply the notations and definitions below. Given the data matrices 
+
+(X, Y), X ∈ Rn×d and Y ∈ R1×n we define the models inference at time step t as 
+
+Y(t) = fθt (X) ∈ Rn×1, (23) The gradient ∇θt fθt (X), by convention, is in Rn×dim (θ). The gradient of (3), the mean squared error, is 
+
+∇θt ˜R(θt) = 2 ( Y(t) − Y)⊤ ∇fθt (X). (24) On the other hand, the inference of the linearized model is defined as 
+
+¯Y(t) = ¯f ¯θt (X) = fθ0 (X) + 〈∇fθ0 (X), ¯θt − θ0
+
+〉 , (25) where ¯θ denotes the parameters of the linearized model, and we assume ¯θ0 = θ0 and therefore 
+
+¯f ¯θ0 (X) = fθ0 (X).For all vectors, we use the ℓ2-norm. For all matrices, we use the ℓ2 induced norm, or spectral norm, defined as ‖A‖ = sup {‖ Av ‖2 : ‖v‖2 ≤ 1}, which is also equal to sup {‖ uA ‖2 : ‖u‖2 ≤ 1} and the largest singular value of A.
+
+Lemma 1. If for all θ in a given range, fθ(X) is Lip (f )-Lipschitz in θ (w.r.t. the ℓ2-norm) and ∇fθ(X) is Lip (∇f )-Lipschitz in θ (w.r.t. the ℓ2 induced norm), then kθ (X, X) = 
+
+∇fθ (X) ∇fθ (X)⊤ ∈ Rn×n is Lip (k)-Lipschitz in θ (w.r.t. the ℓ2 induced norm), with Lip (k) ≤ 2 Lip (f ) Lip (∇f ). (26) 
+
+Proof. First, since fθ is Lip (f )-Lipschitz, it follows that the ℓ2 induced norm of ∇fθ is bounded by Lip (f ). To see this, for any dim (θ)-dimensional vector w, introduce the single parametrized family 
+
+θ(δ) = θ + δw. Then d 
+
+> dδ
+
+fθ(δ) = ∇fθ(δ)w. By Lipschitzness, ‖fθ(δ) − fθ(0) ‖ ≤ Lip (f )δ‖w‖.Taking the limit δ → 0 we obtain that ‖∇ fθw‖ ≤ Lip (f )‖w‖.Recall that kθ (X, X) is the NTK matrix. Since all arguments of kθ , fθ , and ∇fθ are X, we omit them for clarity. To show that kθ is Lipschitz and to compute its Lipschitz constant, given any 
+
+n-dimensional unit vector v, we need to bound 
+
+‖(kθ − kζ )v‖ = ‖ (∇fθ ∇f ⊤ 
+
+> θ
+
+− ∇ fζ ∇f ⊤
+
+> ζ
+
+) v‖. (27) We write 
+
+(kθ − kζ )v = ∇fθ
+
+(∇f ⊤ 
+
+> θ
+
+− ∇ f ⊤
+
+> ζ
+
+) v + ( ∇fθ − ∇ fζ ) ∇f ⊤ 
+
+> ζ
+
+v, (28) which yields, by the triangle inequality, norm bounds, and Lipschitzness, 
+
+‖(kθ − kζ )v‖ ≤ ∥∥∇fθ
+
+(∇f ⊤ 
+
+> θ
+
+− ∇ f ⊤
+
+> ζ
+
+) v∥∥ + ∥∥(∇fθ − ∇ fζ ) ∇f ⊤ 
+
+> ζ
+
+v∥∥ (29) 
+
+≤ ‖∇ fθ ‖ ∥∥(∇f ⊤ 
+
+> θ
+
+− ∇ f ⊤
+
+> ζ
+
+) v∥∥ + ‖∇ fθ − ∇ fζ ‖ ∥∥∇f ⊤ 
+
+> ζ
+
+v∥∥ (30) 
+
+≤ Lip (f ) ‖∇ fθ − ∇ fζ ‖ + Lip (∇f )‖θ − ζ‖ ‖∇ fζ ‖ (31) 
+
+≤ Lip (f )Lip (∇f )‖θ − ζ‖ + Lip (∇f )‖θ − ζ‖Lip (f ) (32) 
+
+= 2 Lip (f )Lip (∇f )‖θ − ζ‖, (33) which proves the claim. 
+
+Lemma 2. The NTK matrix K ∈ Rn×n, defined by [K]i,j = k(xi, yj ), is positive semidefinite. Proof. For all v ∈ Rn, we have v⊤Kv = v⊤∇fθ∇f ⊤ 
+
+> θ
+
+v = ‖∇ f ⊤ 
+
+> θ
+
+v‖ ≥ 0. Therefore, K is positive semi-definite. 
+
+Lemma 3. Let θt be the gradient flow limit of the regularized fine-tuning gradient descent described in (8) . If we assume that λ switches at most countably often and denote its instantaneous value by 
+
+λt, then θt satisfies the following differential equation: 
+
+d
+
+dt θt = −∇ ˜R(θt)⊤ − λt (θt − θ0) . (34) 14 Proof. Subtracting θ0 from both sides of (5) yields 
+
+θt − θ0 = ˜θt − θ0 − λ η 
+
+( ˜θt − θ0
+
+)
+
+, (35) or equivalently, (8) becomes 
+
+θt = θ0 + (1 − λt η)
+
+( ˜θt − θ0
+
+)
+
+, (36) where 
+
+λt =
+
+{
+
+λ if ∇θt ˜R(θt) ( θt − θ0) ≥ 0,
+
+0 otherwise. . (37) On the other hand, by combining (4) and (5) for t + 1 we have 
+
+θt+1 = θt − η∇ ˜R(θt)⊤ − λt+1 η
+
+( ˜θt+1 − θ0
+
+)
+
+, (38) 
+
+= θt − η∇ ˜R(θt)⊤ − λt+1 η
+
+1 − λt+1 η (θt+1 − θ0) , (39) where we replaced ˜θt+1 − θ0 = 1  
+
+> 1−λt+1 η
+
+(θt+1 − θ0) from (36) in (38) to obtain (39). By rearrang-ing the terms we have 
+
+θt+1 = (1 − λt+1 η)
+
+(
+
+θt − η∇ ˜R(θt)⊤ + λt+1 η
+
+1 − λt+1 η θ0
+
+)
+
+, (40) 
+
+= (1 − λt+1 η)θt − η(1 − λt+1 η)∇ ˜R(θt)⊤ + λt+1 η θ0. (41) Subtracting θt from both sides and division by η yields 
+
+θt+1 − θt
+
+η = −λt+1 θt − (1 − λt+1 η)∇ ˜R(θt)⊤ + λt+1 θ0, (42) 
+
+d
+
+dt θt = −∇ ˜R(θt)⊤ − λt (θt − θ0) . (43) To obtain the last equation, we take the limit as η → 0 from both sides such that θt+1 −θt 
+
+> η
+
+→ dθ(t)
+
+> dt
+
+and 1 − λη → 1.
+
+## B Proof of Theorem 1 
+
+From Lemma 3, we reproduce (34), assuming for the moment a constant λ:
+
+d
+
+dt θt = −∇ ˜R(θt)⊤ − λ (θt − θ0) . (44) Using chain rule on (23), and substituting for ∇ ˜R(θt) using (24), we have 
+
+d
+
+dt Y(t) = ∇ fθt (X) d
+
+dt θt,
+
+= −2 ∇ fθt (X) ∇f ⊤ 
+
+> θt
+
+(X) ( Y(t) − Y) − λ ∇ fθt (X) ( θt − θ0) ,
+
+= − (2 kt (Y(t) − Y) + λ ∇fθt (X) ( θt − θ0)) , (45) To reduce clutter, we again remove the explicit dependency of the kernel on input and denote 
+
+kt(X, X) = ∇ fθt (X) ∇f ⊤ 
+
+> θt
+
+(X) by kt, hereafter. By replacing Y(t) = fθt (X) and (45) in be-low equation, we have 
+
+1
+
+2
+
+d
+
+dt ‖Y(t) − Y‖22 = 1
+
+2
+
+d
+
+dt 
+
+(
+
+(Y(t) − Y)⊤(Y(t) − Y)
+
+)
+
+= ( Y(t) − Y)⊤ d
+
+dt Y(t), (46) 
+
+= −2( Y(t) − Y)⊤kt (Y(t) − Y) − λ (Y(t) − Y)⊤ ∇ fθt (X) ( θt − θ0) , (47) 
+
+= −2〈kt (Y(t) − Y), (Y(t) − Y)〉 − λ (Y(t) − Y)⊤ ∇ fθt (X) ( θt − θ0) . (48) 15 Finally, 
+
+1
+
+2
+
+d
+
+dt ‖Y(t) − Y‖22 = −2〈kt (Y(t) − Y), (Y(t) − Y)〉 − λ
+
+2 ∇θ ˜R(θt) ( θt − θ0) . (49) Since kt = ∇fθt (X)∇f ⊤ 
+
+> θt
+
+(X) is positive semidefinite, we have 〈kt (Y(t) − Y), (Y(t) − Y)〉 ≥ 0.To ensure that the error ‖Y(t) − Y‖ does not increase over time, it is sufficient that the gradient 
+
+∇θ ˜R(θt) is aligned with the parameter update direction, i.e., 
+
+∇θ ˜R(θt)( θt − θ0) ≥ 0.
+
+If this condition is not satisfied, then we should set λ = 0 . This condition is aligned with the selective ℓ2 regularization introduced in [9]. 
+
+## C Proof of Theorem 2 
+
+Once again, use (3), to substitute ∇θ ˜R(θt) = 2 ( Y(t) − Y)⊤ ∇ fθt (X) in (34), yielding 
+
+d
+
+dt θt = − 2 ∇ fθt (X)⊤ (Y(t) − Y) − λt (θt − θ0) . (50) Let ut = θt − θ0 and w(t) = ‖ut‖2. The dynamics can be rewritten as 
+
+d
+
+dt ut = − 2 ∇ fθt (X)⊤ (Y(t) − Y) − λt ut. (51) Since ut is continuous, w(t) is a.e. differentiable and, for ut 6 = 0 ,
+
+˙w(t) = u⊤
+
+> t
+
+‖ut‖2
+
+d
+
+dt ut. (52) Substituting (51) into (52) and writing the unit vector ˆut = ut/‖ut‖2,
+
+˙w(t) = − 2 ˆ u⊤ 
+
+> t
+
+∇ fθt (X)⊤ (Y(t) − Y) − λt w(t). (53) By Cauchy–Schwarz and recalling that the ℓ2 induced norm ‖∇ fθt (X)‖ ≤ Lip( f ) (see the proof of Lemma 1), 
+
+−ˆu⊤ 
+
+> t
+
+∇ fθt (X)⊤ (Y(t) − Y) ≤ ‖∇ fθt (X)‖ ‖ Y(t) − Y‖2 ≤ Lip( f ) ‖Y(t) − Y‖2. (54) Therefore, we have 
+
+˙w(t) ≤ − λt w(t) + 2 Lip( f ) ‖Y(t) − Y‖2, (55) 
+
+˙w(t) + λt w(t) ≤ 2 Lip (f ) ‖Y(t) − Y‖2. (56) Let 
+
+Λt =
+
+∫ t
+
+> 0
+
+λτ dτ. (57) We multiply (56) by the integrating factor eΛt and use the product rule 
+
+d
+
+dt 
+
+(eΛt w(t)) ≤ 2 Lip (f ) eΛt ‖Y(t) − Y‖2. (58) We integrate (58) from 0 to t as 
+
+eΛt w(t) − w(0) ≤ 2 Lip (f )
+
+∫ t
+
+> 0
+
+eΛs ‖Y(s) − Y‖2 ds. (59) Then we divide by eΛt to obtain 
+
+w(t) ≤ e−Λt w(0) + 2 Lip (f )
+
+∫ t
+
+> 0
+
+e−(Λ t −Λs) ‖Y(s) − Y‖2 ds, (60) 
+
+≤ e−Λt w(0) + 2 Lip (f )‖Y(0) − Y‖2
+
+∫ t
+
+> 0
+
+e−(Λ t−Λs ) ds, (61) 16 where the last inequality follows from Theorem 1. 
+
+Special case 1. If λt = λ > 0, then Λt = λt therefore we have 
+
+‖ut‖2 ≤ e−λt ‖u0‖2 + 2 Lip (f )‖Y(0) − Y‖2
+
+∫ t
+
+> 0
+
+e−λ(t−s) ds, (62) 
+
+≤ e−λt ‖u0‖2 + 2 Lip (f )‖Y(0) − Y‖2
+
+1 − e−λt 
+
+λ . (63) Since ut = θt − θ0, ‖u0‖2 = 0 , and Y(0) = fθ0 (X), we have 
+
+‖θt − θ0‖2 ≤ 2 Lip (f ) ‖fθ0 (X) − Y‖2
+
+1 − e−λt 
+
+λ , (64) 
+
+lim sup 
+
+> t→∞
+
+‖θt − θ0‖2 ≤ 2 Lip (f ) ‖fθ0 (X) − Y‖2
+
+λ . (65) 
+
+Special case 2. If λt = 0 , from (61), we have 
+
+‖ut‖2 ≤ ‖ u0‖2 + 2 Lip (f ) ‖Y(0) − Y‖2
+
+∫ t
+
+> 0
+
+e0 ds. (66) Therefore, 
+
+‖θt − θ0‖2 ≤ 2 Lip (f ) ‖fθ0 (X) − Y‖2 t. (67) 
+
+## D Proof of Theorem 3 
+
+For simplicity, we consider the lambda constant case to prove Theorems 3 and 4. For Y(t) = fθt (X)
+
+and ¯Y(t) = ¯f ¯θt (X), we define ∆( t) = ‖Y(t) − ¯Y(t)‖2. We have 
+
+1
+
+2
+
+d
+
+dt ∆( t)2 = 1
+
+2
+
+d
+
+dt ‖Y(t) − ¯Y(t)‖22 (68) 
+
+= 1
+
+2 〈Y′(t) − ¯Y′(t), Y(t) − ¯Y(t)〉 + 1
+
+2 〈Y(t) − ¯Y(t), Y′(t) − ¯Y′(t)〉
+
+= 〈Y′(t) − ¯Y′(t), Y(t) − ¯Y(t)〉
+
+= 〈− kt2 ( Y(t) − Y) − λ ∇fθt (X) ( θt − θ0) + k0 2 ( ¯Y(t) − Y) , Y(t) − ¯Y(t)〉 ,
+
+where the last equality follows from (45) in the proof of Theorem 1. We simplify the following term in the last equation as 
+
+− kt2 ( Y(t) − Y) + k0 2 ( ¯Y(t) − Y) (69) 
+
+= − kt2 ( Y(t) − Y) + k02 ( Y(t) − Y) − k02 ( Y(t) − Y) + k0 2 ( ¯Y(t) − Y)
+
+= ( k0 − kt) 2 ( Y(t) − Y) + k0
+
+(2 ( ¯Y(t) − Y) − 2 ( Y(t) − Y)) ,
+
+where in the first equality we added and subtracted k02 ( Y(t) − Y). Substituting (69) in (68) yields 
+
+1
+
+2
+
+d
+
+dt ∆( t)2 = 〈(k0 − kt) 2 ( Y(t) − Y) − λ ∇fθt (X) ( θt − θ0) , Y(t) − ¯Y(t)〉
+
++ 〈k0
+
+(2 ( ¯Y(t) − Y) − 2 ( Y(t) − Y)) , Y(t) − ¯Y(t)〉 , (70) since k0 = ∇fθ0 (X) ∇fθ0 (X)⊤ is positive semidefinite, the second term on the left hand side is non-positive, i.e., 〈k0
+
+(2 ( ¯Y(t) − Y) − 2 ( Y(t) − Y)) , Y(t) − ¯Y(t)〉
+
+= −2( Y(t) − ¯Y(t)) ⊤k0(Y(t) − ¯Y(t)) ≤ 0. (71) As a result of (99) and (71), we have 
+
+1
+
+2
+
+d
+
+dt ∆( t)2 ≤ 〈 (k0 − kt) 2 ( Y(t) − Y) − λ ∇fθt (X) ( θt − θ0) , Y(t) − ¯Y(t)〉. (72) 17 Noting that 1 
+
+> 2
+> d
+> dt
+
+∆( t)2 = ∆( t) d∆( t) 
+
+> dt
+
+and taking norms on both sides of the above, then clearly using (36), we have 
+
+d
+
+dt ∆( t) = ‖ (k0 − kt) 2 ( Y(t) − Y) − λ ∇fθt (X) ( θt − θ0) ‖ (73) 
+
+≤ ‖ (k0 − kt) 2 ( Y(t) − Y) ‖ + λ‖∇ fθt (X) ( θt − θ0) ‖ (74) 
+
+≤ Lip (k)‖ (θt − θ0) ‖‖ 2 ( Y(t) − Y) ‖ + λ Lip (f ) ‖θt − θ0‖ (75) 
+
+≤ 2Lip (k)‖ (θt − θ0) ‖‖ Y(0) − Y‖ + λ Lip (f ) ‖θt − θ0‖ (76) 
+
+≤ 4 Lip (k)Lip (f )‖Y(0) − Y‖2
+
+(1 − e−λt )
+
+λ (77) 
+
++ 2 Lip 2(f )‖Y(0) − Y‖ (1 − e−λt )
+
+≤ − 2 Lip (f )‖Y(0) − Y‖
+
+( 2
+
+λ Lip (k)‖Y(0) − Y‖ + Lip (f )
+
+)
+
+e−λt (78) 
+
++ 2 Lip (f )‖Y(0) − Y‖
+
+( 2
+
+λ Lip (k)‖Y(0) − Y‖ + Lip (f )
+
+)
+
+.
+
+(75) follows from Lipschitz properties of fθ(X) and kt which was shown in Lemma 1. Due to the non-increasing property of ‖Y(t) − Y‖ shown in Theorem 1, we replaced Y(t) with Y(0) to obtain the upper bound. We also used (10) in Theorem 2 to obtain the last inequality. Using Lemma 1 and (78), we have 
+
+d
+
+dt ∆( t) ≤ b − be −λt , (79) where 
+
+b = 2 Lip (f )2‖Y(0) − Y‖
+
+( 4
+
+λ Lip (∇f )‖Y(0) − Y‖ + 1 
+
+)
+
+. (80) By taking the integral of both sides of (79), we obtain 
+
+∆( t) ≤ b
+
+(
+
+t + 1
+
+λ e−λt − 1
+
+λ
+
+)
+
+. (81) Consequently, we have (12). 
+
+## E Proof of Theorem 4 
+
+From Theorem 2, we have 
+
+‖θt − θ0‖ ≤ 2 ‖Y(0) − Y‖ Lip (f )
+
+λ
+
+(1 − e−λt ) (82) In order for the regularizer to satisfy the Lipschitz continuity assumptions, mainly that ‖θ −θ0‖ ≤ r,this shows that there are two phases of behavior depending on how large λ is. The threshold is given by: 
+
+λ◦ = 2‖Y(0) − Y‖ Lip (f )
+
+r
+
+In particular, if λ ≥ λ◦, then θt remains in the r-ball around θ0 for all t. Otherwise, it remains in this ball only as long as 
+
+t ≤ 1
+
+λ ln 1
+
+1 − λ/λ ◦
+
+.
+
+Based on Theorem 3, we get that 
+
+∆( t) ≤ 2 Lip (f )2‖Y(0) − Y‖
+
+( 4
+
+λ Lip (∇f )‖Y(0) − Y‖ + 1 
+
+) ( 
+
+t + 1
+
+λ e−λt − 1
+
+λ
+
+)
+
+.
+
+When λ ≥ λ◦, ∆( t) grows roughly linearly, with coefficient given by: 
+
+∆( t) ≤ 2 Lip (f )‖Y(0) − Y‖ (2 rLip (∇f ) + Lip (f )) t. 
+
+18 F Proof of Theorem 5 
+
+Let UΣU ⊤ denote the eigenvalue decomposition of K (X, X), where Σ =Diag ( λmin (K), . . . , λ max (K)) and U⊤U = I. Due to the proximity of the regularized fine-tuned model to the pretrained model, which promotes linearity, we have 
+
+R(θ) = 1
+
+n
+
+> n
+
+∑
+
+> i=1
+
+L(fθ (xi), yi) ≈ 1
+
+n
+
+> n
+
+∑
+
+> i=1
+
+L( ¯f ¯θ (xi), yi)= 1
+
+n
+
+> n
+
+∑
+
+> i=1
+
+∥∥∥yi − K (xi, X) [ K (X, X) + σI]−1 Y
+
+∥∥∥22
+
+= 1
+
+n
+
+∥∥∥Y − K (X, X) ( K (X, X) + σI)−1 Y
+
+∥∥∥22
+
+= 1
+
+n
+
+∥∥∥(
+
+I − K (X, X) ( K (X, X) + σI)−1)
+
+Y
+
+∥∥∥22
+
+= 1
+
+n
+
+∥∥(I − UΣU ⊤(UΣU ⊤ + σI)−1) Y∥∥22
+
+= 1
+
+n
+
+∥∥(I − UΣ (Σ + σI)−1 U⊤) Y∥∥22
+
+= 1
+
+n
+
+∥∥U (I − Σ(Σ + σI)−1) U⊤Y∥∥22
+
+= 1
+
+n
+
+∥∥(I − Σ(Σ + σI)−1) U⊤Y∥∥22 . (83) Since I − Σ(Σ + σI)−1 is a diagonal matrix, we have 
+
+λmin 
+
+(I − Σ(Σ + σI)−1)2 ‖U⊤Y‖22 < R(θ) < λ max (I − Σ(Σ + σI)−1)2‖U⊤Y‖22. (84) Noting that 
+
+λmin 
+
+(I − Σ(Σ + σI)−1) = σ
+
+σ + λmax (K) , (85) 
+
+λmax 
+
+(I − Σ(Σ + σI)−1) = σ
+
+σ + λmin (K) , (86) we have 
+
+σ2 ‖Y‖22
+
+(σ + λmax (K)) 2 ≤ R (θ) ≤ σ2 ‖Y‖22
+
+(σ + λmin (K)) 2 (87) which is also shown in [28]. 
+
+## G Proof of Theorem 6 
+
+Since K is positive semidefinite (see Lemma 2), we have 
+
+K + S = K1/2 (
+
+I + K−1/2S K −1/2)
+
+K1/2. (88) Considering η = ‖K−1/2S K −1/2‖, we have 
+
+−ηI ≤ K−1/2S K −1/2 ≤ ηI. (89) Consequently, 
+
+(1 − η)I ≤ I + K−1/2S K −1/2 ≤ (1 + η)I, (90) and, from (88) and (90), we obtain 
+
+(1 − η)K ≤ K + S ≤ (1 + η)K. (91) Note that for any two positive semidefinite matrices A and B, if A ≤ B, then λi(A) ≤ λi(B).Therefore, (91) is equivalent to (20) [29]. 19 H Proof of Theorem 7 
+
+From Theorem 5, we already know 
+
+(λmin (K) + σ)2
+
+σ2‖Y‖2 ≤ 1
+
+R(θ) ≤ (λmax (K) + σ)2
+
+σ2‖Y‖2 . (92) Theorem 6, states that 
+
+λmax (K) + σ = λmax (K + σI) ≤ λmax (K + S + σI)
+
+1 − η (93) and 
+
+λmin (K) + σ = λmax (K + σI)
+
+κ(K + σI) ≥ λmax (K + S + σI)
+
+κ(K + σI)(1 + η) . (94) Therefore, we have 
+
+λmax (K + S + σI)
+
+σ‖Y‖κ(K + σI)(1 + η) ≤ 1
+
+R(θ) 1
+
+> 2
+
+≤ λmax (K + S + σI)
+
+σ‖Y‖(1 − η) . (95) On the other hand, it follows from Theorem 5 that 
+
+σ‖Y‖
+
+λmax (K + S) + σ ≤ R (θ ∪ ˆθ) 1 
+
+> 2
+
+≤ σ‖Y‖
+
+λmin (K + S) + σ , (96) and, from Theorem 6 that 
+
+λmin (K + S) + σ ≥ (1 − η)λmin (K + σI)= (1 − η)λmax (K + σI)
+
+κ(K + σI) ,λmax (K + S) + σ ≤ (1 + η)λmax (K + σI). (97) From (96) and (97), we conclude 
+
+σ‖Y‖
+
+(1 + η)λmax (K + σI) ≤ R (θ ∪ ˆθ) 1 
+
+> 2
+
+≤ σ‖Y‖κ(K + σI)
+
+(1 − η)λmax (K + σI) . (98) 
+
+Considering that κ(K + σI) ≤ c, the inequalities (98) and (95) imply 
+
+λmax (K + S + σI)
+
+c(1 + η)2λmax (K + σI) ≤
+
+(
+
+R(θ ∪ ˆθ)
+
+R(θ)
+
+) 1
+
+> 2
+
+≤ cλ max (K + S + σI)
+
+(1 − η)2λmax (K + σI) . (99) Note that (1 − η)2 ≤ (1 + η)−2. By defining a = c 
+
+> (1 −η)2
+
+, we can rewrite (99) in the desired form: 
+
+λmax (K + S + σI)
+
+aλ max (K + σI) ≤
+
+(
+
+R(θ ∪ ˆθ)
+
+R(θ)
+
+) 1
+
+> 2
+
+≤ aλ max (K + S + σI)
+
+λmax (K + σI) . (100) 20 I Robustness to Sampling for Estimating the NTK 
+
+We empirically illustrate that the eigenvalues of the NTK are robust to the choice of NTK samples. Sketching of the kernel matrices is studied in the literature, for instance, in [30]. In [17], which also modeled fine-tuning as an NTK regression problem, the number of NTK samples is fixed to 16 and 64 (see Table 2 of [17]). 
+
+Random Seed λmin λmax Condition Number 
+
+42 2.04 × 10 −6 0.0030 32 .43 
+
+123 6.45 × 10 −7 0.0035 36 .85 
+
+7 7.37 × 10 −8 0.0025 26 .22 
+
+99 3.19 × 10 −9 0.0024 25 .82 
+
+2024 6.78 × 10 −8 0.0025 26 .86 
+
+Table 4: Condition numbers and eigenvalues for different random seeds. Wk of layer 11 is fine-tuned. 
+
+## J Additional Experiments 
+
+We fine-tuned decoder-only models GPT-2 and OPT-125M for 10 epochs using the Adam optimizer. LoRA with r = 8 is used to fine-tune Wk of the layers {0, 5, 11 }. The negative correlation between evaluation accuracy after 10 epochs of training and the condition number of the NTK is illustrated below. In GPT-2, Yelp with the lowest condition number, possesses the highest accuracy, and in OPT-125M, IMDb and Yelp, with higher accuracies, have lower condition numbers than the other tasks. 
+
+Model Dataset Eval Accuracy (%) Condition Number 
+
+GPT-2 
+
+CoLA 71.0 83 
+
+IMDb 87.4 36 
+
+Yelp 87.6 35 
+
+OPT-125m 
+
+SST-2 64.8 910 
+
+CoLA 69.1 720 
+
+IMDb 70.0 210 
+
+Yelp 82.1 310 
+
+Table 5: Evaluation results for GPT-2 and OPT-125M across different datasets. 
+
+## K Lipschitzness 
+
+To empirically estimate Lipschitzness for all models in balls around the initial model θ0, we need to choose models θ in this ball and calculate the Lipschitz constants for each using pairs of feature points (x, x′). Since it’s not feasible to choose all models and all pairs, we have to sample them reasonably. In the table below, we report on θ sampled uniformly on consecutive spherical shells with increasing radius and (x, x′) samples from pairs of training data points. We calculate the estimated Lipschitz constant for each θ and report both the average and maximum estimates, for each radius. The accurate Lipschitz constant Lip (f ), technically, is the maximum. However, the average is also meaningful in that it represents more typical practical behavior. We conducted the following procedure. We first capture the maximum fluctuation, Rmax , in parame-ters θ as in Table 6 . 21 Dataset Layer Rmax 
+
+CoLA Wk ∈ { 0, 5, 11 } 0.174 CoLA Wk ∈ { 0, 11 } 0.189 
+
+Table 6: Rmax = Max |θ − θ0| during 10 epochs of fine-tuning. 
+
+Algorithm 1 Computation of Lavg and Lupper vs. r
+
+Input: Set S of data samples (x, x′)
+
+1: Initialize list Lmax (indexed by θ)
+
+2: Initialize lists Lavg , Lupper (indexed by r)
+
+3: for r = 0 to Rmax do 
+
+4: Generate a new set T (r) of nT models using 
+
+θ = θ0 + distortion( r), where distortion( r) = rv 
+
+‖v‖ , v ∼ N (0 , 1) 
+
+5: for all θ ∈ T (r) do 
+
+6: Initialize empty list Llist 
+
+7: Set model params to θ
+
+8: for all (x, x′) ∈ S do 
+
+9: Compute ‖fθ(x′) − fθ(x)‖
+
+‖x′ − x‖ and append to Llist 
+
+10: end for 
+
+11: Append max( Llist ) to Lmax 
+
+12: end for 
+
+13: Append mean( Lmax ) to Lavg 
+
+14: Append max( Lmax ) to Lupper 
+
+15: end for Output: Lavg and Lupper vs. r
+
+Then we used Rmax to calculate the Lipschitz continuity as in Algorithm 1. We used |S| = 1000 
+
+pairs of data points, nT = 100 models, i.e., 100 different θs, with Rmax = 0 .174 according to Table 6, 10 steps to vary distortion r in step 3 of the algorithm, and regularization value λ = 5 .Both the average, Lavg , and upper bound, Lupper , Lipschitz constants show a gradual and consistent increase as r grows, indicating that the model’s sensitivity to perturbations increases mildly with distance from the original parameters θ0. On average, the model remains stable under small to moderate distortions.                       
+
+> rLavg Lupper
+> 0.000000 0.020724 0.020724 0.019333 0.020725 0.020764 0.038667 0.020726 0.020803 0.058000 0.020727 0.020843 0.077333 0.020727 0.020883 0.096667 0.020728 0.020923 0.116000 0.020729 0.020962 0.135333 0.020730 0.021002 0.154667 0.020731 0.021042 0.174000 0.020732 0.021081
+
+Table 7: Lipschitz ratio of the model with selected layers {0, 5, 11 } and parameter type key ( Wk)for 1000 pairs of data samples (x, x′) with Rmax = 0 .174 .22 r Lavg Lupper 
+
+0.000000 0.014479 0.014479 0.021000 0.014480 0.014505 0.042000 0.014482 0.014530 0.063000 0.014483 0.014556 0.084000 0.014484 0.014582 0.105000 0.014486 0.014608 0.126000 0.014487 0.014634 0.147000 0.014488 0.014660 0.168000 0.014490 0.014686 0.189000 0.014491 0.014712 
+
+Table 8: Lipschitz ratio of the model with selected layers {0, 11 } and parameter type key ( Wk) for 
+
+100 pairs of data samples (x, x′) with Rmax = 0 .189 .
+
+## L Layer Selection Algorithm 
+
+Building upon the foundation established by Theorem 7, Corollary 1, and Figure 3, we distill our proposed methodologies into the following PEFT layer selection strategy informed by our spectral perturbation bounds. 
+
+Algorithm 2 Trainable Parameter Selection via Spectral Perturbation 
+
+Input: Pretrained parameters θ; scalar σ > 0; training samples X = [ x1, . . . , xn]⊤; candidates parameter subsets { ˆθ(1) , . . . , ˆθ(L)}; C = {1, . . . , L }
+
+1: Compute base NTK matrix K ∈ Rn×n.
+
+2: for l = 1 , . . . , L do 
+
+3: Compute kernel contribution Sl for candidate ˆθ(l).
+
+4: end for 
+
+5: for each subset C ∈ C do 
+
+6: Compute combined kernel SC ← ∑
+
+l∈C Sl.
+
+7: Compute spectral ratio 
+
+rc ← λmax 
+
+(K + SC + σI)
+
+λmax (K + σI) .
+
+8: end for 
+
+9: Select C∗ ← argmin 
+
+C
+
+rc.
+
+Output: Selected parameters { ˆθ(l) : l ∈ C∗}.             
+
+> {  {  {   {   {    
+> C    θ̂ θ
+> 
+> 
+> 
+> 
+> 
+>       
+> 
+> 
+> 
+> 
+> 
+>            
+> C
+
+(a) CoLA           
+
+> {  {  {   {   {    
+> C     θ̂ θ
+> 
+> 
+> 
+> 
+> 
+> 
+>         
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+>        
+> 
+
+(b) SST-2 
+
+Figure 3: Empirical risk ratio log 
+
+( R(θ∪ ˆθ)
+
+> R(θ)
+
+)
+
+and maximum eigenvalue ratio log 
+
+( λmax (K+S+σI) 
+
+> λmax (K+σI)
+
+)
+
+are used to evaluate the impact of candidate layers. Here, θ is fixed as the weights {Wk } of layer {0}, while ˆθ represents the candidate layers. The horizontal axis represents the combination of layer {0} and different candidate layers. 
+
+23 M Discussion and Implication of Assumptions 
+
+• Stochastic vs. deterministic gradient descent: Our theoretical derivations are based on deterministic gradient descent, while the AdamW optimizer, which is stochastic, is used in our experiments. Our theory is designed to make a few key aspects precise: (1) that it is possible to directly elicit NTK regime behavior through regularization and (2) that, once we operate in the NTK regime, the spectrum of the kernel determines training performance. Note that (2) does not rely on any particular optimization scheme. As for (1), while it is true that the noisy gradient aspect of stochastic approaches is not part of the theory, gradi-ent descent/flow captures the local-search approach of gradient-based methods, including SGD and its variants. Applying selective regularization (Eq. (8)) is as straightforward as applying gradient clipping with SGD and Adam. The bounds of Theorems 3 and 4 transfer to stochastic variants through standard bounds that link their respective trajectories. (These typically need strong convexity assumptions on the loss functions and bounds on the vari-ance of the stochastic gradient [31]. • Regularized vs. non-regularized fine-tuning It is crucial to emphasize that our linearity analysis only applies to the explicitly regularized variant of fine-tuning that we present. Even though we believe that this regularization may sometimes exist implicitly during fine-tuning, establishing bounds between non-regularized fine-tuning and linearized fine-tuning remains outside the scope of this paper and is an interesting avenue for future investigation. • Cross-entropy vs. mean squared loss: Our theoretical results are derived for the squared loss, while our experiments succeed with cross-entropy. According to [31], we provide intu-itions on why our theoretical insights generalize well to different loss functions. Note that optimizing cross-entropy is equivalent to optimizing KL-divergence, and KL-divergence and squared loss are intimately related, given that they’re both Bregman divergences. For two outputs that are close to each other, i.e., in the high-accuracy regime, the KL-divergence behaves very similarly to the squared loss [32]. As such, while the theory doesn’t apply di-rectly to cross-entropy, the behavior that we demonstrate qualitatively supports the behavior that we experimentally observe with cross-entropy. • Lipschitzness The Lipschitz continuity assumption in Theorems 2- 4 is not limiting. Al-most every architecture and training methodology used in practice limits the complexity of the networks. Of particular relevance to our paper are the robust variants of low-rank adaptation, which explicitly enforce this kind of Lipschitz condition [33]. In Appendix K, we empirically estimate the Lipschitz constant for models in balls around the initial model. 
+
+## N Hyperparameters 
+
+Dataset CoLA SST-2 Yelp IMDb 
+
+Optimizer AdamW Warmup Ratio 0.06 LR Schedule Linear Max Sequence Length 512 LoRA Rank r 8LoRA α 8Number of Epochs 10 
+
+Batch Size 32 16 32 16 Learning Rate 4e-4 5e-4 4e-4 4e-4 
+
+Table 9: Hyperparameters used for the RoBERTa-base model on various benchmarks, including GLUE (CoLA, SST-2), Yelp, and IMDb. 24

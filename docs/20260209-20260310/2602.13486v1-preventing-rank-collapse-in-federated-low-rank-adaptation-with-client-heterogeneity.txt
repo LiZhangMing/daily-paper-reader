@@ -1,0 +1,1895 @@
+Title: Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity
+
+URL Source: https://arxiv.org/pdf/2602.13486v1
+
+Published Time: Tue, 17 Feb 2026 01:20:09 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+# Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+Fei Wu 1 Jia Hu 1 Geyong Min 1 Shiqiang Wang 1
+
+## Abstract 
+
+Federated low-rank adaptation (FedLoRA) has facilitated communication-efficient and privacy-preserving fine-tuning of foundation models for downstream tasks. In practical federated learn-ing scenarios, client heterogeneity in system re-sources and data distributions motivates hetero-geneous LoRA ranks across clients. We identify a previously overlooked phenomenon in hetero-geneous FedLoRA, termed rank collapse , where the energy of the global update concentrates on the minimum shared rank, resulting in subopti-mal performance and high sensitivity to rank con-figurations. Through theoretical analysis, we re-veal the root cause of rank collapse: a mismatch between rank-agnostic aggregation weights and rank-dependent client contributions, which sys-tematically suppresses higher-rank updates at a geometric rate over rounds. Motivated by this insight, we propose raFLoRA , a rank-partitioned aggregation method that decomposes local up-dates into rank partitions and then aggregates each partition weighted by its effective client contribu-tions. Extensive experiments across classification and reasoning tasks show that raFLoRA prevents rank collapse, improves model performance, and preserves communication efficiency compared to state-of-the-art FedLoRA baselines. 
+
+## 1. Introduction 
+
+Pre-trained foundation models (FMs) have become the cor-nerstone of generative AI tasks across natural language pro-cessing (NLP) and computer vision (CV) domains (Vaswani et al., 2017; Grattafiori et al., 2024; Dosovitskiy et al., 2021). Fine-tuning these models has emerged as a standard paradigm for efficiently adapting them to diverse down-stream tasks. However, high-quality public data are increas-ingly scarce, and privacy concerns over training on private 
+
+> 1
+
+Department of Computer Science, University of Exeter, Exeter, UK. Correspondence to: Fei Wu <fw407@exeter.ac.uk >.
+
+Preprint. February 17, 2026. 
+
+Figure 1. FedLoRA with heterogeneous ranks. The global update is aggregated and allocated across clients with different ranks. 
+
+data continue to grow. Federated learning (FL) (McMa-han et al., 2017) enables privacy-preserving collaboration to effectively leverage distributed private data for training high-quality models, therefore, FL has been combined with fine-tuning of FMs in recent works. However, the prohibitive communication overhead due to the scale of FMs has motivated the development of the federated low-rank adaptation (FedLoRA) framework (Hu et al., 2022; Zhang et al., 2024). Existing studies primarily focus on improving performance (Chen et al., 2025; Guo et al., 2025) or mitigating aggregation bias (Sun et al., 2024; Singhal et al., 2025b). Despite their effectiveness, they pre-dominantly operate under homogeneous settings, assuming that all clients adopt an identical LoRA rank. In practice, clients in FL exhibit inherent heterogeneity in both system resources and data distributions. Client resources vary widely in computational capability, mem-ory size, and communication bandwidth, while client data are typically non-independent and identically distributed (non-IID) across domains. In this context, the LoRA rank inherently controls the trade-off between resource usage and adaptation capacity. For example, in central-ized fine-tuning of LLaMA-3.1-8B (Grattafiori et al., 2024) on MetaMathQA40K (Yu et al., 2024) and evaluation on GSM8K (Cobbe et al., 2021), increasing the LoRA rank from 8 to 256 enlarges the model update size from 13 MiB to 416 MiB, while improving accuracy from 70.3% to 74.1%. Consequently, allowing heterogeneous LoRA ranks pro-vides a principled way to accommodate client heterogeneity 1 
+
+> arXiv:2602.13486v1 [cs.LG] 13 Feb 2026 Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity
+> Table 1. Comparison of different federated low-rank adaptation methods under heterogeneous rank settings.
+
+Methods Heterogeneous Rank Support Unbiased Aggregation Communication Overhead Rank Collapse Prevention 
+
+FedIT (Zhang et al., 2024) ✗ ✗ O(( d + n)r) N/A 
+
+HetLoRA (Cho et al., 2024) ✓ ✗ O(( d + n)r) ✗
+
+FLoRA (Wang et al., 2024) ✓ ✓ O(min( m(d + n)r, dn )) ✗
+
+FlexLoRA (Bai et al., 2024) ✓ ✓ O(( d + n)r) ✗
+
+raFLoRA (ours) ✓ ✓ O(( d + n)r) ✓
+
+in FL. In this direction, several works have investigated Fed-LoRA with heterogeneous ranks by exploring aggregation and allocation across clients (Cho et al., 2024; Wang et al., 2024; Bai et al., 2024). Figure 1 provides an overview of the heterogeneous FedLoRA training methods. Nevertheless, our observation identifies a previously over-looked phenomenon in existing heterogeneous FedLoRA methods. Taking the state-of-the-art FlexLoRA (Bai et al., 2024) as a representative example, we observe that, even though higher-rank clients contribute more parameters dur-ing training, almost all of the energy 1 of the global update is captured by the minimal shared rank, as illustrated in Figure 2a. We term this behavior rank collapse , where the collapse reflects the concentration of the energy spectrum, rather than a reduction in algebraic rank. This phenomenon leads to consistently suboptimal performance across diverse non-IID data settings and induces high sensitivity to the shared rank, as shown in Figures 2c and 2d. Therefore, this study aims to address the following research question: 
+
+How to prevent rank collapse while consistently improving global performance of FedLoRA with client heterogeneity? 
+
+Addressing this question poses two non-trivial challenges: (i) Despite the empirical evidence, there remains a lack of principled understanding of why rank collapse arises under joint data and rank heterogeneity, where aggregation and allocation processes across heterogeneous clients are tightly coupled. (ii) Translating this understanding into a heteroge-neous FedLoRA framework is challenging, as preventing rank collapse requires rethinking the aggregation mecha-nism beyond uniform weighting, while balancing unbiased aggregation with communication efficiency. Together, these challenges call for a deeper understanding of rank collapse and a principled solution for heterogeneous-rank FedLoRA. To address these challenges, we conduct a rigorous theoreti-cal analysis and reveal the root cause of rank collapse to a rank-wise averaging mismatch in heterogeneous-rank aggre-gation: the same aggregation weight is applied to all rank directions, while higher-rank directions (non-shared) are supported by only a subset of clients. As a result, updates                  
+
+> 1In this paper, the term “energy” refers to the squared singular values of a matrix, not physical energy consumption at devices.
+> (a) FlexLoRA .(b) raFLoRA (ours).
+> (c) non-IID settings. (d) Rank configurations.
+> Figure 2. Energy breakdown of the global update and accuracy under various settings. In (a) and (b), the global update has an alge-braic rank of 64. Client ranks are selected from {8,16 ,32 ,48 ,64 }.In (c), αcontrols the degree of data heterogeneity across clients. In (d), only the minimal rank r1varies across different ranks.
+
+along higher-rank directions are systematically diluted under uniform averaging. More importantly, this dilution accumu-lates across successive rounds, geometrically suppressing higher-rank contributions until they become negligible. Motivated by this insight, we propose raFLoRA , a rank-partitioned aggregation method for federated low-rank adap-tation with client heterogeneity. Specifically, raFLoRA 
+
+decomposes local updates into non-overlapping rank par-titions and aggregates each part using weights determined by its rank-wise effective contributors. By correcting the mismatch, raFLoRA eliminates the per-round dilution of higher-rank updates and thereby prevents rank collapse. Ta-ble 1 summarizes the key differences between raFLoRA 
+
+and baselines. Figure 2b empirically validates raFLoRA ’s ability to prevent rank collapse, while Figures 2c and 2d demonstrate its consistent accuracy gains across diverse non-IID data distributions and rank configurations. We summarize the main contributions of this work below: • We identify a previously overlooked phenomenon in het-erogeneous FedLoRA, termed rank collapse , reveal its root cause as a mismatch between rank-agnostic aggrega-tion weights and rank-dependent client contributions, and prove that the collapse proceeds at a geometric rate. 2Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+• We propose raFLoRA , a novel rank-partitioned aggre-gation method that resolves the mismatch by aligning aggregation weights with rank-wise effective client con-tributions, thereby preventing rank collapse. • We empirically demonstrate that raFLoRA consistently preserves rank-wise energy and improves global model performance across diverse tasks and non-IID data distri-butions, while maintaining communication efficiency. 
+
+## 2. Related Work 
+
+Homogeneous FedLoRA. To reduce the communication cost of federated fine-tuning for FMs, FedIT (Zhang et al., 2024) integrates LoRA into local training. Build-ing on this framework, RoLoRA (Chen et al., 2025) im-proves convergence via alternating optimization, while 
+
+FedSA-LoRA (Guo et al., 2025) decouples global and per-sonalized LoRA components. To address data heterogeneity, 
+
+SLoRA (Babakniya et al., 2023) adopts a two-stage initial-ization strategy, and FRLoRA (Yan et al., 2025) increases effective update rank through residual-based updates. To mitigate aggregation bias, FFA-LoRA (Sun et al., 2024) up-dates only the LoRA B matrix, and FedEx-LoRA (Singhal et al., 2025b) applies local bias correction. However, these methods are limited to homogeneous FedLoRA settings. 
+
+Heterogeneous FedLoRA. In practical FL scenarios, client heterogeneity motivates heterogeneous FedLoRA ranks across clients. Zero-padding-based HetLoRA (Cho et al., 2024) enables aggregation across heterogeneous ranks, but introduces aggregation bias. To address this issue, 
+
+FLoRA (Wang et al., 2024) proposes a stacking-based aggre-gation scheme to achieve unbiased aggregation, at the cost of additional communication overhead and cold-start LoRA initialization. FlexLoRA (Bai et al., 2024) eliminates this communication overhead by aggregating reconstructed full-size parameters and reassigning rank-specific LoRA updates via SVD. However, our theoretical analysis uncovers that rank collapse is a universal phenomenon in heterogeneous FedLoRA, leading to suboptimal performance and high sensitivity to the shared rank. In contrast, the proposed 
+
+raFLoRA prevents rank collapse through rank-partitioned aggregation, while achieving unbiased aggregation and pre-serving communication efficiency. 
+
+## 3. Preliminaries 
+
+In this section, we formalize a model of vanilla FedLoRA that captures unbiased and communication-efficient aggre-gation in a unified framework (Bai et al., 2024). Concretely, there are K clients, each assigned a LoRA rank 
+
+rk ∈ { r1, r 2, . . . , r max }, where the rank levels satisfy r1 <r2 < · · · < r max . At round t, the server uniformly samples a subset Mt ⊆ { 1, . . . , K } of M clients at random. We define rank coverage as the probability pi = P(rk ≥
+
+i) = |{ k : rk ≥ i}| /K , where i = 1 , . . . , r max .
+
+p1 = · · · = pr1 = 1 > p r1+1 ≥ · · · ≥ prmax > 0, (1) which means that higher ranks are supported by progres-sively fewer clients in heterogeneous-rank settings. We consider a specific layer of the pre-trained weight ma-trix Wpre ∈ Rd×n. We model the incremental global up-date using a rank-rmax LoRA parameterization: ∆W (t) 
+
+> g
+
+≈
+
+B(t) 
+
+> g
+
+A(t) 
+
+> g
+
+where the server maintains a maximal rank rmax 
+
+with B(t) 
+
+> g
+
+∈ Rd×rmax and A(t) 
+
+> g
+
+∈ Rrmax ×n.For each selected client k ∈ M t, the server broadcasts the corresponding rank-rk LoRA parameters obtained by truncation: eB(t) 
+
+> k
+
+= B(t) 
+
+> g
+
+[: , 1 : rk] and eA(t) 
+
+> k
+
+= A(t) 
+
+> g
+
+[1 : rk, :] ,where [: , 1 : rk] denotes selecting all rows and the first rk
+
+columns, and [1 : rk, :] denotes selecting the first rk rows and all columns. Client k then locally trains these parameters on its private data, producing local updates B(t) 
+
+> k
+
+and A(t) 
+
+> k
+
+.The heterogeneous client updates are aggregated in the full 
+
+d × n space using FedAvg (McMahan et al., 2017): 
+
+∆W (t+1)  
+
+> g
+
+= 1
+
+M
+
+X
+
+> k∈M t
+
+B(t) 
+
+> k
+
+A(t) 
+
+> k
+
+= 1
+
+M
+
+X
+
+> k∈M t
+
+∆W (t) 
+
+> k
+
+, (2) assuming equal client samples for analytical simplicity. The aggregated update ∆W (t+1)  
+
+> g
+
+is then decomposed to rank rmax via SVD (Bai et al., 2024): 
+
+∆W (t+1)  
+
+> g
+
+≈
+
+> rmax
+
+X
+
+> i=1
+
+σ(t+1)  
+
+> i
+
+u(t+1)  
+
+> i
+
+v(t+1) ⊤ 
+
+> i
+
+. (3) The global LoRA updates B(t+1)  
+
+> g
+
+and A(t+1)  
+
+> g
+
+are then re-constructed from the SVD components. Specifically, 
+
+B(t+1)  
+
+> g
+
+= [ σ(t+1) 1 u(t+1) 1 , . . . , σ (t+1)  
+
+> rmax
+
+u(t+1)  
+
+> rmax
+
+],A(t+1)  
+
+> g
+
+= [ v(t+1) 1 , . . . , v (t+1)  
+
+> rmax
+
+]⊤. (4) which defines the global LoRA update for the next round. To assess the effect of heterogeneous ranks on the global update, we quantify each singular direction by its expected 
+
+energy e(t) 
+
+> i
+
+= E[( σ(t) 
+
+> i
+
+)2]. We define the cumulative energy up to rank-r is E(t) 
+
+> r
+
+= Pri=1 e(t) 
+
+> i
+
+and the normalized energy ratio is ρ(t) 
+
+> r
+
+= E(t) 
+
+> r
+
+/E (t) 
+
+> rmax
+
+, which measures the fraction of total expected energy captured by the top-r directions. After SVD, the total energy of the global update is decom-posed into rank-1 to rank-rmax components under a fixed ordering by descending singular values. We refer to the minimal rank r1 as the shared rank , with the remaining 
+
+rmax − r1 components forming the higher ranks . Accord-ingly, ρ(t) 
+
+> r1
+
+measures the energy fraction in the shared rank, while 1 − ρ(t) 
+
+> r1
+
+corresponds to that in the higher ranks. 3Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+## 4. Problem Analysis 
+
+Based on the above formulation, we define rank collapse and analyze its emergence under vanilla FedLoRA, with intuitive insights into the underlying mechanism. 
+
+4.1. Definition of Rank Collapse 
+
+According to our observations in Figure 2a, although the global update is decomposed into rank-rmax components, its singular-value energy increasingly concentrates on the shared rank r1 over rounds. This observation motivates the following definition, where the formal definition of energy ratio ρ(t) 
+
+> r1
+
+for the shared rank is provided in Section 3. 
+
+Definition 4.1 (Rank Collapse) . In vanilla FedLoRA, we define rank collapse to occur when 1 − ρ(t) 
+
+> r1
+
+progressively diminishes and becomes negligible over training rounds. Under rank collapse, although the global update retains al-gebraic rank rmax after SVD, its effective rank no longer reflects the available higher-rank capacity. Instead, the learn-ing dynamics are governed by the shared rank r1, render-ing higher-rank components progressively ineffective. This limits the expressiveness of the global model, resulting in suboptimal performance under non-IID data and strong sen-sitivity to the shared client rank, as illustrated in Figure 2. 
+
+4.2. Theoretical Analysis 
+
+To expose the core mechanism underlying rank collapse, we analyze the formulation under the following assumptions. 
+
+Assumption 4.2 (Fixed Singular Basis) . We assume that the global update can be represented as ∆W (t) 
+
+> g
+
+=
+
+Prmax  
+
+> i=1
+
+σ(t) 
+
+> i
+
+uiv⊤ 
+
+> i
+
+where {uiv⊤ 
+
+> i
+
+} is a fixed singular basis. 
+
+Assumption 4.3 (Direction-preserving Updates) . We as-sume that client updates preserve the global singular direc-tions, i.e., ∆W (t) 
+
+> k
+
+= Prk 
+
+> i=1
+
+eσ(t)
+
+> k,i
+
+uiv⊤ 
+
+> i
+
+, where eσ(t) 
+
+> k,i
+
+= β σ (t)
+
+> i
+
+and β > 0 is a scalar scaling factor. These assumptions yield a minimal, tractable model with a closed-form recursion in a fixed singular basis, which is reasonable when the dominant subspace evolves slowly across rounds. We later relax them to account for basis drift. Based on Assumptions 4.2–4.3 and preliminaries in Sec-tion 3, we obtain the following Theorem 4.4, with the de-tailed proof provided in Appendix A. 
+
+Theorem 4.4 (Rank Collapse in vanilla FedLoRA) . Let 
+
+ρ(t) 
+
+> r1
+
+=  
+
+> Pr1
+> i=1 e(t)
+> i
+> Prmax
+> j=1 e(t)
+> j
+
+denote the cumulative expected energy ratio of the global update within the shared rank r1 at round 
+
+t. Then the effective rank of the global update collapses to 
+
+r1 at a geometric rate. Specifically, for any t ≥ 0,
+
+1 − ρ(t) 
+
+> r1
+
+≤ Cγ t, (5)  
+
+> Figure 3. Illustration of rank collapse. The shared-rank directions are fully aggregated, while the higher-rank directions are diluted.
+
+where the initial energy imbalance constant C and the con-vergence rate γ are given by 
+
+C =
+
+Prmax  
+
+> j=r1+1
+
+e(0) 
+
+> j
+
+Pr1 
+
+> i=1
+
+e(0) 
+
+> i
+
+, γ = qr1+1 
+
+qr1
+
+< 1. (6) 
+
+Here qi = β2h(pi) is the sampling-induced contraction factor, where pi denotes the rank coverage rate as defined previously, and h(p) = p2 + K−MM (K−1) p(1 − p) is increasing in p. Consequently, lim t→∞ ρ(t) 
+
+> r1
+
+= 1 .
+
+The intuitive mechanism behind Theorem 4.4 is a mismatch in heterogeneous-rank aggregation: the same aggregation weight is applied to all rank directions, while higher-rank directions are supported by only a subset of clients. Specifi-cally, for a given rank direction i, only clients with rk ≥ i
+
+contribute to the update, yielding piM effective contribu-tors in expectation. However, FedAvg nevertheless normal-izes the aggregation by the total number of clients M in a rank-agnostic manner, even though the effective number of contributors is inherently rank-dependent. In expectation, the update along direction i behaves as 
+
+E[σ(t+1)  
+
+> i
+
+| σ(t) 
+
+> i
+
+] = piM · (βσ (t) 
+
+> i
+
+)
+
+M = piβσ (t) 
+
+> i
+
+. (7) As illustrated in Figure 3, this mismatch systematically at-tenuates higher-rank updates at each aggregation round, and the effect accumulates over training to ultimately induce rank collapse. For the shared directions ( i ≤ r1), we have 
+
+pi = 1 , and the updates are properly averaged. In contrast, for higher-rank directions ( i > r 1), pi < 1, causing their updates to be systematically suppressed ( i.e., diluted un-der uniform averaging) by a multiplicative factor pi across rounds. Consequently, energy in higher-rank directions de-cays geometrically relative to the shared rank r1, and the global update becomes dominated by the top-r1 directions. The above intuition is derived under assumptions that iso-late the rank-wise averaging mismatch. Nevertheless, rank collapse persists under general non-IID settings and may 4Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+Figure 4. Illustration of the rank-partitioned aggregation. Each partition is weighted by its effective participating clients. 
+
+be further reinforced by data heterogeneity. Relaxing As-sumptions 4.2–4.3 causes clients to update different local subspaces, inducing drift in the singular directions across rounds. As a result, while the top-r1 directions are broadly shared and remain stable under aggregation, higher-rank directions encode more client-specific information and thus become increasingly misaligned and susceptible to atten-uation. Consequently, higher-rank components are both diluted by uniform averaging and accumulate energy less effectively across rounds, causing the shared directions to dominate the global update and reinforcing rank collapse. A detailed theoretical analysis under relaxed assumptions is provided in Appendix B. 
+
+## 5. raFLoRA Method 
+
+The analysis identifies the rank-wise averaging mismatch as the root cause of rank collapse. Motivated by this insight, we propose a new aggregation strategy to correct this mismatch. We formally introduce raFLoRA , which performs 
+
+rank-partitioned aggregation for Federated Lo w-Rank 
+
+Adaptation with clients heterogeneity. Unlike conventional 
+
+FedAvg , which uniformly averages all uploaded updates, 
+
+raFLoRA partitions the local updates into independent rank-wise components, with aggregation weights aligned to effective rank-wise contributors. Let R = {r1, r 2, · · · , r max } denote the ordered boundaries with r1 < r 2 < · · · < r max . For each h ∈ R , define 
+
+prev( h) = 
+
+(
+
+0, h = r1,
+
+max {r ∈ R | r < h }, otherwise ,
+
+which induces a rank partition [l, h ] with l = prev( h) + 1 .The full rank rmax is thus partitioned into non-overlapping rank partitions induced by the boundaries in R. As illus-trated in Figure 4, when three clients have increasing local ranks r1, r2, and r3, these boundaries divide the full rank into three partitions, each corresponding to the portion of the update that is supported by a given subset of clients. 
+
+Algorithm 1 Rank-partitioned Aggregation for Federated Low-Rank Adaptation with Client Heterogeneity 
+
+1: Input: total rounds T ; total clients K; participation ra-tio per round ρ; ranks rk ∈ {r1, r 2, . . . , r max }; Wpre ∈
+
+Rd×n; initial global LoRA updates (B(0)  
+
+> g
+
+, A (0)  
+
+> g
+
+) with B(t) 
+
+> g
+
+∈
+
+Rd×rmax , A (t) 
+
+> g
+
+∈ Rrmax ×n.2: Output: global update ∆W (t+1)  
+
+> g
+
+.3: for t = 1 to T do 
+
+4: Sample participating clients Mt ⊆ { 1, . . . , K } uniformly with |M t| = M
+
+5: Broadcast LoRA updates for each client k ∈ M t: eB(t) 
+
+> k
+
+=
+
+B(t) 
+
+> g
+
+[: , : rk ], eA(t) 
+
+> k
+
+= A(t) 
+
+> g
+
+[: rk , :] 
+
+6: In parallel for each client k ∈ M t:7: Train local model and upload B(t) 
+
+> k
+
+, A (t) 
+
+> k
+
+.8: Rank-partitioned Aggregation at Server: 9: Initialization ∆W (t+1)  
+
+> g
+
+= 0 
+
+10: for each rank boundary h ∈ R do 
+
+11: l ← prev( h) + 1 
+
+12: Ch ← { k ∈ M t : rk ≥ h}
+
+13: Nh ← P 
+
+> j∈C h
+
+nj
+
+14: ∆Wh = P
+
+> k∈C h
+> nk
+> Nh
+
+ Bk [: , l :h]Ak [l:h, :] 
+
+15: ∆W (t+1)  
+
+> g
+
+← ∆W (t+1)  
+
+> g
+
++ ∆ Wh
+
+16: end for 
+
+17: Decompose ∆W (t+1)  
+
+> g
+
+to (B(t+1)  
+
+> g
+
+, A (t+1)  
+
+> g
+
+) via SVD 18: end for 
+
+19: return (Wpre + B(t+1)  
+
+> g
+
+A(t+1)  
+
+> g
+
+)
+
+For each rank partition ending at boundary h, aggregation uses only the clients whose local rank satisfies rk ≥ h, so that aggregation weights reflect the clients that genuinely contribute information at this rank. We denote this set of ef-fective contributors by Ch = {k ∈ M t | rk ≥ h}, with the corresponding total sample size Nh = P 
+
+> k∈C h
+
+nk, where 
+
+nk denotes the local sample size of client k. As shown in Figure 4, all clients contribute to the shared-rank parti-tion [1 , r 1], fewer clients contribute to the second partition 
+
+[r1 + 1 , r 2], and only the highest-rank client contributes to the last partition [r2 + 1 , r 3].Given a specific rank partition [l, h ], its aggregated contri-bution at round t is defined as 
+
+∆W (t) 
+
+> h
+
+= X
+
+> k∈C h
+
+nk
+
+Nh
+
+
+
+B(t) 
+
+> k
+
+[: , l :h] A(t) 
+
+> k
+
+[ l:h, :] 
+
+
+
+, (8) where the slice [: , l :h] selects all rows and rank indices l
+
+through h of B(t) 
+
+> k
+
+, and [ l:h, :] selects rank indices l through 
+
+h and all columns of A(t) 
+
+> k
+
+.The global update is then obtained by summing the contribu-tions from all rank partitions, ∆W (t+1)  
+
+> g
+
+= P 
+
+> h∈R
+
+∆W (t) 
+
+> h
+
+.Accordingly, in the example illustrated in Figure 4, the aggregation weights are 1/3 for the shared-rank partition where three clients contribute, 1/2 for the second partition where two clients contribute, and 1 for the last partition where only a single client provides updates. 5Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+After aggregation, ∆W (t+1)  
+
+> g
+
+is projected via SVD (Eqs. 3– 4) to obtain ∆W (t+1)  
+
+> g
+
+= B(t+1)  
+
+> g
+
+A(t+1)  
+
+> g
+
+, which initializes the global model in LoRA representation at round t+1 .Algorithm 1 summarizes the raFLoRA workflow, which in-corporates rank-partitioned aggregation with heterogeneous client ranks. In each round, the server uniformly samples clients, broadcasts the global LoRA updates, and collects local updates in parallel (Lines 4–7). The server then per-forms rank-partitioned aggregation, aggregating each rank partition using only its effective contributors (Lines 9–16), followed by an SVD to obtain the global low-rank factors for the next round (Line 17). In the next section, we empirically demonstrate the effectiveness of raFLoRA .
+
+## 6. Experiments 
+
+In this section, we evaluate raFLoRA through comprehen-sive experiments. We describe the experimental setup, per-formance across models and tasks, rank collapse prevention, fine-tuning overheard, and sensitivity & robustness. 
+
+6.1. Experimental Setup 
+
+The experimental setup specifies the models and datasets for each task, metrics for evaluation, non-IID data partitioning, baselines, and hyperparameter settings. All experiments are performed on a single GPU, using an NVIDIA RTX 5090 (32 GB) or an NVIDIA H100-SXM (80 GB). 
+
+Models and Datasets. Our experiments cover both encoder-only and decoder-only models across diverse tasks, in-cluding image and text classification, as well as mathe-matical and commonsense reasoning. For image classi-fication, we use ViT-base (Dosovitskiy et al., 2021) on CIFAR100 (Krizhevsky, 2009). For text classification, we adopt RoBERTa-base (Liu et al., 2019) and evaluate on 20 Newsgroups (Lang, 1995). For mathematical reasoning, we evaluate LLaMA-3.2-3B (Meta AI, 2024) and LLaMA-3.1-8B (Grattafiori et al., 2024) on GSM8K (Cobbe et al., 2021). For commonsense reasoning, we fine-tune LLaMA-3.2-3B (Meta AI, 2024) on Commonsense15K (Hu et al., 2023) and evaluate it on eight benchmarks. 
+
+Metrics. We report the energy ratio and the best test ac-curacy as mean ± standard deviation over three random seeds. In addition, communication cost is measured as the total upload and download volume over all FL rounds, while computational cost is defined as the total training runtime. 
+
+Data Partitioning. We consider both IID and multiple non-IID data partitioning strategies. For vision and NLU tasks, we adopt (i) a Dirichlet-based partitioning to control data heterogeneity, where a smaller α indicates stronger non-IIDness (denoted as niid-a1 for α = 1 ), and (ii) a pathological non-IID setting (Zhang et al., 2025) in which each client contains only a subset of labels. For instance, 
+
+patho-c20a1 indicates each client has only 20 labels with α = 1 . For GSM8K, data are uniformly partitioned across clients, while for Commonsense15K, we apply a non-IID partitioning by answer type with α = 1 .
+
+Baselines. Our experimental baselines include state-of-the-art methods designed for FedLoRA with heteroge-neous ranks. HetLoRA (Cho et al., 2024) aligns hetero-geneous ranks via zero padding, and we follow its zero-padding-based aggregation mechanism. FLoRA (Wang et al., 2024) performs aggregation through heterogeneous stacking, with stacked updates sent from the server to clients. 
+
+FlexLoRA (Bai et al., 2024) adopts an unbiased aggrega-tion scheme and allocates heterogeneous ranks using SVD. 
+
+Hyperparameters. Unless otherwise specified, we use 100 clients with a 10% participation rate per round, the AdamW optimizer, and one local epoch per round. The learning rate is initialized at 5 × 10 −4 and linearly decayed over rounds. LoRA ranks are uniformly sampled from {8, 16 , 32 , 48 , 64 }
+
+with LoRA alpha set to rk to yield unit scaling. For vision and NLU tasks, training runs for 100 rounds with LoRA applied to all linear layers, while for reasoning tasks, train-ing runs for 20 rounds with LoRA applied only to the Q
+
+and V modules. Additional hyperparameter settings and implementation details are provided in Appendix E. 
+
+6.2. Performance across Diverse Tasks 
+
+We evaluate raFLoRA across a diverse set of vision, lan-guage, and reasoning tasks, with detailed data partitioning and hyperparameter settings provided in Appendix E. As shown in Tables 2 and 3, raFLoRA delivers consistent im-provements over baselines across a wide range of tasks. 
+
+For example, on classification tasks, raFLoRA achieves the best performance on CIFAR100 and 20NG, improving accuracy by up to 2.6% and 3.0% over FlexLoRA and 
+
+FLoRA , respectively. On the more challenging mathemat-ical reasoning task GSM8K, raFLoRA further improves performance under both LLaMA-3.2-3B and LLaMA-3.1-8B settings. Moreover, on commonsense reasoning bench-marks, as shown in Table 3, raFLoRA attains the highest average accuracy across eight tasks and achieves the best results on 7 out of 8 benchmarks, demonstrating consistent gains under heterogeneous client ranks. 
+
+Table 2. Performance comparison across diverse tasks. Accuracy is reported in (%). Vision results are obtained using ViT-base, text results using RoBERTa-base, and math results using LLaMA-3.2-3B / LLaMA-3.1-8B. The best result is highlight in bold.                   
+
+> Methods Vision Language Mathematical Reasoning
+> CIFAR100 20NG GSM8K
+> HetLoRA 84.04 ±1.37 62.06 ±0.67 36.75 ±1.23 /56.43 ±0.29
+> FLoRA 86.30 ±0.79 61.91 ±0.52 36.09 ±0.57 /56.25 ±0.85
+> FlexLoRA 84.02 ±1.17 63.05 ±0.83 40.21 ±0.42 /58.43 ±0.74
+> raFLoRA (ours) 86.59 ±0.75 64.80 ±0.34 41.62 ±1.15 /59.06 ±0.27
+
+6Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+Table 3. Performance comparison on commonsense reasoning tasks using LLaMA-3.2-3B, reported in accuracy (%). 
+
+Methods BoolQ PIQA SIQA HS WG ARC-e ARC-c OBQA Avg. 
+
+HetLoRA 63.88 ±0.31 79.78 ±0.33 66.73 ±0.42 77.63 ±0.90 58.62 ±0.99 84.89 ±0.30 69.85 ±0.73 72.53 ±0.12 71.74 
+
+FLoRA 59.45 ±5.24 78.76 ±0.36 65.49 ±1.44 70.93 ±3.38 55.06 ±2.03 83.77 ±0.93 69.43 ±0.64 69.40 ±1.60 69.04 
+
+FlexLoRA 64.57 ±0.45 81.07 ±0.06 69.74 ±0.85 81.09 ±0.93 64.09 ±1.03 86.46 ±0.09 72.01 ±1.07 76.33 ±1.01 74.42 
+
+raFLoRA (ours) 65.35 ±0.62 81.28 ±0.80 69.89 ±0.44 81.93 ±1.55 65.67 ±1.71 86.59 ±0.28 72.21 ±0.82 75.33 ±0.83 74.78 
+
+(a) Accuracy (ViT-base) (b) Loss (ViT-base) 
+
+(c) Accuracy (LLaMA-3.2-3B) (d) Loss LLaMA-3.2-3B 
+
+Figure 5. Global evaluation accuracy and global training loss over communication rounds. Results on CIFAR100 with ViT-base are shown in (a) and (b), while results on GSM8K with LLaMA-3.2-3B are shown in (c) and (d). 
+
+Moreover, we track the global evaluation accuracy and global training loss during fine-tuning. As illustrated in Figure 5, raFLoRA consistently achieves higher global ac-curacy and lower global loss across training rounds on both ViT-base and LLaMA-3.2-3B models. Notably, FLoRA 
+
+re-initializes its LoRA parameters at each round of local training. Although global updates are merged into the base model, the low-rank adaptation does not persist across rounds, causing the optimization trajectory in the low-rank subspace to be repeatedly reset, which may slow conver-gence and degrade performance on more complex tasks. 
+
+6.3. Rank Collapse Prevention 
+
+Next, we investigate the effectiveness of raFLoRA in preventing rank collapse. We conduct federated fine-tuning experiments on CIFAR100 using ViT-base under the patho-c20a1 setting (see Section 6.1). We quantify the energy ratio of higher ranks (ranks 9-64) in the global update using 1 − ρ8, as defined in Def. 4.1. As shown in Table 4, raFLoRA effectively prevents rank collapse compared to all baselines . After 100 rounds, the 
+
+Table 4. Higher-rank energy ratio of the global update over training rounds. R denotes different FL round during training.                                
+
+> Methods R=1 R=10 R=20 R=30 R=50 R=100
+> HetLoRA 39.82% 0.11% 0.03% 0.01% 0.00% 0.00%
+> FLoRA 49.34% 23.31% 21.77% 23.79% 29.94% 27.67%
+> FlexLoRA 48.83% 19.32% 6.79% 2.29% 0.61% 0.00%
+> raFLoRA (ours) 36.46% 55.43% 64.61% 66.50% 69.11% 70.02%
+
+Figure 6. Higher-rank energy ratio of the global update over 10 FL rounds under different data heterogeneity settings. 
+
+higher-rank energy in HetLoRA and FlexLoRA decays to nearly zero, with HetLoRA exhibiting a faster decay due to the aggregation bias. In contrast, FLoRA retains 27% of higher-rank energy, as its low-rank updates are reset each round and therefore do not accumulate cross-round attenua-tion. By comparison, higher-rank components in raFLoRA 
+
+still account for approximately 70% of the total energy, re-flecting the effectiveness of rank-partitioned aggregation in preserving higher-rank contributions across rounds. De-tailed energy breakdowns are provided in Figures 2a and 2b, as well as Figures 8a and 8b in Appendix C. Additionally, we analyze the higher-rank energy dynamics of FlexLoRA and raFLoRA under varying data hetero-geneity. As shown in Figure 6, increased data heterogeneity leads to poorer preservation of higher-rank energy. This suggests that data heterogeneity may weaken the alignment of higher-rank updates and limit their effective aggregation, consistent with our analysis in Section 4. 
+
+6.4. Communication and Computation Costs 
+
+We evaluate the communication and computational costs of different methods during fine-tuning. As shown in Ta-ble 5, raFLoRA achieves communication efficiency com-
+
+Table 5. Comparison of computational and communication cost. Results are reported over 100 rounds on ViT-base (RTX 5090) and 20 rounds on LLaMA-3.1-8B (H100). Communication cost mea-sures total client traffic, and computational cost reports runtime.                       
+
+> Methods ViT-base LLaMA-3.1-8B
+> Comp. Cost Comm. Cost Comp. Cost Comm. Cost
+> HetLoRA 40m50s 40.48GiB 1h33m55s 21.28GiB
+> FLoRA 47m05s 220.96GiB 1h40m11s 113.34GiB
+> FlexLoRA 40m40s 40.48GiB 1h38m09s 21.28GiB
+> raFLoRA (ours) 42m55s 40.48GiB 1h50m56s 21.28GiB
+
+7Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity             
+
+> (a) Non-IID Settings (b) Client Participant Rates. (c) Rank Configurations (d) Rank Distributions
+> Figure 7. Sensitivity and robustness analyses of raFLoRA and FlexLoRA under different settings. In (a), data heterogeneity increases from left to right. In (b), the client participation rate increases. The detailed configurations for (c) and (d) are provided in Section 6.5.
+
+parable to strong baselines with only modest additional computational overhead . In particular, raFLoRA reduces communication cost to 18% of that of FLoRA . Its computa-tional cost lies between FlexLoRA and FLoRA on smaller models, and increases slightly with model scale due to the computational complexity of rank-partitioned aggregation, while remaining well controlled. Overall, the additional overhead is modest and represents a favorable trade-off given the performance gains achieved. 
+
+6.5. Sensitivity and Robustness Analyses 
+
+Since FlexLoRA provides unbiased aggregation while maintaining communication efficiency, we further per-form sensitivity and robustness analyses of raFLoRA and 
+
+FlexLoRA under a range of heterogeneous settings. 
+
+Effect of non-IID settings. We conduct experiments on the 20NG dataset under varying data heterogeneity settings. Fig-ure 7a demonstrates that raFLoRA is more robust to data heterogeneity than FlexLoRA . As heterogeneity increases, 
+
+FlexLoRA exhibits pronounced performance degradation, whereas raFLoRA effectively mitigates this decline and consistently achieves better performance. 
+
+Effect of client participation rates. We conduct exper-iments on CIFAR100 under different client participation rates. Figure 7b shows that raFLoRA maintains higher ac-curacy across different client participation rates. Increasing the participation rate does not necessarily benefit raFLoRA ,which may indicate that reduced regularization from partial participation can increase the risk of overfitting. 
+
+Effect of rank configurations. We conduct experiments on the GSM8K dataset under different rank configurations, where conf-1 to conf-5 correspond to {1, 16 , 32 , 48 , 64 },
+
+{4, 16 , 32 , 48 , 64 }, {8, 16 , 32 , 48 , 64 }, {8, 16 , 32 , 48 , 96 },and {8, 16 , 32 , 48 , 128 }, respectively. As illustrated in Fig-ure 7c, raFLoRA demonstrates performance gains over 
+
+FlexLoRA across all configurations and avoids the pro-nounced sensitivity to the minimal rank. 
+
+Effect of rank distributions. We conduct experiments on Commonsense15K with ranks {8, 16 , 32 , 48 , 64 } un-der four rank distributions: a uniform distribution (dist-1: {0.2, 0.2, 0.2, 0.2, 0.2}), a low-rank skewed distribu-tion (dist-2: {0.7, 0.1, 0.1, 0.05 , 0.05 }), a high-rank skewed distribution (dist-3: {0.05 , 0.05 , 0.1, 0.1, 0.7}), and a bell-shaped distribution (dist-4: {0.05 , 0.1, 0.7, 0.1, 0.05 }). As shown in Figure 7d, raFLoRA outperforms FlexLoRA 
+
+under most rank distributions. Under the low-rank skewed distribution, raFLoRA achieves performance comparable to FlexLoRA . This may be because raFLoRA relies on a hierarchical rank-energy structure, whose advantage dimin-ishes when most clients are concentrated at low ranks. Additional experiments on extended rank configurations and LoRA module insertion settings are reported in Appendix D, validating the robustness and scalability of raFLoRA .
+
+6.6. Discussion 
+
+A key observation from our experiments is that rank col-lapse emerges as a pervasive failure mode in existing het-erogeneous FedLoRA methods. This phenomenon can be influenced by method-specific design choices, such as unbi-ased aggregation or residual fusion. More importantly, the impact of rank collapse becomes particularly severe in large models and highly heterogeneous settings, where higher-rank adaptations are essential for capturing complex task structures and subtle client-specific variations. The advantage of raFLoRA lies in explicitly addressing this failure mode through rank-aware aggregation. By enabling coherent accumulation of higher-rank information across training rounds, raFLoRA preserves client-specific signals that are critical for performance with client heterogeneity. Broadly, these results indicate that properly aligning aggre-gation structure with heterogeneity is essential for unlocking the expressiveness of federated adaptations. 
+
+## 7. Conclusion 
+
+We identify rank collapse in heterogeneous FedLoRA and provide a rigorous theoretical analysis revealing that its root cause is a rank-wise averaging mismatch. To address this issue, we propose raFLoRA , a rank-partitioned aggrega-tion strategy that aligns aggregation weights with rank-wise effective contributors. Extensive experiments across diverse tasks demonstrate its effectiveness and robustness, enabling efficient and scalable adaptation of large models. 8Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+## References 
+
+Babakniya, S., Elkordy, A., Ezzeldin, Y., Liu, Q., Song, K.-B., EL-Khamy, M., and Avestimehr, S. SLoRA: Fed-erated parameter efficient fine-tuning of language models. In International Workshop on Federated Learning in the Age of Foundation Models in Conjunction with NeurIPS 2023 , 2023. Bai, J., Chen, D., Qian, B., Yao, L., and Li, Y. Federated fine-tuning of large language models under heterogeneous tasks and client resources. Advances in Neural Informa-tion Processing Systems , 37:14457–14483, 2024. Bisk, Y., Zellers, R., Gao, J., and Choi, Y. Piqa: Reasoning about physical commonsense in natural language. In Pro-ceedings of the AAAI conference on artificial intelligence ,volume 34, pp. 7432–7439, 2020. Chen, S., Guo, Y., Ju, Y., Dalal, H., Zhu, Z., and Khisti, A. J. Robust federated finetuning of LLMs via alternat-ing optimization of LoRA. In The Thirty-ninth Annual Conference on Neural Information Processing Systems ,2025. Cho, Y. J., Liu, L., Xu, Z., Fahrezi, A., and Joshi, G. Het-erogeneous LoRA for federated fine-tuning of on-device foundation models. In Proceedings of the 2024 Confer-ence on Empirical Methods in Natural Language Pro-cessing , 2024. Clark, C., Lee, K., Chang, M.-W., Kwiatkowski, T., Collins, M., and Toutanova, K. BoolQ: Exploring the surprising difficulty of natural yes/no questions. In Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Hu-man Language Technologies, Volume 1 (Long and Short Papers) , pp. 2924–2936, 2019. Clark, P., Cowhey, I., Etzioni, O., Khot, T., Sabharwal, A., Schoenick, C., and Tafjord, O. Think you have solved question answering? try arc, the ai2 reasoning challenge. 
+
+arXiv preprint arXiv:1803.05457 , 2018. Cobbe, K., Kosaraju, V., Bavarian, M., Chen, M., Jun, H., Kaiser, L., Plappert, M., Tworek, J., Hilton, J., Nakano, R., et al. Training verifiers to solve math word problems. 
+
+arXiv preprint arXiv:2110.14168 , 2021. Dosovitskiy, A., Beyer, L., Kolesnikov, A., Weissenborn, D., Zhai, X., Unterthiner, T., Dehghani, M., Minderer, M., Heigold, G., Gelly, S., Uszkoreit, J., and Houlsby, N. An image is worth 16x16 words: Transformers for image recognition at scale. In The Ninth International Conference on Learning Representations , 2021. Grattafiori, A., Dubey, A., Jauhri, A., Pandey, A., Kadian, A., Al-Dahle, A., Letman, A., Mathur, A., Schelten, A., Vaughan, A., et al. The llama 3 herd of models. arXiv preprint arXiv:2407.21783 , 2024. Guo, P., Zeng, S., Wang, Y., Fan, H., Wang, F., and Qu, L. Selective aggregation for low-rank adaptation in federated learning. In The Thirteenth International Conference on Learning Representations , 2025. Hu, E. J., yelong shen, Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L., and Chen, W. LoRA: Low-rank adaptation of large language models. In The Tenth Inter-national Conference on Learning Representations , 2022. Hu, Z., Wang, L., Lan, Y., Xu, W., Lim, E.-P., Bing, L., Xu, X., Poria, S., and Lee, R. LLM-adapters: An adapter family for parameter-efficient fine-tuning of large lan-guage models. In Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing , pp. 5254–5276, 2023. Krizhevsky, A. Learning multiple layers of features from tiny images. Technical report, 2009. Lang, K. Newsweeder: learning to filter netnews. In Pro-ceedings of the Twelfth International Conference on Inter-national Conference on Machine Learning , pp. 331–339, 1995. Liu, Y., Ott, M., Goyal, N., Du, J., Joshi, M., Chen, D., Levy, O., Lewis, M., Zettlemoyer, L., and Stoyanov, V. RoBERTa: A robustly optimized bert pretraining approach. arXiv preprint arXiv:1907.11692 , 2019. McMahan, B., Moore, E., Ramage, D., Hampson, S., and y Arcas, B. A. Communication-efficient learning of deep networks from decentralized data. In Artificial intelli-gence and statistics , pp. 1273–1282. PMLR, 2017. Meta AI. Llama 3.2: Revolutionizing edge AI and vision with open, customizable models. https://ai.meta. com/blog/llama-3-2-connect-2024-visio n-edge-mobile-devices/ , September 2024. Mihaylov, T., Clark, P., Khot, T., and Sabharwal, A. Can a suit of armor conduct electricity? a new dataset for open book question answering. In Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing , pp. 2381–2391, 2018. Sakaguchi, K., Bras, R. L., Bhagavatula, C., and Choi, Y. Winogrande: An adversarial winograd schema challenge at scale. Communications of the ACM , 64(9):99–106, 2021. Sap, M., Rashkin, H., Chen, D., Le Bras, R., and Choi, Y. Social IQa: Commonsense reasoning about social interactions. In Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing 
+
+9Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP) , pp. 4463–4473, 2019. Singhal, R., Ponkshe, K., Vartak, R., Varshney, L. R., and Vepakomma, P. Fed-SB: A silver bullet for extreme com-munication efficiency and performance in (private) feder-ated LoRA fine-tuning. In ES-FoMo III: 3rd Workshop on Efficient Systems for Foundation Models , 2025a. Singhal, R., Ponkshe, K., and Vepakomma, P. FedEx-LoRA: Exact aggregation for federated and efficient fine-tuning of large language models. In Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pp. 1316–1336, 2025b. Sun, Y., Li, Z., Li, Y., and Ding, B. Improving LoRA in privacy-preserving federated learning. In The Twelfth International Conference on Learning Representations ,2024. Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., and Polosukhin, I. At-tention is all you need. Advances in neural information processing systems , 30, 2017. Wang, Z., Shen, Z., He, Y., Sun, G., Wang, H., Lyu, L., and Li, A. Flora: Federated fine-tuning large language models with heterogeneous low-rank adaptations. Ad-vances in Neural Information Processing Systems , 37: 22513–22533, 2024. Yan, Y., Feng, C.-M., Zuo, W., Zhu, L., Goh, R. S. M., and Liu, Y. Federated residual low-rank adaption of large language models. In The Thirteenth International Conference on Learning Representations , 2025. Yu, L., Jiang, W., Shi, H., YU, J., Liu, Z., Zhang, Y., Kwok, J., Li, Z., Weller, A., and Liu, W. Metamath: Bootstrap your own mathematical questions for large language mod-els. In The Twelfth International Conference on Learning Representations , 2024. Zellers, R., Holtzman, A., Bisk, Y., Farhadi, A., and Choi, Y. HellaSwag: Can a machine really finish your sentence? In Proceedings of the 57th Annual Meeting of the Asso-ciation for Computational Linguistics , pp. 4791–4800, 2019. Zhang, J., Vahidian, S., Kuo, M., Li, C., Zhang, R., Yu, T., Wang, G., and Chen, Y. Towards building the fed-eratedgpt: Federated instruction tuning. In ICASSP 2024 - 2024 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP) , 2024. Zhang, Z., Liu, P., Xu, J., and Hu, R. Fed-hello: Efficient federated foundation model fine-tuning with heteroge-neous LoRA allocation. IEEE Transactions on Neural Networks and Learning Systems , 36(10):17556–17569, 2025. 10 Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+## A. Proof of Rank Collapse in Heterogeneous FedLoRA 
+
+Proof. We analyze the dynamics of vanilla FedLoRA with heterogeneous ranks in the fixed singular basis {uiv⊤ 
+
+> i
+
+}rmax 
+
+> i=1
+
+specified by Assumption 4.2. 
+
+Step 1: One-step energy recursion. By the FedAvg aggregation rule (McMahan et al., 2017) and Assumption 4.3, the singular value of the global update in direction i at round t + 1 , denoted σ(t+1)  
+
+> i
+
+, is given by the average of the contributions from the M selected clients. Let Mt be the set of clients selected in round t. For a fixed direction i, define 
+
+N (t) 
+
+> i
+
+= X
+
+> k∈M t
+
+1{rk ≥ i}, (9) where 1{·} is the indicator function (equal to 1 if its argument is true and 0 otherwise). Thus N (t) 
+
+> i
+
+counts how many sampled clients support direction i in round t.By Assumption 4.3, a client k with rk ≥ i contributes β σ (t) 
+
+> i
+
+in direction i, while a client with rk < i contributes 0.Therefore, 
+
+σ(t+1)  
+
+> i
+
+= 1
+
+M
+
+X
+
+> k∈M t
+
+1{rk ≥ i} βσ (t) 
+
+> i
+
+= β N (t)
+
+> i
+
+M σ(t) 
+
+> i
+
+. (10) The energy in direction i at round t + 1 is e(t+1)  
+
+> i
+
+= ( σ(t+1)  
+
+> i
+
+)2, so we obtain 
+
+e(t+1)  
+
+> i
+
+= ( σ(t+1)  
+
+> i
+
+)2 = β2 N (t)
+
+> i
+
+M
+
+!2
+
+e(t) 
+
+> i
+
+. (11) 
+
+Step 2: Expected contraction factor. We now take expectation of (11) conditional on the current state e(t) 
+
+> i
+
+. We assume that client sampling is independent of the current global state, so N (t) 
+
+> i
+
+is independent of e(t) 
+
+> i
+
+and the conditional expectation only averages over the sampling randomness. Since client sampling is uniform without replacement, N (t) 
+
+> i
+
+follows a hypergeometric distribution 
+
+N (t) 
+
+> i
+
+∼ Hypergeo( K, Kp i, M ),
+
+where K is the total number of clients and Kp i is the number of clients that support direction i by (1) . This distribution has mean and variance 
+
+E[N (t) 
+
+> i
+
+] = M p i, Var( N (t) 
+
+> i
+
+) = M p i(1 − pi) K − MK − 1 .
+
+Hence the second moment is 
+
+E(N (t) 
+
+> i
+
+)2 = Var( N (t) 
+
+> i
+
+) +  E[N (t) 
+
+> i
+
+]2 = M p i(1 − pi) K − MK − 1 + M 2p2 
+
+> i
+
+. (12) Substituting this into (11), we define the expected contraction factor qi for direction i
+
+E[e(t+1)  
+
+> i
+
+| e(t) 
+
+> i
+
+] = β2 1
+
+M 2 E(N (t) 
+
+> i
+
+)2 e(t) 
+
+> i
+
+= qi e(t) 
+
+> i
+
+, (13) with 
+
+qi = β2
+
+
+
+p2 
+
+> i
+
++ K − MM (K − 1) pi(1 − pi)
+
+
+
+. (14) Let e(t) 
+
+> i
+
+= E[e(t) 
+
+> i
+
+]. Using the tower property of expectation, e(t) 
+
+> i
+
+satisfies the linear recursion 
+
+e(t) 
+
+> i
+
+= qie(t−1)  
+
+> i
+
+= · · · = e(0)  
+
+> i
+
+(qi)t. (15) 11 Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+Step 3: Monotonicity of the contraction factors. Define 
+
+h(p) = p2 + K − MM (K − 1) p(1 − p).
+
+Let 
+
+τ = K − MM (K − 1) ,
+
+so that 
+
+h(p) = (1 − τ )p2 + τ p. 
+
+Because 1 ≤ M < K , we have τ > 0. The derivative of h is 
+
+h′(p) = 2(1 − τ )p + τ. 
+
+Since 1 ≤ M < K , we have τ ∈ (0 , 1) , and thus h′(p) > 0 for all p ∈ [0 , 1] . Therefore, h(p) is strictly increasing on [0 , 1] .From (14) we have qi = β2h(pi), so qi is strictly ordered according to the coverage pi. By (1), 
+
+p1 = · · · = pr1 > p r1+1 ≥ · · · ≥ prmax ,
+
+which directly implies the ordering of contraction factors 
+
+q1 = · · · = qr1 > q r1+1 ≥ · · · ≥ qrmax .
+
+In particular, we define 
+
+γ = qr1+1 
+
+qr1
+
+∈ [0 , 1) . (16) 
+
+Step 4: Geometric convergence of the expected energy ratio. We next study the geometric convergence of the expected energy ratio ρ(t) 
+
+> r1
+
+, defined as ρ(t) 
+
+> r1
+
+=  
+
+> Pr1
+> i=1 e(t)
+> i
+> Prmax
+> j=1 e(t)
+> j
+
+. Assume that the initial low-rank energy is nonzero, i.e., Pr1 
+
+> i=1
+
+e(0)  
+
+> i
+
+> 0, so that the top-r1 subspace carries nontrivial energy. We examine the quantity 1 − ρ(t) 
+
+> r1
+
+, which represents the fraction of the total expected energy residing in the tail ranks ( j > r 1)
+
+1 − ρ(t) 
+
+> r1
+
+= 1 −
+
+Pr1 
+
+> i=1
+
+e(t)
+
+> i
+
+Prmax  
+
+> j=1
+
+e(t)
+
+> j
+
+=
+
+Prmax  
+
+> j=r1+1
+
+e(t)
+
+> j
+
+Pr1 
+
+> i=1
+
+e(t) 
+
+> i
+
++ Prmax  
+
+> j=r1+1
+
+e(t)
+
+> j
+
+. (17) Since all energies are nonnegative, we upper bound this fraction by omitting the tail term in the denominator 
+
+1 − ρ(t) 
+
+> r1
+
+≤
+
+Prmax  
+
+> j=r1+1
+
+e(t)
+
+> j
+
+Pr1 
+
+> i=1
+
+e(t)
+
+> i
+
+. (18) Substituting the dynamics (15) and using qi ≥ qr1 for all i ≤ r1, we obtain 
+
+1 − ρ(t) 
+
+> r1
+
+≤
+
+Prmax  
+
+> j=r1+1
+
+e(0)  
+
+> j
+
+(qj )t
+
+Pr1 
+
+> i=1
+
+e(0)  
+
+> i
+
+(qi)t ≤
+
+Prmax  
+
+> j=r1+1
+
+e(0)  
+
+> j
+
+(qj )t
+
+(qr1 )t Pr1 
+
+> i=1
+
+e(0) 
+
+> i
+
+=
+
+Prmax  
+
+> j=r1+1
+
+e(0) 
+
+> j
+
+ qj
+
+> qr1
+
+t
+
+Pr1 
+
+> i=1
+
+e(0) 
+
+> i
+
+. (19) By the ordering of {qi} established above, for all j > r 1 we have qj ≤ qr1+1 , and hence, using (16), 
+
+0 ≤ qj
+
+qr1
+
+≤ qr1+1 
+
+qr1
+
+= γ. 
+
+Therefore, for all j > r 1,  qj
+
+qr1
+
+t
+
+≤ γt,
+
+and we obtain 
+
+1 − ρ(t) 
+
+> r1
+
+≤
+
+Prmax  
+
+> j=r1+1
+
+e(0) 
+
+> j
+
+Pr1 
+
+> i=1
+
+e(0) 
+
+> i
+
+!
+
+γt = Cγ t. (20) By (1) , pr1+1 < p r1 . Since qi = β2h(pi) and h(·) is strictly increasing, this implies qr1+1 < q r1 , and hence 0 ≤ γ < 1 by (16). Therefore, as t → ∞ , we have γt → 0, and consequently lim t→∞ ρ(t) 
+
+> r1
+
+= 1 .12 Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+## B. A Mean-Field Analysis under General Non-IID Settings 
+
+We relax Assumptions 4.2–4.3 and study rank-wise energy dynamics under general non-IID settings. Our analysis is a 
+
+mean-field heuristic . We derive a tractable second-moment recursion by (i) modeling rank-dependent participation through a sampling random variable, (ii) capturing basis drift via an alignment factor, and (iii) absorbing cross-direction mixing into a bounded residual. The objective is to show that data heterogeneity acts as a bounded perturbation and does not remove the dominant rank-wise averaging mismatch induced by uniform aggregation weights, which drives rank collapse. We define c(t) 
+
+> k,i
+
+= ⟨u(t) 
+
+> i
+
+, ∆W (t) 
+
+> k
+
+v(t) 
+
+> i
+
+⟩ as the contribution of client k along the i-th global direction at round t, and c(t) 
+
+> i
+
+=
+
+⟨u(t) 
+
+> i
+
+, ∆W (t) 
+
+> g
+
+v(t) 
+
+> i
+
+⟩ as the corresponding aggregated coefficient. By linearity of FedAvg ,
+
+c(t) 
+
+> i
+
+= 1
+
+M
+
+X
+
+> k∈M t
+
+c(t)
+
+> k,i
+
+.
+
+To account for cross-round basis evolution, we introduce the alignment factor 
+
+κ(t) 
+
+> i
+
+= ⟨u(t+1)  
+
+> i
+
+, u (t) 
+
+> i
+
+⟩⟨ v(t+1)  
+
+> i
+
+, v (t) 
+
+> i
+
+⟩, |κ(t) 
+
+> i
+
+| ≤ 1, (21) which measures how well the i-th singular direction is preserved across consecutive rounds. Let N (t) 
+
+> i
+
+denote the number of participating clients whose local rank supports direction i (Appendix A), so that E[N (t) 
+
+> i
+
+/M ] = 
+
+pi. To explicitly connect finite-sample aggregation with the mean-field formulation, we first consider the following decomposition of the coefficient update 
+
+ζ(t) 
+
+> i
+
+= c(t+1)  
+
+> i
+
+− κ(t) 
+
+> i
+
+β(t)
+
+> i
+
+N (t)
+
+> i
+
+M c(t) 
+
+> i
+
+, (22) where ζ(t) 
+
+> i
+
+collects cross-direction mixing and other departures from the multiplicative model. Taking conditional expectation of (22) and using E[N (t) 
+
+> i
+
+/M ] = pi yields the mean-field coefficient evolution. With rank-dependent participation, basis drift, and cross-direction mixing, the conditional expectation satisfies 
+
+E[c(t+1)  
+
+> i
+
+| c(t) 
+
+> i
+
+] = κ(t) 
+
+> i
+
+pi β(t) 
+
+> i
+
+c(t) 
+
+> i
+
++ E[ζ(t) 
+
+> i
+
+| c(t) 
+
+> i
+
+], (23) where β(t) 
+
+> i
+
+= E[β(t)
+
+> k,i
+
+] denotes the average effective local update strength. Let e(t) 
+
+> i
+
+= ( c(t) 
+
+> i
+
+)2 denote the rank-wise energy and define 
+
+X(t) 
+
+> i
+
+= κ(t) 
+
+> i
+
+β(t)
+
+> i
+
+N (t)
+
+> i
+
+M c(t) 
+
+> i
+
+.
+
+Then c(t+1)  
+
+> i
+
+= X(t) 
+
+> i
+
++ ζ(t) 
+
+> i
+
+, and conditioning on c(t) 
+
+> i
+
+yields 
+
+E
+
+h
+
+(c(t+1)  
+
+> i
+
+)2 | c(t)
+
+> i
+
+i
+
+= E
+
+h
+
+(X(t) 
+
+> i
+
+)2 | c(t)
+
+> i
+
+i
+
++ 2 E
+
+h
+
+X(t) 
+
+> i
+
+ζ(t) 
+
+> i
+
+| c(t)
+
+> i
+
+i
+
++ E
+
+h
+
+(ζ(t) 
+
+> i
+
+)2 | c(t)
+
+> i
+
+i
+
+.
+
+By Young’s inequality applied pointwise and then taking conditional expectation, for any λ > 0,
+
+2 E
+
+h
+
+X(t) 
+
+> i
+
+ζ(t) 
+
+> i
+
+| c(t)
+
+> i
+
+i
+
+≤ λ E
+
+h
+
+(X(t) 
+
+> i
+
+)2 | c(t)
+
+> i
+
+i
+
++ λ−1 E
+
+h
+
+(ζ(t) 
+
+> i
+
+)2 | c(t)
+
+> i
+
+i
+
+.
+
+Taking total expectation gives 
+
+E[e(t+1)  
+
+> i
+
+] ≤ (1 + λ) E
+
+h
+
+(X(t) 
+
+> i
+
+)2i
+
++ (1 + λ−1) E
+
+h
+
+(ζ(t) 
+
+> i
+
+)2i
+
+. (24) Moreover, 
+
+(X(t) 
+
+> i
+
+)2 = ( κ(t) 
+
+> i
+
+)2(β(t) 
+
+> i
+
+)2 N (t)
+
+> i
+
+M
+
+!2
+
+e(t) 
+
+> i
+
+.
+
+13 Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+We approximate the second moment by decoupling (κ(t) 
+
+> i
+
+, β (t) 
+
+> i
+
+, N (t) 
+
+> i
+
+) from e(t) 
+
+> i
+
+and from each other at the level of second moments, yielding the following mean-field upper bound 
+
+E
+
+(κ(t) 
+
+> i
+
+)2(β(t) 
+
+> i
+
+)2 N (t)
+
+> i
+
+M
+
+!2
+
+e(t)
+
+> i
+
+ ≤ E
+
+h
+
+(κ(t) 
+
+> i
+
+)2(β(t) 
+
+> i
+
+)2i
+
+E
+
+ N (t)
+
+> i
+
+M
+
+!2 E[e(t) 
+
+> i
+
+]. (25) By the hypergeometric second-moment identity in Appendix A, E[( N (t) 
+
+> i
+
+/M )2] = h(pi). Assuming the residual has uniformly bounded second moment, i.e., there exists δ2 
+
+> i
+
+such that 
+
+(1 + λ−1) E
+
+h
+
+(ζ(t) 
+
+> i
+
+)2i
+
+≤ δ2 
+
+> i
+
+, ∀t, 
+
+substituting into (24) yields 
+
+E[e(t+1)  
+
+> i
+
+] ≤ q′ 
+
+> i
+
+E[e(t) 
+
+> i
+
+] + δ2 
+
+> i
+
+, (26) where 
+
+q′ 
+
+> i
+
+= (1 + λ) h(pi) E
+
+h
+
+(κ(t) 
+
+> i
+
+)2(β(t) 
+
+> i
+
+)2i
+
+.
+
+Under this mean-field approximation, the rank-wise averaging mismatch enters the contraction factor solely through 
+
+E[( N (t) 
+
+> i
+
+/M )2] = h(pi), while basis drift and local update strength appear as multiplicative modifiers via E[( κ(t) 
+
+> i
+
+)2(β(t) 
+
+> i
+
+)2].All remaining non-ideal effects are absorbed into the additive residual floor δ2 
+
+> i
+
+. Consequently, shared low-rank directions (i ≤ r1) remain comparatively stable and continue to accumulate energy, whereas sparsely covered higher-rank directions (i > r 1) are progressively suppressed, so rank collapse persists under general non-IID settings. When δ2 
+
+> i
+
+is negligible, energy concentrates toward the rank-r1 subspace at least as fast as in the basic analysis. When δ2 
+
+> i
+
+> 0, higher-rank energies are bounded by floors of order δ2 
+
+> i
+
+/(1 − q′
+
+> i
+
+), preserving the qualitative behavior predicted by the basic setting. 
+
+## C. Rank-wise Energy Breakdowns of HetLoRA and FLoRA 
+
+Beyond the rank-wise energy breakdowns of FlexLoRA and raFLoRA presented in Section 1, we further report the corresponding results for HetLoRA and FLoRA as additional baselines. Figure 8 illustrates the evolution of rank-wise energy ratios for these methods.             
+
+> (a) Energy of HetLoRA .(b) Energy of FLoRA .
+> Figure 8. Rank-wise energy ratios of HetLoRA and FLoRA on CIFAR100 using ViT under the patho-c20a1 data partitioning.
+
+As shown in Figure 8a, rank collapse is most pronounced in HetLoRA . Within fewer than 10% of the total training rounds, the update energy concentrates almost entirely on the minimum rank. This behavior is driven by two compounding factors. First, heterogeneous rank participation induces a rank-wise aggregation mismatch, where higher-rank directions are supported by fewer clients but normalized using uniform weights. Second, the separate aggregation of the LoRA A and B
+
+matrices introduces additional aggregation bias, as noted in prior studies (Wang et al., 2024; Bai et al., 2024). Together, these effects substantially accelerate the decay of higher-rank components. Figure 8b shows that FLoRA also exhibits low-rank dominance, with the minimum rank accounting for approximately 70%–80% of the update energy. However, this effect is noticeably less severe than in HetLoRA and FlexLoRA . This 14 Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+behavior can be attributed to FLoRA ’s broadcast-and-aggregation mechanism, where each training round starts from an 
+
+A-initialized and B-zero LoRA state, and the resulting low-rank update is subsequently integrated into the base model. As a result, cross-round accumulation of global low-rank bias is mitigated. Nevertheless, FLoRA remains subject to rank-wise aggregation mismatch within each round, leading to a bounded yet persistently low-rank-dominated energy structure, rather than the rapid rank collapse observed in HetLoRA or the complete collapse seen in FlexLoRA .
+
+## D. Extended Experiments 
+
+To further examine the impact of rank heterogeneity and LoRA module insertion, we conduct extended experiments that vary both rank configurations and LoRA insertions.         
+
+> (a) Additional rank configurations. (b) Different LoRA insertion modules.
+> Figure 9. Extended experiments comparing raFLoRA and FlexLoRA under varying rank configurations and LoRA module insertion settings.
+
+Effect of additional rank configurations. We evaluate a broader range of rank configurations, including conf-6 
+
+{8, 12 , 16 , 20 , 24 }, conf-7 {4, 8, 16 , 32 , 64 }, and conf-8 {1, 4, 16 , 64 , 256 }, which exhibit progressively larger rank gaps. As shown in Figure 9a, raFLoRA consistently achieves larger accuracy improvements over FlexLoRA as rank heterogeneity increases, with gains of up to 4%. This trend reflects the strong dependence of FlexLoRA on the minimum client rank, which increasingly constrains the effective rank of the global update under larger rank gaps. In contrast, raFLoRA mitigates rank collapse through rank-partitioned aggregation, enabling higher-rank clients to contribute more effectively and thereby better exploiting larger rank configurations. 
+
+Effect of different LoRA module insertion settings. We further evaluate the robustness of raFLoRA under various LoRA module insertion settings, including {Q, V }, {Q, K, V }, and {Q, K, V, U, D }, where Q, K, and V denote the query, key, and value projections in attention layers, and U and D correspond to the MLP up- and down-projection layers, respectively. These configurations progressively increase the number of adapted modules. As shown in Figure 9b, raFLoRA 
+
+consistently achieves higher average accuracy across all commonsense reasoning benchmarks under these settings. These results indicate that raFLoRA scales well with the number of inserted LoRA modules and remains robust across diverse module configurations, highlighting its suitability for flexible and scalable adaptation of large models. 
+
+## E. Hyperparameter Settings for Main Experiments 
+
+E.1. Image Classification for Vision Datasets For image classification, we conduct experiments on CIFAR100 (Krizhevsky, 2009), which contains 60K color images of size 32 × 32 from 100 classes. Each class includes 500 training samples and 100 test samples, resulting in 50K training images and 10K test images in total. 
+
+Hyperparameters For image classification, we follow standard federated learning configurations. Unless otherwise specified, all experiments adopt identical optimization and communication settings, with the complete hyperparameter config-uration summarized in Table 6. Given its relatively large label space, CIFAR100 supports flexible non-IID data partitioning, and we therefore fix its data partition to the pathological non-IID setting patho-c20a1 in the main experiments. 15 Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity               
+
+> Table 6. Hyperparameter settings for image classification experiments on CIFAR100.
+> Hyperparameters Values
+> Number of Clients 100 Number of Rounds 100 Client Participation Ratio per Round 10% Data Partitioning patho-c20a1 Local Training Epoch 1Batch Size 32 Optimizer AdamW Learning Rate 5e-4 Learning Rate Scheduler Linear decay per round Inserted Modules of LoRA All linear layers LoRA Rank Configurations 8,16,32,48,64 Rank Probability Distributions 0.2,0.2,0.2,0.2,0.2
+
+E.2. Text Classification for Language Datasets For text classification, we evaluate our method on the 20 Newsgroups (Lang, 1995) dataset, a topic classification benchmark consisting of newsgroup posts spanning 20 distinct categories. The dataset contains approximately 11.3K training samples and 7.5K test samples.               
+
+> Table 7. Hyperparameter settings for text classification experiments on 20NG.
+> Hyperparameters Values
+> Number of Clients 100 Number of Rounds 100 Client Participation Ratio per Round 10% Data Partitioning patho-c5a1 Local Training Epoch 1Batch Size 32 Optimizer AdamW Learning Rate 5e-4 Learning Rate Scheduler Linear decay per round Inserted Modules of LoRA All linear layers LoRA Rank Configurations 8,16,32,48,64 Rank Probability Distributions 0.2,0.2,0.2,0.2,0.2
+
+Hyperparameters For text classification, we similarly follow standard federated learning configurations. Unless otherwise specified, all experiments adopt identical optimization and communication settings, with the complete hyperparameter configuration summarized in Table 7. Owing to its larger number of classes, the 20 Newsgroups dataset allows flexible non-IID partitioning, and we fix its data partition to the pathological non-IID setting patho-c5a1 in the main experiments. 
+
+E.3. Mathematical Reasoning Datasets For mathematical reasoning, we use the GSM8K (Cobbe et al., 2021) dataset, which contains approximately 8.5K high-quality, linguistically diverse grade-school math word problems, including 7.5K training samples and 1.3K test samples. The task focuses on question answering for basic mathematical problems that require multi-step reasoning, typically involving 2 to 8 solution steps. The problems require no concepts beyond early algebra and are primarily solved through sequences of elementary arithmetic operations (e.g., +, −, ×, ÷). Each solution is provided in natural language rather than symbolic expressions, making the dataset particularly suitable for evaluating step-by-step reasoning capabilities of language models. 
+
+Hyperparameters Following prior work on federated low-rank adaptation of large-scale models, such as Fed-SB (Singhal et al., 2025a) and FedEx-LoRA (Singhal et al., 2025b), we adopt similar training protocols with necessary modifications to accommodate heterogeneous LoRA rank settings. The detailed hyperparameter configurations used in our main experiments are summarized in Table 8. For the GSM8K dataset, we evenly partition the training data across all clients. 16 Preventing Rank Collapse in Federated Low-Rank Adaptation with Client Heterogeneity 
+
+Table 8. Hyperparameter settings for mathematical reasoning experiments on GSM8K. 
+
+Hyperparameters Values 
+
+Number of Clients 100 Number of Rounds 20 Client Participation Ratio per Round 10% Data Partitioning iid Local Training Epoch 1Batch Size 4Optimizer AdamW Learning Rate 5e-4 Learning Rate Scheduler Linear decay per round Inserted Modules of LoRA Query and Value LoRA Rank Configurations 8,16,32,48,64 Rank Probability Distributions 0.2,0.2,0.2,0.2,0.2 
+
+E.4. Commonsense Reasoning Datasets For commonsense reasoning, we use the Commonsense15K (Hu et al., 2023) benchmark, which comprises eight sub-tasks: BoolQ (Clark et al., 2019), PIQA (Bisk et al., 2020), SIQA (Sap et al., 2019), HellaSwag (Zellers et al., 2019), Winogrande (Sakaguchi et al., 2021), ARC-Easy and ARC-Challenge (Clark et al., 2018), and OpenBookQA (Mihaylov et al., 2018). Models are fine-tuned on Commonsense-15K and evaluated separately on the test sets of each of the eight tasks. 
+
+Table 9. Hyperparameter settings for commonsense reasoning experiments on Commonsense15K. 
+
+Hyperparameters Values 
+
+Number of Clients 100 Number of Rounds 20 Client Participation Ratio per Round 10% Data Partitioning niid-a1 Local Training Epoch 1Batch Size 16 Optimizer AdamW Learning Rate 5e-4 Learning Rate Scheduler Linear decay per round Inserted Modules of LoRA Query and Value LoRA Rank Configurations 8,16,32,48,64 Rank Probability Distributions 0.2,0.2,0.2,0.2,0.2 
+
+Hyperparameters Building on established protocols for federated low-rank adaptation of large-scale models (Singhal et al., 2025b;a), we adopt a consistent training setup with minimal adjustments to support heterogeneous LoRA rank settings. The complete set of hyperparameters is reported in Table 9. For Commonsense15K, we apply a non-IID data partitioning strategy based on answer types, and fix the partition to the niid-a1 setting in the main experiments. 17

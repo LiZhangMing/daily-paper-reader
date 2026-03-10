@@ -1,0 +1,1823 @@
+Title: FLoRG: Federated Fine-tuning with Low-rank Gram Matrices and Procrustes Alignment
+
+URL Source: https://arxiv.org/pdf/2602.17095v1
+
+Published Time: Fri, 20 Feb 2026 01:27:28 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+Published as a conference paper at ICLR 2026 
+
+# FL ORG: F EDERATED FINE -TUNING WITH LOW -RANK 
+
+# GRAM MATRICES AND PROCRUSTES ALIGNMENT 
+
+Chuiyang Meng 
+
+The University of British Columbia 
+
+chuiyangmeng@ece.ubc.ca 
+
+Ming Tang 
+
+Southern University of Science and Technology 
+
+tangm3@sustech.edu.cn 
+
+Vincent W.S. Wong ∗
+
+The University of British Columbia 
+
+vincentw@ece.ubc.ca 
+
+## ABSTRACT 
+
+Parameter-efficient fine-tuning techniques such as low-rank adaptation (LoRA) enable large language models (LLMs) to adapt to downstream tasks efficiently. Federated learning (FL) further facilitates this process by enabling collaborative fine-tuning across distributed clients without sharing private data. However, the use of two separate low-rank matrices in LoRA for federated fine-tuning intro-duces two types of challenges. The first challenge arises from the error induced by separately aggregating those two low-rank matrices. The second challenge oc-curs even when the product of two low-rank matrices is aggregated. The server needs to recover factors via matrix decomposition, which is non-unique and can introduce decomposition drift. To tackle the aforementioned challenges, we pro-pose FLoRG, a federated fine-tuning framework which employs a single low-rank matrix for fine-tuning and aggregates its Gram matrix (i.e., the matrix of inner products of its column vectors), eliminating the aggregation error while also re-ducing the communication overhead. FLoRG minimizes the decomposition drift by introducing a Procrustes alignment approach which aligns the decomposed ma-trix between consecutive fine-tuning rounds for consistent updates. We theoreti-cally analyze the convergence of FLoRG and prove that adopting the Procrustes alignment results in a tighter convergence bound. Experimental results across multiple LLM fine-tuning benchmarks demonstrate that FLoRG outperforms five state-of-the-art baseline schemes in the downstream task accuracy and can reduce the communication overhead by up to 2041 ×.
+
+## 1 INTRODUCTION 
+
+Large language models (LLMs) (Zhao et al., 2023; Achiam et al., 2023; Touvron et al., 2023; Grattafiori et al., 2024) have achieved state-of-the-art performance across a wide range of natu-ral language processing tasks. However, their massive scale introduces critical challenges in terms of computation cost, memory consumption, and adaptability to downstream tasks. To address these concerns, low-rank adaptation (LoRA) (Hu et al., 2022; Hayou et al., 2024; Kopiczko et al., 2024; Liu et al., 2024) has emerged as an effective approach. In particular, the LoRA module employs a fine-tuning matrix ∆W with two low-rank matrices B and A into the pretrained model W0 as 
+
+W = W0 + ∆ W = W0 + BA . Thus, it enables task-specific adaptation while only updat-ing ∆W. This approach reduces both memory usage and computation overhead compared to full-model fine-tuning significantly. However, fine-tuning still favors domain-specific data at scale. Such data is typically distributed across multiple clients and therefore requires collaborative fine-tuning. To resolve this issue, federated learning (FL) (McMahan et al., 2017; Li et al., 2020) provides a privacy-preserving framework for collaborative model training, where multiple clients fine-tune a shared global model without exposing their raw data. Combining LoRA with FL is therefore highly 
+
+> ∗
+
+Corresponding author: Vincent W.S. Wong 
+
+1
+
+> arXiv:2602.17095v1 [cs.LG] 19 Feb 2026
+
+Published as a conference paper at ICLR 2026 appealing: clients can collaboratively fine-tune a model by locally performing lightweight training via LoRA modules and uploading the low-rank updates for global aggregation. The conventional works (Zhang et al., 2024; Fang et al., 2024; Zhang et al., 2023b; Wu et al., 2024) propose federated fine-tuning with LoRA which enables each client n to transmit its low rank matri-ces Bn and An to the central server. Afterwards, the central server aggregates Bn and An separately and then broadcasts the two aggregated matrices back to each client for performing fine-tuning in the subsequent rounds. In this case, the updated LoRA module after the model aggregation can be expressed as ( 1
+
+> N
+
+P 
+
+> n
+
+Bn) × ( 1
+
+> N
+
+P 
+
+> n
+
+An). This approach introduces a challenge: The aggregation is fundamentally biased, because the true update should be 1
+
+> N
+
+P
+
+> n
+
+(BnAn), which is different from 
+
+( 1
+
+> N
+
+P 
+
+> n
+
+Bn) × ( 1
+
+> N
+
+P 
+
+> n
+
+An). This mismatch introduces a systematic aggregation error which af-fects the global model update in every fine-tuning round. As the number of rounds increases, the aggregation error is stacked, which will degrade the fine-tuning performance. To alleviate the error induced by model aggregation, some works (Yan et al., 2024; Bai et al., 2024; Yan et al., 2025) calculate the product of BnAn and perform aggregation at the central server. Then, the central server performs decomposition to this aggregated matrix to recover two low-rank matrices for the next fine-tuning round. While this approach avoids the error induced by separately aggregating matrices Bn and An, it introduces another non-trivial challenge: decomposition is gen-erally non-unique. In particular, the rank of the LoRA module is typically much smaller than the dimension of the input or output of the parameter matrix. This rank deficiency can lead to multiple decompositions. In addition, when the aggregated matrix has eigenvalue multiplicities, many valid decompositions exist. As a result, choosing different matrix decompositions fundamentally changes two low-rank matrices. It incurs a drift in the parameter subspace and changes the direction of the model update for the subsequent rounds. This drift will stack as the fine-tuning proceeds and de-grade the fine-tuning performance. Furthermore, direct decomposition (e.g., eigendecomposition) may incur rank mismatch since the rank of the aggregated matrix may be different from the local low-rank matrices. Based on the aforementioned discussions, we focus on addressing the following question: Is there a federated fine-tuning approach which eliminates the error induced by separate model aggregation while minimizing the drift induced by matrix decomposition? 
+
+To address this question, we start by rethinking what to aggregate in federated fine-tuning. As LoRA involves matrix multiplication, either separate model aggregation or matrix decomposition is unavoidable. Therefore, one of our key insights is to reparameterize the LoRA module with a sin-gle low-rank matrix. FLoRG aggregates the corresponding Gram matrices to achieve an unbiased aggregation with a low communication overhead. Furthermore, another insight is to propose a Pro-crustes alignment approach to the decomposed matrix to stabilize the fine-tuning while preserving its Gram matrix, thereby mitigating drift caused by the non-uniqueness of matrix decomposition. Designing such a framework is challenging due to the following unexplored questions: (i) How can we design a low-rank parameterization which adapts to any pretrained matrix shape while supporting error-free aggregation? (ii) How to optimize the Procrustes alignment matrix to minimize the decomposition drift? (iii) How to characterize the overall convergence rate of FLoRG under nonconvex losses, and disentangle the impact of Procrustes alignment on the convergence? In this work, we make the following contributions to address the aforementioned questions: • We propose FLoRG, which replaces two low-rank matrices in LoRA with a single low-rank matrix. By leveraging a shared semi-orthogonal basis, FLoRG adapts to parameter matrices with arbitrary shapes. Each client only updates the single low-rank matrix, and the server aggregates the corresponding Gram matrix. FLoRG eliminates the aggregation error by turning the bilinear server-side aggregation into a linear operation. By transmitting a single matrix instead of two matrices, FLoRG is communication-efficient when compared with federated LoRA schemes. • We propose a Procrustes alignment approach after matrix decomposition to preserve the aggregated Gram matrix while aligning the decomposed matrix across rounds to mitigate the decomposition drift and address the rank mismatch issue. In particular, we solve an optimization problem to minimize the inter-round decomposition drift via a Frobenius-norm objective. The closed-form optimal solution projects the decomposed matrix onto a target r-rank subspace without changing its Gram matrix. 2Published as a conference paper at ICLR 2026 • We theoretically analyze the convergence rate of our proposed FLoRG in the nonconvex loss setting. In particular, incorporating our proposed Procrustes alignment zeros out the Procrustes alignment drift term, thereby resulting in a tighter convergence bound. • We conduct extensive experiments on GLUE (Wang et al., 2018) with MRPC, QQP, MNLI, QNLI, WNLI, and RTE datasets. We compare our proposed FLoRG with five state-of-the-art baseline schemes, including FedIT (Zhang et al., 2024), FeDeRA (Yan et al., 2024), FFA-LoRA (Sun et al., 2024), FedSA-LoRA (Guo et al., 2025), and FedEx-LoRA (Singhal et al., 2025). Results show that our proposed FLoRG achieves a higher testing accuracy than the baseline schemes under different settings and reduces the communication overhead by up to 2041 ×.
+
+## 2 RELATED WORKS 
+
+LoRA: Low-rank adaptation (LoRA) (Hu et al., 2022) introduces two low-rank matrices to the pretrained model to perform parameter-efficient fine-tuning. Multiple LoRA variants have been proposed (Zhang et al., 2023a; Dettmers et al., 2023; Hayou et al., 2024; Kopiczko et al., 2024; Liu et al., 2024; Zhao et al., 2024; Bensa¨ ıd et al., 2025). For example, in (Zhang et al., 2023a), the authors proposed a LoRA framework to adaptively allocate the parameter budget among weight matrices based on the importance score. In (Zhao et al., 2024), the authors projected the gradient matrix into a low-rank form to perform efficient fine-tuning. In (Bensa¨ ıd et al., 2025), the authors reformulated the low-rank adaptation with a single matrix. While the aforementioned works have shown an improvement in the performance, they are primarily designed for centralized settings. Domain-specific data are often possessed by a number of distributed clients, which motivates the incorporation of FL. 
+
+Federated Fine-tuning with LoRA: LoRA has been incorporated into FL to enable collaborative fine-tuning across distributed clients. The conventional federated fine-tuning works (Zhang et al., 2024; Fang et al., 2024; Zhang et al., 2023b; Wu et al., 2024; Long et al., 2024; Cho et al., 2024; Byun & Lee, 2025) directly aggregate two low-rank matrices separately to obtain the global model. Some works (Babakniya et al., 2023; Yan et al., 2024; Bai et al., 2024; Yan et al., 2025) aggregate the LoRA modules (i.e., the products of two matrices) and then perform matrix decomposition to recover two low-rank matrices. In addition, the authors in (Wang et al., 2024) proposed a stacking-based approach to aggregate the low-rank matrices. The authors in (Sun et al., 2024) proposed to freeze matrix A and only update matrix B. The authors in (Guo et al., 2025) proposed to let the clients locally update matrix B and only share matrix A for aggregation. 
+
+## 3 METHODOLOGY 
+
+3.1 FL ORG In this section, we propose FLoRG, a federated fine-tuning framework. FLoRG employs a single low-rank matrix and aggregates Gram matrices to eliminate the error induced by the separate aggre-gation as in conventional LoRA. FLoRG performs Procrustes alignment to the decomposed matrix to minimize the decomposition drift. A schematic illustration is shown in Fig. 1. We consider a central server and N clients. Let T = {1, 2, . . . , T } and N = {1, 2, . . . , N } denote the set of T fine-tuning rounds and the set of N clients, respectively. At the beginning of the first fine-tuning round, each client n ∈ N has the same pretrained weight matrix W0 ∈ Rdout ×din . Note that 
+
+W0 is kept frozen and will not be updated during fine-tuning. We consider that each client n ∈ N 
+
+has a local dataset Dn. Let ξn ∼ D n denote a mini-batch of training samples. Let Fn(Wt; ξn)
+
+denote the local loss function of client n ∈ N on ξn with model Wt in the t-th fine-tuning round. We denote the expected loss of client n with model Wt as Fn(Wt) = Eξn∼D n [Fn(Wt; ξn)] . Let 
+
+∇Fn(Wt; ξn) denote the local stochastic gradient of Wt of client n in the t-th fine-tuning round. The learning procedure of FLoRG can be summarized as the following steps. 
+
+(i) Local Update with Low-rank Gram Matrices: Different from LoRA, FLoRG uses a single matrix A ∈ Rr×k for fine-tuning, where r ≪ min {din , d out } denotes the rank of A. Let k =
+
+3Published as a conference paper at ICLR 2026 
+
+Figure 1: System model of our proposed FLoRG. 
+
+min {din , d out }. Matrices L ∈ Rdout ×k and R ∈ Rk×din are initialized and shared across all clients. Both matrices L and R are semi-orthogonal, i.e., L⊺L = Ik and RR ⊺ = Ik. Note that matrices L
+
+and R remain unchanged during fine-tuning. The fine-tuning matrix in the t-th fine-tuning round is 
+
+∆Wt = LQ tR = L(At)⊺AtR, t ∈ T , (1) where Qt denotes the square Gram parameter matrix in the t-th fine-tuning round. By leveraging L
+
+and R, FLoRG is compatible with parameter matrices of any dimensions. Thus, the full model can be expressed as Wt = W0 + ∆ Wt.In the t-th fine-tuning round, the central server broadcasts At to all clients. Client n ∈ N updates 
+
+At using its local dataset. Let ∇AFn(Wt; ξn) ∈ Rr×k denote the gradient of the low-rank matrix, which is given by 
+
+∇AFn(Wt; ξn) = At  Htn + ( Htn)⊺ , n ∈ N , t ∈ T , (2) where Htn = L⊺∇Fn(Wt; ξn)R⊺. Client n performs stochastic gradient descent to update matrix 
+
+At. We define η as the learning rate. Let At+ 12 
+
+> n
+
+denote the locally updated low-rank matrix of client 
+
+n in the t-th fine-tuning round, which is given by 
+
+At+ 12 
+
+> n
+
+= At − η∇AFn(Wt; ξn), n ∈ N , t ∈ T . (3) 
+
+(ii) Model Aggregation: When compared with the conventional federated LoRA schemes, in which clients must upload both locally-updated low-rank matrices, client n in FLoRG only needs to transmit At+ 12 
+
+> n
+
+to the central server, thereby reducing the per-round uplink communication overhead by more than half. Let Qt+ 12 
+
+> n
+
+=
+
+
+
+At+ 12
+
+> n
+
+⊺
+
+At+ 12 
+
+> n
+
+denote the locally updated Gram matrix for client 
+
+n in the t-th training round. After receiving the locally updated parameter matrices from all clients, the central server performs model aggregation with respect to At+ 12 
+
+> n
+
+as 
+
+Qt+1 = 1
+
+N
+
+X
+
+> n∈N
+
+Qt+ 12 
+
+> n
+
+, t ∈ T , (4) where Qt+1 ∈ Rk×k is the aggregated Gram matrix at the end of the t-th fine-tuning round. Due to the Gram matrix design, aggregating 
+
+
+
+At+ 12
+
+> n
+
+⊺
+
+At+ 12 
+
+> n
+
+is linear and preserves the positive semi-definite (PSD) property. Therefore, the central server can obtain the true aggregated matrix. This removes the bilinear inconsistency induced by aggregating matrices Bn and An separately as in conventional federated LoRA schemes (i.e., aggregation error). Let r′ denote the rank of Qt+1 ,which satisfies 
+
+rank( Qt+ 12 
+
+> n
+
+) ≤ r′ = rank( Qt+1 ) (a) 
+
+≤ min {k, N r } , (5) where inequality (a) follows from the subadditivity property of rank operator. 4Published as a conference paper at ICLR 2026 
+
+(iii) Decomposition with Procrustes Alignment: Since Qt+1 is a square PSD Gram matrix, the central server performs eigendecomposition to Qt+1 as follows: 
+
+Qt+1 = ( Pt+1 )⊺Λt+1 Pt+1 , t ∈ T , (6) where Pt+1 ∈ Rr′×k. Λt+1 ∈ Rr′×r′
+
+denotes the eigenvalue matrix of Qt+1 . Thus, a canonical decomposition which satisfies ( ˜At+1 )⊺ ˜At+1 = Qt+1 is 
+
+˜At+1 = (Λ t+1 ) 12 Pt+1 , t ∈ T , (7) where ˜At+1 is a valid decomposition of Qt+1 . However, directly applying ˜At+1 for the subsequent fine-tuning round (i.e., At+1 := ˜At+1 ) may yield sub-optimal performance since the decomposition yields two challenges: non-unique decomposition and rank mismatch .First, the above expression of matrix ˜At+1 provides a canonical representation of the decomposition of Qt+1 , which is non-unique. This is because for any matrix with orthogonal columns O ∈ Rr′×r′
+
+,we have (O ˜At+1 )⊺O ˜At+1 = Qt+1 . Furthermore, although the decomposition guarantees that 
+
+( ˜At+1 )⊺ ˜At+1 preserves the aggregated Gram matrix, there exist many such decompositions due to the non-uniqueness of decompositions (e.g., Cholesky decomposition or SVD) when the rank is deficient or the eigenvalues have multiplicities. However, this non-uniqueness affects the future fine-tuning. From the update rule in eqn. (2), each client performs local fine-tuning in the (t + 1) -th fine-tuning round using the gradient which depends explicitly on At+1 . As a result, different decompositions of Qt+1 may yield different At+1 which result in divergent gradient paths. These paths may potentially lead to unstable fine-tuning dynamics across rounds. Second, as stated in eqn. (5), the rank of the decomposed matrix may be different from that of the original one (i.e., r′̸ = r). In such cases, we need to recover a matrix of the target rank r for consistency across fine-tuning rounds. The aforementioned challenges motivate reparameterizing matrix ˜At+1 to stabilize the subsequent fine-tuning process while enforcing the target rank r. To this end, we propose Procrustes alignment to project ˜At+1 onto the r-rank subspace. Let St ∈ Rr×r′
+
+denote this Procrustes alignment matrix in the t-th fine-tuning round. The matrix after projection is denoted as St ˜At+1 . In particular, Procrustes alignment minimizes the Frobenius norm between the matrix after projection St ˜At+1 
+
+and At, which minimizes the drift caused by the non-uniqueness of matrix decomposition. We then formulate the following optimization problem in the t-th fine-tuning round: 
+
+P1 : minimize  
+
+> St
+
+St ˜At+1 − At 2
+
+> F
+
+(8a) 
+
+subject to (St)⊺St = Ir′ , (8b) where Ir′ ∈ Rr′×r′
+
+denotes the identity matrix. To solve problem P1, we first convert the objective function (8a) into the following form: 
+
+St ˜At+1 − At 2
+
+> F
+
+= Tr  (At)⊺At + Tr 
+
+
+
+( ˜At+1 )⊺(St)⊺St ˜At+1 
+
+− 2 Tr 
+
+
+
+At( ˜At+1 )⊺(St)⊺
+
+= At 2 
+
+> F
+
++ ˜At+1 2
+
+> F
+
+− 2 Tr 
+
+
+
+At( ˜At+1 )⊺(St)⊺
+
+. (9) Since ∥At∥2 
+
+> F
+
+and ∥ ˜At+1 ∥2 
+
+> F
+
+have been determined after matrix decomposition at the end of the t-th fine-tuning round, problem P1 is equivalent to the following problem: 
+
+P2 : maximize  
+
+> St
+
+Tr 
+
+
+
+At( ˜At+1 )⊺(St)⊺
+
+(10a) 
+
+subject to constraint ( 8b ).
+
+Then, we present the following theorem to obtain the optimal solution to problems P2 and P1, with the proof provided in Appendix A.1. 
+
+Theorem 1. (Optimal Procrustes Alignment Matrix) We denote the SVD of At( ˜At+1 )⊺ as 
+
+At( ˜At+1 )⊺ = UtΣt(Vt)⊺, where Ut ∈ Rr×r′
+
+and Vt ∈ Rr′×r′
+
+have orthogonal columns. Let 
+
+5Published as a conference paper at ICLR 2026 
+
+Σt = diag( σt
+
+> 1
+
+, σ t
+
+> 2
+
+, . . . , σ tr′ ) ∈ Rr′×r′
+
+denote the diagonal matrix of singular values of At( ˜At+1 )⊺.The optimal solution St,⋆ to problems P2 and P1 satisfies 
+
+St,⋆ = Ut(Vt)⊺. (11) The main benefits of our proposed Procrustes alignment are two-fold. First, it resolves the issue due to non-unique decomposition. In particular, the Procrustes alignment approach selects, among all valid decompositions of Qt+1 , the one which is nearest to that in the last fine-tuning round (i.e., At)in Frobenius norm. Thus, it stabilizes the gradients in the subsequent fine-tuning rounds. Second, it addresses the rank mismatch issue of the decomposed matrix by using a semi-orthogonal Procrustes alignment matrix to project ˜At+1 with rank r′ onto the target r-rank subspace. After the central server has determined matrix St,⋆ , it calculates the low-rank matrix for the (t+1) -th training round as At+1 = St,⋆ ˜At+1 . Thus, the full model in the (t + 1) -th round is given by 
+
+Wt+1 = W0 + L(At+1 )⊺At+1 R. (12) Then, the central server broadcasts the matrix At+1 to all clients on the downlink. Note that the proposed FLoRG can effectively reduce the per-round communication overhead by more than half when compared with traditional federated LoRA schemes. For a model with L LoRA layers, the total per-round computation overhead of eigendecomposition and Procrustes alignment at the server is O(Lk 3) + O(L(krr ′ + min( r, r ′)2 max( r, r ′))) . From this complexity analysis, the per-round server computation overhead scales linearly with the number of LoRA layers and is independent of the number of clients (beyond the standard Gram aggregation), indicating that FLoRG is scalable even with many layers and many clients. The workflow of our proposed FLoRG is presented in Appendix A.2. 3.2 THEORETICAL ANALYSIS 
+
+In this section, we analyze the convergence rate of our proposed FLoRG. Without loss of generality, we consider nonconvex loss functions in our analysis. We first present the following assumptions which are widely used in the literature (e.g., (Li et al., 2020; Wang et al., 2020; Guo et al., 2025)). 
+
+Assumption 1. (L-Smoothness (Li et al., 2020; Wang et al., 2020)) The loss function of each client 
+
+n is continuously differentiable and L-smooth. That is, for arbitrary two matrices Wt and Wt+1 ,we have fn(Wt+1 ) ≤ fn(Wt)+ ⟨∇ fn(Wt), Wt+1 −Wt⟩F + L 
+
+> 2
+
+∥Wt+1 −Wt∥2 
+
+> F
+
+, t ∈ T , n ∈ N .
+
+Assumption 2. (Bounded Gradient (Li et al., 2020; Wang et al., 2020)) The local stochastic gradient of A is upper-bounded, i.e., Eξn∼D n
+
+∥∇ AFn(Wt; ξn)∥2
+
+> F
+
+ ≤ ψ, t ∈ T , n ∈ N .
+
+Assumption 3. (Bounded Parameter Space (Guo et al., 2025)) The Frobenius norm of model pa-rameter matrices At and ˜At are upper-bounded by two positive constants CA and ˜CA, respectively, i.e., ∥At∥F ≤ CA, ∥ ˜At∥F ≤ ˜CA, t ∈ T , t ∈ T .
+
+In addition, we present two lemmas to facilitate our convergence analysis, with the proof provided in Appendices A.3 and A.4, respectively. 
+
+Lemma 1. We denote Ht = 1
+
+> N
+
+P 
+
+> n∈N
+
+Htn = 1
+
+> N
+
+P 
+
+> n∈N
+
+L⊺GtnR⊺. Let λmin (X) denote the smallest positive eigenvalue of matrix X. For any matrices At and Ht, we have 
+
+Ht, (At)⊤At Ht + ( Ht)⊤ +  Ht + ( Ht)⊤(At)⊤At 
+
+> F
+
+≥ 4 λmin 
+
+ (At)⊤At Ht 2
+
+> F
+
+, t ∈ T .
+
+(13) 
+
+Lemma 2. Let St denote an arbitrary Procrustes alignment matrix in the t-th fine-tuning round. Let σmin (X) denote the smallest positive singular value of matrix X. We define ∆t+1 proc =
+
+St ˜At+1 − At 2
+
+> F
+
+− St,⋆ ˜At+1 − At 2
+
+> F
+
+≥ 0. The difference of two Procrustes alignment ma-trices is bounded, i.e., ∥St − St,⋆ ∥2 
+
+> F
+
+≤ ∆t+1 proc 
+
+> σmin
+
+( ˜At+1 (At)⊺) , t ∈ T .
+
+Now, we present the convergence rate of our proposed FLoRG in the following theorem, with the proof provided in Appendix A.5. 6Published as a conference paper at ICLR 2026 
+
+Theorem 2. (Convergence Rate of FLoRG) We denote the optimal model as W⋆. Under Assump-tions 1 − 3 and Lemmas 1 − 2, the convergence rate of our proposed FLoRG is bounded by 
+
+1
+
+T
+
+X
+
+> t∈T
+
+∇f (Wt) 2 
+
+> F
+
+≤ f (W1) − f (W⋆)
+
+T Ω| {z }
+
+> Initial optimality gap
+
++ η2ψ2
+
+2Ω + 3Lη 2ψ  η2ψ + 2 C2
+
+> A
+
+
+
+2Ω | {z }
+
+> Residual bias term
+
++ 1
+
+T Ω
+
+X
+
+> t∈T
+
+2ηψ ˜C2
+
+> A
+
+∆t
+
+> proc
+
+N σ min 
+
+ ˜At(At−1)⊺
+
+| {z }
+
+> Procrustes alignment drift term
+
+, (14) where Ω = 4 η min t∈T {λmin (( At)⊺At)} − η2 
+
+> 2
+
+− η 
+
+> 2
+
+.Based on the theoretical analysis, we can observe that the convergence rate of our proposed FLoRG depends on three terms. The first term is the initial optimality gap, which diminishes as the num-ber of fine-tuning rounds T increases. The second term is the non-diminishing residual bias term. The third term is the Procrustes alignment drift term, which captures the impact of the Procrustes alignment on the convergence rate. When the Procrustes alignment is applied, ∆t 
+
+> proc
+
+becomes zero. Hence, the third term becomes zero, under which we can achieve a tighter bound and improve the convergence rate. 
+
+## 4 EXPERIMENTAL RESULTS 
+
+4.1 EXPERIMENT SETUP 
+
+Base Models, Datasets, and Baseline Schemes: We choose OPT-125M (Zhang et al., 2022), RoBERTa-large (Liu et al., 2019), and Llama-3.2-3B (Dubey et al., 2024) as three base models with three different scales. In particular, OPT-125M, RoBERTa-large, and Llama-3.2-3B have 125M, 355M, and 3B model parameters. We choose GLUE (Wang et al., 2018) as a natural language understanding benchmark with MRPC, QQP, MNLI, QNLI, WNLI, and RTE datasets. In addition, we choose SQuAD (Rajpurkar et al., 2016) v1.1 as a question-answering dataset. We compare the performance of our proposed FLoRG with the following baseline schemes: • FedIT (Zhang et al., 2024): Each client transmits the locally updated LoRA matrices B
+
+and A to the central server. The central server aggregates B and A separately. • FeDeRA (Yan et al., 2024): Each client transmits locally updated LoRA matrices B and 
+
+A to the central server. The central server aggregates BA and performs SVD to obtain the updated matrices B and A.• FFA-LoRA (Sun et al., 2024) Each client freezes matrix A and only updates matrix B.The central server performs aggregation on matrix B.• FedSA-LoRA (Guo et al., 2025): Each client locally updates matrices B and A but only shares matrix A for aggregation. • FedEx-LoRA (Singhal et al., 2025): Each client transmits locally updated LoRA matrices 
+
+B and A to the central server. The central server aggregates B and A separately and determines a residual matrix to mitigate the aggregation error. 
+
+Implementation Details: To show the learning performance of GLUE datasets, we show the test-ing accuracy. To characterize the communication overhead, we present the total number of parame-ters transmitted between all clients and the central server. For GLUE, to model the data heterogene-ity across clients’ local datasets, we use the Dirichlet distribution Dir( ρ) to create non-independent and identically distributed (non-iid) data partitioning. In particular, ρ > 0 controls the degree of non-iidness across clients’ local datasets. A lower value of ρ indicates a higher degree of data het-erogeneity. To show the learning performance of the SQuAD v1.1 dataset, we show the exact match (EM) and F1 scores. For SQuAD v1.1, we consider the dataset to be independently and identically distributed. In the ablation studies, we choose RoBERTa-large as the base model. Unless stated oth-erwise, we consider all clients participate in the fine-tuning and set η = 5 e − 5, ρ = 0 .5, N = 20 ,and r = 4 . The details of the hyperparameter settings are presented in Appendix A.6. 7Published as a conference paper at ICLR 2026 
+
+loss.eps 
+
+(a) 
+
+acc.eps 
+
+(b) Figure 2: Comparison of the (a) training loss and (b) testing accuracy versus the number of fine-tuning rounds on RoBERTa-large and QNLI. 
+
+4.2 LEARNING PERFORMANCE 
+
+In this section, we compare the testing accuracy of different schemes under different base models and datasets. Due to the space limit, we present the results under MNLI, QNLI, WNLI, and RTE datasets. The experiments are repeated under 2 random seeds, and we report the average testing accuracy. Results in Table 1 show that our proposed FLoRG outperforms the baseline schemes under those four datasets in most cases. In particular, on OPT-125M, FLoRG improves the testing accuracy over the strongest baseline by 1.52 on MNLI, 1.13 on WNLI, and 0.65 on RTE. On RoBERTa-large, the margins are 0.31 on MNLI, 0.45 on QNLI, 0.37 on WNLI, and 0.28 on RTE. On Llama-3.2-3B, FLoRG improves the testing accuracy over the strongest baseline by 0.41 on MNLI, 0.84 on WNLI, and 0.69 on RTE. Furthermore, we present the training loss and testing accuracy curves in Fig. 2. Additional experimental results are presented in Appendix A.7. These results validate the superiority of FLoRG. 
+
+Table 1: Comparison of the testing accuracy across different baseline schemes.                                                                                
+
+> Base Model Dataset FLoRG FedIT FeDeRA FFA-LoRA FedSA-LoRA FedEx-LoRA
+> OPT-125M MNLI 87.35 79.42 81.15 83.54 84.61 85.83 QNLI 89.52 84.18 86.71 87.93 88.69 89.88
+> WNLI 65.28 58.45 59.34 62.61 62.83 64.15 RTE 68.92 61.08 64.51 66.02 67.39 68.27 RoBERTa-large MNLI 91.27 84.91 88.06 89.28 90.75 90.96 QNLI 92.58 87.49 90.07 90.96 91.54 92.13 WNLI 66.48 59.34 61.83 63.72 63.47 66.11 RTE 71.26 64.25 67.12 68.49 69.93 70.98 Llama-3.2-3B MNLI 93.15 87.24 89.83 91.05 92.38 92.74 QNLI 93.12 89.17 91.45 92.53 93.27 93.05 WNLI 68.73 61.52 64.19 65.97 66.81 67.89 RTE 73.84 67.08 69.75 71.33 72.56 73.15
+
+4.3 COMPARISON OF THE COMMUNICATION OVERHEAD 
+
+In this section, we compare the communication overhead incurred under different baseline schemes. We use the QNLI dataset to conduct the experiments. Results in Table 2 show that to achieve the target test accuracy, our proposed FLoRG uses a much lower total number of transmitted model parameters when compared with the baselines. This demonstrates that FLoRG can significantly reduce the communication overhead by up to 2041 × when compared with the baseline schemes. Additional results of the computation overhead and memory usage are presented in Appendix A.7. 8Published as a conference paper at ICLR 2026 
+
+Table 2: Comparison of the total number of transmitted parameters (upload and download) to achieve the target accuracy. Symbol “ −” means that the target accuracy cannot be achieved.                                                                                
+
+> Base Model Target Acc. FLoRG FedIT FeDeRA FFA-LoRA FedSA-LoRA FedEx-LoRA
+> OPT-125M 80.00 8.2×10 63.78 ×10 72.46 ×10 71.59 ×10 72.10 ×10 71.25 ×10 10
+> 85.00 1.07 ×10 7−4.2×10 72.75 ×10 73.61 ×10 71.77 ×10 10
+> RoBERTa-large 80.00 8.7×10 64.68 ×10 73.02 ×10 71.85 ×10 72.59 ×10 72.08 ×10 10
+> 85.00 1.45 ×10 78.12 ×10 75.17 ×10 73.35 ×10 74.42 ×10 72.96 ×10 10
+
+4.4 ABLATION STUDIES 
+
+Impact of the Procrustes alignment In this subsection, we study the impact of our proposed Pro-crustes alignment on the learning performance. Results in Table 3 show that by applying Procrustes alignment, our proposed FLoRG yields a consistent improvement in terms of the testing accuracy. On OPT-125M, Procrustes alignment provides an improvement of 3.40 on MRPC, 2.86 on QQP, 6.27 on MNLI, 2.97 on QNLI, 5.60 on WNLI, and 4.45 on RTE, respectively. On RoBERTa-large, Procrustes alignment provides an improvement of 3.37 on MRPC, 2.84 on QQP, 2.46 on MNLI, 3.86 on QNLI, 4.34 on WNLI, and 4.31 on RTE, respectively, whereas FLoRG without Procrustes align-ment can only achieve a comparable testing accuracy to FeDeRA, as shown in Table 1. It showcases the importance of our proposed Procrustes alignment to improve the fine-tuning performance. 
+
+Table 3: Comparison of the testing accuracy of FLoRG with and without Procrustes alignment.                                  
+
+> Base Model FLoRG MRPC QQP MNLI QNLI WNLI RTE
+> OPT-125M w/ Procrustes alignment 86.54 88.71 87.20 89.69 65.41 68.77
+> w/o Procrustes alignment 83.14 85.85 80.93 86.72 59.81 64.32 RoBERTa-large w/ Procrustes alignment 89.87 91.27 91.39 92.48 66.41 71.40
+> w/o Procrustes alignment 86.50 88.43 88.93 88.62 62.07 67.09
+
+Impact of the Rank In this subsection, we vary r to demonstrate the impact of rank on the fine-tuning performance. In particular, we conduct experiments under r = 2 , 4, 8, respectively. We present the results under the WNLI and RTE datasets. Results in Table 4 show that our proposed FLoRG outperforms the baseline schemes under different rank settings, demonstrating the robust-ness of our proposed FLoRG under various ranks. Additional experimental results can be found in Appendix A.7. 
+
+Table 4: Comparison of the testing accuracy under different ranks.                                                  
+
+> Rank Dataset FLoRG FedIT FeDeRA FFA-LoRA FedSA-LoRA FedEx-LoRA
+> r= 2 WNLI 60.55 55.57 56.30 57.50 59.14 58.32 RTE 65.82 58.41 61.19 62.88 64.30 62.79
+> r= 4 WNLI 66.34 59.19 61.97 63.55 63.61 66.12 RTE 71.41 64.11 66.97 68.62 70.10 71.28
+> r= 8 WNLI 68.83 61.70 63.52 65.10 66.47 68.02 RTE 72.10 64.78 66.99 68.02 70.61 71.30
+
+Robustness to the Data Heterogeneity In this subsection, we study the impact of the degree of data heterogeneity across clients’ local datasets on the fine-tuning performance. We present the re-sults under the WNLI and RTE datasets. It can be observed in Table 5 that under different degrees of data heterogeneity, our proposed FLoRG outperforms the baseline schemes under more hetero-geneous settings. In addition, as the degree of data heterogeneity increases (i.e., ρ decreases), the improvement over the baseline schemes also increases, showcasing the robustness and superiority of our proposed FLoRG under heterogeneous data settings. Additional experimental results are presented in Appendix A.7. 9Published as a conference paper at ICLR 2026 
+
+Table 5: Comparison of the testing accuracy under different degrees of data heterogeneity.                                                  
+
+> Non-IIDness Dataset FLoRG FedIT FeDeRA FFA-LoRA FedSA-LoRA FedEx-LoRA
+> ρ= 0 .1WNLI 60.12 53.07 54.21 56.14 57.74 58.84 RTE 65.30 55.60 59.19 61.20 60.75 61.67
+> ρ= 0 .5WNLI 66.34 59.19 61.97 63.55 63.61 66.12 RTE 71.41 64.11 66.97 68.62 70.10 71.28
+> ρ= 1 WNLI 67.83 61.70 63.52 64.33 65.61 68.31
+> RTE 72.21 66.90 68.71 70.40 71.78 72.55
+
+Matrix Initialization for Matrices L and R In this subsection, we show the impact of the initial-ization of matrices L and R on the learning performance. In particular, we compare our proposed semi-orthogonal initialization with Kaiming initialization (He et al., 2015) and SVD initialization (Boutsidis & Gallopoulos, 2007). Results in Table 6 show that the semi-orthogonal approach out-performs the other two approaches in most cases, demonstrating the effectiveness of our proposed initialization approach for matrices L and R.
+
+Table 6: Comparison of the testing accuracy under different initialization schemes.                                            
+
+> Base Model Initialization MRPC QQP MNLI QNLI WNLI RTE
+> OPT-125M Semi-orthogonal 86.54 88.71 87.20 89.69 65.41 68.77 Kaiming 84.35 88.90 85.23 87.73 62.29 69.31
+> SVD 86.41 87.69 83.19 88.74 64.37 67.69 RoBERTa-large Semi-orthogonal 89.87 91.27 91.39 92.48 66.41 71.40
+> Kaiming 87.68 92.34 89.11 91.57 64.19 70.32 SVD 88.70 90.37 91.49 91.45 65.08 71.40
+
+Impact of the Client Availability In this subsection, we show the impact of the client availability on the learning performance. In particular, we conduct experiments under varying client participa-tion ratios. Results in Table 7 show that under different ratios of client participation, our proposed FLoRG outperforms the baseline schemes in most cases, demonstrating its applicability. 
+
+Table 7: Comparison of the testing accuracy under different client participation ratios.                                               
+
+> Client participation ratio Dataset FLoRG FedIT FeDeRA FFA-LoRA FedSA-LoRA FedEx-LoRA
+> 0.2WNLI 58.42 54.15 55.20 56.30 57.10 56.46 RTE 63.25 57.80 59.45 60.92 61.85 61.35
+> 0.5WNLI 64.50 58.10 60.35 61.80 62.40 63.58 RTE 69.15 62.50 65.20 66.75 68.20 68.61
+> 1WNLI 66.34 59.19 61.97 63.55 63.61 66.12 RTE 71.41 64.11 66.97 68.62 70.10 71.28
+
+## 5 CONCLUSION 
+
+In this work, we proposed FLoRG, a federated fine-tuning framework with low-rank Gram matrices. In particular, FLoRG features a single low-rank matrix instead of two low-rank matrices as in the conventional LoRA module. By transmitting this matrix and aggregating the corresponding Gram matrix, FLoRG eliminates the error induced by separately aggregating two matrices and significantly reduces the per-round communication overhead. Moreover, we proposed a Procrustes alignment ap-proach to reparameterize the decomposed low-rank matrix after model aggregation. We theoretically analyzed the convergence rate of our proposed FLoRG framework and characterized the impact of our proposed Procrustes alignment on the convergence. Experimental results show that our proposed FLoRG framework achieves a higher testing accuracy and can reduce the communication overhead by up to 2041 × when compared with five baseline schemes. 10 Published as a conference paper at ICLR 2026 
+
+## REFERENCES 
+
+Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ahmad, Ilge Akkaya, Florencia Leoni Ale-man, Diogo Almeida, Janko Altenschmidt, Sam Altman, Shyamal Anadkat, et al. GPT-4 technical report. arXiv preprint arXiv:2303.08774 , Mar. 2023. Sara Babakniya, Ahmed Roushdy Elkordy, Yahya H Ezzeldin, Qingfeng Liu, Kee-Bong Song, Mostafa El-Khamy, and Salman Avestimehr. SLoRA: Federated parameter efficient fine-tuning of language models. arXiv preprint arXiv:2308.06522 , Aug. 2023. Jiamu Bai, Daoyuan Chen, Bingchen Qian, Liuyi Yao, and Yaliang Li. Federated fine-tuning of large language models under heterogeneous tasks and client resources. In Proc. Advances Neural Info. Process. Syst. (NeurIPS) , Dec. 2024. David Bensa¨ ıd, Noam Rotstein, Roy Velich, Daniel Bensa¨ ıd, and Ron Kimmel. SingLoRA: Low rank adaptation using a single matrix. arXiv preprint arXiv:2507.05566 , Jul. 2025. Christos Boutsidis and Efstratios Gallopoulos. SVD based initialization: A head start for nonnega-tive matrix factorization. Pattern recognition , 41(4):1350–1362, Sep. 2007. Yuji Byun and Jaeho Lee. Towards federated low-rank adaptation of language models with rank heterogeneity. In Proc. Conf. Nations Americas Assoc. Comput. Linguistics (NAACL)) , Apr 2025. Yae Jee Cho, Luyang Liu, Zheng Xu, Aldi Fahrezi, and Gauri Joshi. Heterogeneous loRA for federated fine-tuning of on-device foundation models. In Proc. Conf. Empirical Methods Natural Lang. Process. (EMNLP) , Nov. 2024. Tim Dettmers, Artidoro Pagnoni, Ari Holtzman, and Luke Zettlemoyer. QLoRA: Efficient finetuning of quantized LLMs. In Proc. Proc. Advances Neural Info. Process. Syst. (NeurIPS) , Dec. 2023. Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey, Abhishek Kadian, Ahmad Al-Dahle, Aiesha Letman, Akhil Mathur, Alan Schelten, Amy Yang, Angela Fan, et al. The llama 3 herd of models. 
+
+arXiv e-prints , pp. arXiv–2407, 2024. Zihan Fang, Zheng Lin, Zhe Chen, Xianhao Chen, Yue Gao, and Yuguang Fang. Automated federated pipeline for parameter-efficient fine-tuning of large language models. arXiv preprint arXiv:2404.06448 , Apr. 2024. Aaron Grattafiori, Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey, Abhishek Kadian, Ahmad Al-Dahle, Aiesha Letman, Akhil Mathur, Alan Schelten, Alex Vaughan, et al. The Llama 3 herd of models. arXiv preprint arXiv:2407.21783 , Jul. 2024. Pengxin Guo, Shuang Zeng, Yanran Wang, Huijie Fan, Feifei Wang, and Liangqiong Qu. Selective aggregation for low-rank adaptation in federated learning. In Proc. Int. Conf. Learn. Representa-tions (ICLR) , Apr. 2025. Soufiane Hayou, Nikhil Ghosh, and Bin Yu. LoRA+: Efficient low rank adaptation of large models. In Proc. int. Conf. Mach. Learn. (ICML) , Jul. 2024. Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. Delving deep into rectifiers: Surpassing human-level performance on imageNet classification. In Proc. IEEE Int. Conf. Compute. Vis. (ICCV) , Dec. 2015. Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al. LoRA: Low-rank adaptation of large language models. In Proc. Int. Conf. Learn. Representations (ICLR) , Apr. 2022. Dawid J Kopiczko, Tijmen Blankevoort, and Yuki M Asano. VeRA: Vector-based random matrix adaptation. In Proc. Int. Conf. Learn. Representations (ICLR) , May 2024. Xiang Li, Kaixuan Huang, Wenhao Yang, Shusen Wang, and Zhihua Zhang. On the convergence of FedAvg on non-IID data. In Proc. Int. Conf. Learn. Representations (ICLR) , Apr. 2020. 11 Published as a conference paper at ICLR 2026 Shih-Yang Liu, Chien-Yi Wang, Hongxu Yin, Pavlo Molchanov, Yu-Chiang Frank Wang, Kwang-Ting Cheng, and Min-Hung Chen. DoRA: Weight-decomposed low-rank adaptation. In Proc. int. Conf. Mach. Learn. (ICML) , Jul. 2024. Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettlemoyer, and Veselin Stoyanov. RoBERTa: A robustly optimized BERT pre-training approach. arXiv preprint arXiv:1907.11692 , Jul. 2019. Guodong Long, Tao Shen, Jing Jiang, Michael Blumenstein, et al. Dual-personalizing adapter for federated foundation models. In Proc. Advances Neural Info. Process. Syst. (NeurIPS) , Dec. 2024. Brendan McMahan, Eider Moore, Daniel Ramage, Seth Hampson, and Blaise Aguera y Arcas. Communication-efficient learning of deep networks from decentralized data. In Proc. Int. Conf. Artif. Intell. Statist. (AISTATS) , Fort Lauderdale, FL, Apr. 2017. Pranav Rajpurkar, Jian Zhang, Konstantin Lopyrev, and Percy Liang. SQuAD: 100,000+ questions for machine comprehension of text. arXiv preprint arXiv:1606.05250 , 2016. Raghav Singhal, Kaustubh Ponkshe, and Praneeth Vepakomma. FedEx-LoRA: Exact aggregation for federated and efficient fine-tuning of foundation models. In Proc. Annu. Meeting Assoc. Com-put. Linguistics , Vienna, Austria, Jul. 2025. Youbang Sun, Zitao Li, Yaliang Li, and Bolin Ding. Improving LoRA in privacy-preserving feder-ated learning. In Proc. Int. Conf. Learn. Representations (ICLR) , May 2024. Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timoth´ ee Lacroix, Baptiste Rozi` ere, Naman Goyal, Eric Hambro, Faisal Azhar, et al. Llama: Open and efficient foundation language models. arXiv preprint arXiv:2302.13971 , Feb. 2023. Alex Wang, Amanpreet Singh, Julian Michael, Felix Hill, Omer Levy, and Samuel R Bowman. GLUE: A multi-task benchmark and analysis platform for natural language understanding. arXiv preprint arXiv:1804.07461 , Apr. 2018. Jianyu Wang, Qinghua Liu, Hao Liang, Gauri Joshi, and H Vincent Poor. Tackling the objective inconsistency problem in heterogeneous federated optimization. In Proc. Advances Neural Info. Process. Syst. (NeurIPS) , Dec. 2020. Ziyao Wang, Zheyu Shen, Yexiao He, Guoheng Sun, Hongyi Wang, Lingjuan Lyu, and Ang Li. FLoRA: Federated fine-tuning large language models with heterogeneous low-rank adaptations. In Proc. Advances Neural Info. Process. Syst. (NeurIPS) , Dec. 2024. Feijie Wu, Zitao Li, Yaliang Li, Bolin Ding, and Jing Gao. FedBiOT: LLM local fine-tuning in federated learning without full model. In Proc. ACM SIGKDD Conf. on Knowl. Discovery Data Mining (KDD) , Aug. 2024. Yunlu Yan, Chun-Mei Feng, Wangmeng Zuo, Rick Siow Mong Goh, Yong Liu, and Lei Zhu. Fed-erated residual low-Rank adaptation of large language models. In Proc. Int. Conf. Learn. Repre-sentations (ICLR) , Apr. 2025. Yuxuan Yan, Qianqian Yang, Shunpu Tang, and Zhiguo Shi. FeDeRA: Efficient fine-tuning of lan-guage models in federated learning leveraging weight decomposition. In Proc. Advances Neural Info. Process. Syst. (NeurIPS) , Dec. 2024. Jianyi Zhang, Saeed Vahidian, Martin Kuo, Chunyuan Li, Ruiyi Zhang, Tong Yu, Guoyin Wang, and Yiran Chen. Towards building the federated GPT: Federated instruction tuning. In Proc. IEEE Int. Conf. Acoust. Speech Signal Process. (ICASSP) , Apr. 2024. Qingru Zhang, Minshuo Chen, Alexander Bukharin, Nikos Karampatziakis, Pengcheng He, Yu Cheng, Weizhu Chen, and Tuo Zhao. AdaLoRA: Adaptive budget allocation for parameter-efficient fine-tuning. In Proc. Int. Conf. Learn. Representations (ICLR) , May 2023a. Susan Zhang, Stephen Roller, Naman Goyal, Mikel Artetxe, Moya Chen, Shuohui Chen, Christo-pher Dewan, Mona Diab, Xian Li, Xi Victoria Lin, et al. OPT: Open pre-trained transformer language models. arXiv preprint arXiv:2205.01068 , May 2022. 12 Published as a conference paper at ICLR 2026 Zhuo Zhang, Yuanhang Yang, Yong Dai, Qifan Wang, Yue Yu, Lizhen Qu, and Zenglin Xu. Fed-PETuning: When federated learning meets the parameter-efficient tuning methods of pre-trained language models. In Proc. Annu. Meeting Assoc. of Comput. Linguistics (ACL) , Jul. 2023b. Jiawei Zhao, Zhenyu Zhang, Beidi Chen, Zhangyang Wang, Anima Anandkumar, and Yuandong Tian. GaLore: Memory-efficient llm training by gradient low-rank projection. In Proc. Int. Conf. Mach. Learn. (ICML) , Jul. 2024. Wayne Xin Zhao, Kun Zhou, Junyi Li, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen Zhang, Junjie Zhang, Zican Dong, et al. A survey of large language models. arXiv preprint arXiv:2303.18223 , Mar. 2023. 13 Published as a conference paper at ICLR 2026 
+
+## A APPENDIX 
+
+A.1 PROOF OF THEOREM 1During the Procrustes alignment, we define Zt = ( Ut)⊺StVt ∈ Rr′×r′
+
+. Therefore, St satisfies 
+
+St = UtZt(Vt)⊺. (15) Note that (St)⊺St = Ir′ . In addition, since matrices Ut and Vt have orthogonal columns, we have 
+
+Tr 
+
+
+
+At( ˜At+1 )⊺(St)⊺
+
+= Tr  UtΣt(Vt)⊺Vt(Zt)⊺(Ut)⊺
+
+= Tr  Σt(Zt)⊺
+
+=
+
+> r′
+
+X
+
+> j=1
+
+σtj ztj,j . (16) Since matrix Zt satisfies (Zt)⊺Zt = Ir′ , each element ztj,j yields ztj,j ≤ 1, we have 
+
+Tr 
+
+
+
+At( ˜At+1 )⊺(St)⊺
+
+
+
+≤ Pr′ 
+
+> j=1
+
+σtj , with the equality achieved at Zt = Ir′ . Therefore, when the maximum objective is achieved, matrix St,⋆ satisfies 
+
+St,⋆ = UtIr′ (Vt)⊺ = Ut(Vt)⊺. (17) This completes the proof of Theorem 1. A.2 ALGORITHM FOR FL ORG 
+
+Algorithm 1 FLoRG 
+
+1: Input : Local fine-tuning datasets Dn, n ∈ N ; learning rate η; pretrained model W0; initialized low-rank matrix A1.2: The central server initializes L and R with orthogonal columns and broadcasts them to all clients. 3: W1 := W0 + L(A1)⊺A1R.4: For t ∈ T do 
+
+5: The central server broadcasts At to all clients. 6: For client n ∈ N in parallel do 
+
+7: At+ 12 
+
+> n
+
+:= At − η∇AFn(Wt; ξn).8: Transmits At+ 12 
+
+> n
+
+to the central server. 9: End for 
+
+10: Qt+1 := 1
+
+> N
+
+P
+
+> n∈N
+
+
+
+At+ 12
+
+> n
+
+⊺
+
+At+ 12 
+
+> n
+
+.11: Perform eigendecomposition to Qt+1 and obtain ˜At+1 := (Λ t+1 ) 12 Pt+1 .12: Perform Procrustes alignment to ˜At+1 and obtain St,⋆ := Ut(Vt)⊺.13: At+1 := St,⋆ ˜At+1 .14: ¯Wt+1 := W0 + L(At+1 )⊺At+1 R.15: End for 
+
+16: Output : Average fine-tuned model ¯WT +1 .
+
+A.3 PROOF OF LEMMA 1
+
+Ht, (At)⊤At Ht + ( Ht)⊤ +  Ht + ( Ht)⊤(At)⊤At
+
+> F
+> (a)
+
+= Ht+( Ht)⊤ 
+
+> 2
+
+, (At)⊤At Ht + ( Ht)⊤ +  Ht + ( Ht)⊤(At)⊤At
+
+> F
+
+= 2 Ht+( Ht)⊤ 
+
+> 2
+
+, (At)⊤At Ht+( Ht)⊤  
+
+> 2F
+
++ 2 Ht+( Ht)⊤ 
+
+> 2
+
+, Ht+( Ht)⊤ 
+
+> 2
+
+(At)⊤At
+
+> F
+> (b)
+
+≥ 2 λmin 
+
+ (At)⊤At Ht+( Ht)⊤
+
+> 2
+> 2
+> F
+
++ 2 λmin 
+
+ (At)⊤At Ht+( Ht)⊤
+
+> 2
+> 2
+> F
+
+14 Published as a conference paper at ICLR 2026 
+
+= 4 λmin 
+
+ (At)⊤At Ht+( Ht)⊤
+
+> 2
+> 2
+> F
+
+= 4 λmin 
+
+ (At)⊤At Ht 2 
+
+> F
+
+, (18) where equality (a) is obtained due to the fact that the second factor within the inner product is symmetric. Thus, the skew-symmetric part of Ht is orthogonal. inequality (b) result from 
+
+(At)⊺At ⪰ λmin (( At)⊺At) Ik.This completes the proof of Lemma 1. A.4 PROOF OF LEMMA 2We expand St ˜At+1 − At 2
+
+> F
+
+as follows: 
+
+St ˜At+1 − At 2
+
+> F
+
+= ˜At+1 2
+
+> F
+
++ At 2 
+
+> F
+
+− 2 Tr 
+
+
+
+St ˜At+1 (At)⊺
+
+. (19) Similarly, we have 
+
+St,⋆ ˜At+1 − At 2
+
+> F
+
+= ˜At+1 2
+
+> F
+
++ At 2 
+
+> F
+
+− 2 Tr 
+
+
+
+St,⋆ ˜At+1 (At)⊺
+
+. (20) Therefore, ∆t+1 proc satisfies 
+
+∆t+1 proc = 2 
+
+
+
+Tr 
+
+
+
+St,⋆ ˜At+1 (At)⊺
+
+− Tr 
+
+
+
+St ˜At+1 (At)⊺ 
+
+. (21) Let Mt = ˜At+1 (At)⊺ = Ut
+
+> M
+
+Σt
+
+> M
+
+Vt
+
+> M
+
+, where matrices Ut 
+
+> M
+
+∈ Rr′×r′
+
+and Vt 
+
+> M
+
+∈ Rr′×r have orthogonal columns. Σt 
+
+> M
+
+∈ Rr′×r′
+
+. Let Pt = Ut
+
+> M
+
+(St)⊺(Vt
+
+> M
+
+)⊺ and Pt,⋆ = Ut
+
+> M
+
+(St,⋆ )⊺(Vt
+
+> M
+
+)⊺ =
+
+Ir′ . Then, we have 
+
+Tr 
+
+
+
+St ˜At+1 (At)⊺
+
+= Tr  PtΣt
+
+> M
+
+ =
+
+> r′
+
+X
+
+> j=1
+
+σj pj,j . (22) Similarly, we have 
+
+Tr 
+
+
+
+St,⋆ ˜At+1 (At)⊺
+
+=
+
+> r′
+
+X
+
+> j=1
+
+σj . (23) By combining eqn. (21), (22), and (23), we obtain 
+
+∆t+1 proc = 2 
+
+> r′
+
+X
+
+> j=1
+
+σj (1 − pj,j ). (24) Since matrices Ut 
+
+> M
+
+and Vt 
+
+> M
+
+have orthogonal columns, we have 
+
+St − St,⋆ 2 
+
+> F
+
+= Pt − I 2
+
+> F
+
+= Tr  (Pt − I)⊺(Pt − I)
+
+= 2 r′ − Tr  Pt − Tr  (Pt)⊺
+
+= 2 
+
+> r′
+
+X
+
+> j=1
+
+(1 − pj,j ). (25) By combining eqns. (24) and (25), we have 
+
+∆t+1 proc = 2 
+
+> r′
+
+X
+
+> j=1
+
+σj (1 − pj,j )
+
+15 Published as a conference paper at ICLR 2026 
+
+≥ 2σmin 
+
+ ˜At+1 (At)⊺
+
+(1 − pj,j )= 2 σmin 
+
+ ˜At+1 (At)⊺
+
+Pt − I 2
+
+> F
+
+= 2 σmin 
+
+ ˜At+1 (At)⊺
+
+St − St,⋆ 2 
+
+> F
+
+. (26) By rearranging this inequality, we have 
+
+St − St,⋆ 2 
+
+> F
+
+≤ ∆t+1 proc 
+
+σmin 
+
+ ˜At+1 (At)⊺
+
+ . (27) This completes the proof of Lemma 2. A.5 PROOF OF THEOREM 2Based on Assumption 1, we expand E[f (Wt+1 )] as 
+
+E f (Wt+1 ) ≤ E f (Wt) + E  ∇f (Wt), Wt+1 − Wt
+
+> F
+
+| {z }
+
+> T1
+
++ L
+
+2 E
+
+h
+
+Wt+1 − Wt 2
+
+> F
+
+i| {z }
+
+> T2
+
+. (28) In particular, Wt+1 − Wt satisfies 
+
+Wt+1 − Wt
+
+= 1
+
+N
+
+X
+
+> n∈N
+
+ L(At+1 )⊺At+1 R − L(At)⊺AtR
+
+= L 1
+
+N
+
+X
+
+> n∈N
+
+
+
+(At+ 12 
+
+> n
+
+)⊺At+ 12 
+
+> n
+
+− (At)⊺At
+
+R
+
+= L 1
+
+N
+
+X
+
+> n∈N
+
+  At − η∇AFn(Wt; ξn)⊺  At − η∇AFn(Wt; ξn) − (At)⊺At
+
+
+
+R
+
+= L
+
+
+
+(At)⊺At − η  (At)⊺ ¯Gt 
+
+> A
+
++ ( ¯Gt
+
+> A
+
+)⊺At + η2( ¯Gt
+
+> A
+
+)⊺ ¯Gt 
+
+> A
+
+− (At)⊺At
+
+
+
+R
+
+= L
+
+
+
+η2( ¯Gt
+
+> A
+
+)⊺ ¯Gt 
+
+> A
+
+− η  (At)⊺ ¯Gt 
+
+> A
+
++ ( ¯Gt
+
+> A
+
+)⊺At 
+
+R, (29) where ¯Gt 
+
+> A
+
+= 1
+
+> N
+
+P 
+
+> n∈N
+
+∇AFn(Wt; ξn) = At (Ht + ( Ht)⊺). Let At,⋆ denote the low-rank matrix obtained by applying the Procrustes alignment. We first bound T1 as follows: 
+
+T1
+
+= − ηE  ∇f (Wt), L  (At)⊺ ¯Gt 
+
+> A
+
++ ( ¯Gt
+
+> A
+
+)⊺At R F
+
+ + η2E  ∇f (Wt), L( ¯Gt
+
+> A
+
+)⊺ ¯Gt
+
+> A
+
+R F
+
+
+
+= ηE  ∇f (Wt), L  (At,⋆ − At)⊺ ¯Gt 
+
+> A
+
++ ( ¯Gt
+
+> A
+
+)⊺(At,⋆ − At) R F
+
+| {z }
+
+> T3
+
+− ηE  ∇f (Wt), L  (At,⋆ )⊺ ¯Gt 
+
+> A
+
++ ( ¯Gt
+
+> A
+
+)⊺At R F
+
+
+
++ η2E  ∇f (Wt), L( ¯Gt
+
+> A
+
+)⊺ ¯Gt
+
+> A
+
+R F
+
+
+
+> (a)
+
+= T3 − ηE  Ht,  (At)⊺ ¯Gt 
+
+> A
+
++ ( ¯Gt
+
+> A
+
+)⊺At
+
+> F
+
+ + η2E  Ht, ( ¯Gt
+
+> A
+
+)⊺ ¯Gt 
+
+> AF
+
+
+
+= T3 − ηE  Ht, (At)⊺At  Ht + ( Ht)⊺ +  Ht + ( Ht)⊺ (At)⊺At
+
+> F
+
+
+
++ η2E  Ht, ( ¯Gt
+
+> A
+
+)⊺ ¯Gt 
+
+> AF
+
+ , (30) where equality (a) is obtained due to the fact that for an arbitrary matrix X, we have ⟨Gt, LXR ⟩ =
+
+⟨Ht, X⟩. T3 can be bounded as follows: 
+
+T3 ≤ η
+
+2 ∇f (Wt) 2 
+
+> F
+
++ η
+
+2 E
+
+h
+
+L  (At,⋆ − At)⊺ ¯Gt 
+
+> A
+
++ ( ¯Gt
+
+> A
+
+)⊺(At,⋆ − At) R 2
+
+> F
+
+i
+
+16 Published as a conference paper at ICLR 2026 
+
+> (a)
+
+≤ η
+
+2 ∇f (Wt) 2 
+
+> F
+
++ 2 ηE
+
+h
+
+(At,⋆ − At)⊺ ¯Gt
+
+> A
+> 2
+> F
+
+i
+
+> (b)
+
+≤ η
+
+2 ∇f (Wt) 2 
+
+> F
+
++ 2 η At,⋆ − At 2 
+
+> F
+
+E
+
+h ¯Gt
+
+> A
+> 2
+> F
+
+i
+
+> (c)
+
+≤ η
+
+2 ∇f (Wt) 2 
+
+> F
+
++ 2ηN 2 At,⋆ − At 2
+
+> F
+
+X
+
+> n∈N
+
+∇AFn(Wt; ξn) 2
+
+> F
+> (d)
+
+≤ η
+
+2 ∇f (Wt) 2 
+
+> F
+
++ 2ηψ N At,⋆ − At 2
+
+> F
+
+= η
+
+2 ∇f (Wt) 2 
+
+> F
+
++ 2ηψ N
+
+ St,⋆ − St ˜At 2
+
+> F
+> (e)
+
+≤ η
+
+2 ∇f (Wt) 2 
+
+> F
+
++ 2ηψ N St,⋆ − St 2 
+
+> F
+
+˜At 2
+
+> F
+> (f)
+
+≤ η
+
+2 ∇f (Wt) 2 
+
+> F
+
++ 2ηψ ˜C2
+
+> A
+
+∆t
+
+> proc
+
+N σ min 
+
+ ˜At(At−1)⊺
+
+ , (31) where inequalities (a) and (c) result from Jensen’s inequality. Inequalities (b) and (e) is obtained by using the fact ∥AB ∥F ≤ ∥ A∥F ∥B∥F . Inequality (d) results from Assumption 2. Inequality (f) results from Assumption 3 and Lemma 2. Then, we further bound the second term of T1 as 
+
+− ηE  Ht, (At)⊺At  Ht + ( Ht)⊺ +  Ht + ( Ht)⊺ (At)⊺At
+
+> F
+
+
+
+> (a)
+
+≤ − 4ηλ min 
+
+ (At)⊺At (L)⊺∇f (Wt)( R)⊺ 2 
+
+> F
+
+, (32) where inequality (a) results from Lemma 1. Then, we bound η2E  Ht, ( ¯Gt
+
+> A
+
+)⊺ ¯Gt 
+
+> AF
+
+ as follows: 
+
+η2E  Ht, ( ¯Gt
+
+> A
+
+)⊺ ¯Gt 
+
+> AF
+
+ (a) 
+
+≤ η2
+
+ 12 Ht 2 
+
+> F
+
++ 12 ¯Gt
+
+> A
+> 4
+> F
+
+
+
+= η2
+
+ 12 (L)⊺∇f (Wt)( R)⊺ 2 
+
+> F
+
++ 12 ¯Gt
+
+> A
+> 4
+> F
+
+
+
+> (b)
+
+≤ η2
+
+2 (L)⊺∇f (Wt)( R)⊺ 2 
+
+> F
+
++ η2ψ2
+
+2 , (33) where inequality (a) results from Jensen’s inequality. Inequality (b) is obtained by using Lemma 2. By combining inequalities (30), (31), (32), and (33), we have 
+
+T1 ≤ 2ηψ ˜C2
+
+> A
+
+∆t
+
+> proc
+
+N σ min 
+
+ ˜At(At−1)⊺
+
+ +
+
+
+
+−4ηλ min 
+
+ (At)⊺At + η2
+
+2 + η
+
+2
+
+
+
+∇f (Wt) 2 
+
+> F
+
++ η2
+
+2 ψ2. (34) Now, we bound T2. In particular, it satisfies 
+
+T2 = E
+
+
+
+L
+
+
+
+η2( ¯Gt
+
+> A
+
+)⊺ ¯Gt 
+
+> A
+
+− η  (At)⊺ ¯Gt 
+
+> A
+
++ ( ¯Gt
+
+> A
+
+)⊺At 
+
+R 2
+
+> F
+
+
+
+> (a)
+
+≤ 3η4E
+
+h
+
+Lη2( ¯Gt
+
+> A
+
+)⊺ ¯Gt
+
+> A
+
+R 2
+
+> F
+
+i
+
++ 6 η2E
+
+h
+
+Lη(At)⊺ ¯Gt
+
+> A
+
+R 2
+
+> F
+
+i
+
+> (b)
+
+≤ 3η4E
+
+h
+
+( ¯Gt
+
+> A
+
+)⊺ ¯Gt
+
+> A
+> 2
+> F
+
+i
+
++ 6 η2E
+
+h
+
+(At)⊺ ¯Gt
+
+> A
+> 2
+> F
+
+i
+
+> (c)
+
+≤ 3η4E
+
+h ¯Gt
+
+> A
+> 4
+> F
+
+i
+
++ 6 η2E
+
+h
+
+At 2
+
+> F
+
+i
+
+E
+
+h ¯Gt
+
+> A
+> 2
+> F
+
+i
+
+> (d)
+
+≤ 3η2ψ  η2ψ + 2 C2
+
+> A
+
+ . (35) where inequality (a) is obtained by using Jensen’s inequality. Inequality (b) is obtained since L and 
+
+R have orthogonal columns. Inequality (c) results from the fact ∥AB ∥F ≤ ∥ A∥F ∥B∥F . Inequality (d) is obtained by using Assumption 2 and Assumption 3. 17 Published as a conference paper at ICLR 2026 Then, we combine inequalities (28), (34), and (35), we have 
+
+E f ( ¯Wt+1 ) ≤ E f ( ¯Wt) +
+
+ η2
+
+2 + η
+
+2 − 4ηλ min 
+
+ (At)⊺At
+
+(∇f (Wt) 2
+
+> F
+
++ η2ψ2
+
+2 + 3Lη 2ψ  η2ψ + 2 C2
+
+> A
+
+
+
+2 + 2ηψ ˜C2
+
+> A
+
+∆t
+
+> proc
+
+N σ min 
+
+ ˜At(At−1)⊺
+
+ . (36) We denote Ω = 4 η min t∈T {λmin (( At)⊺At)} − η2 
+
+> 2
+
+− η 
+
+> 2
+
+. By rearranging inequality (36) and sum-ming over all T fine-tuning rounds, we have 
+
+Ω X
+
+> t∈T
+
+∇f (Wt) 2
+
+> F
+
+≤ X
+
+> t∈T
+
+ f ( ¯Wt) − f ( ¯Wt+1 ) + T η2ψ2
+
+2 + 3Lη 2ψ  η2ψ + 2 C2
+
+> A
+
+
+
+2
+
+!
+
++ X
+
+> t∈T
+
+2ηψ ˜C2
+
+> A
+
+∆t
+
+> proc
+
+N σ min 
+
+ ˜At(At−1)⊺
+
+
+
+> (a)
+
+≤ f ( ¯W1) − f ( ¯W⋆) + T η2ψ2
+
+2 + 3Lη 2ψ  η2ψ + 2 C2
+
+> A
+
+
+
+2
+
+!
+
++ X
+
+> t∈T
+
+2ηψ ˜C2
+
+> A
+
+∆t
+
+> proc
+
+N σ min 
+
+ ˜At(At−1)⊺
+
+ ,
+
+(37) where inequality (a) is obtained due to the fact that f (W⋆) ≤ f (WT +1 ). Then, we multiply 1  
+
+> TΩ
+
+on both sides of inequality (37) and obtain 
+
+1
+
+T
+
+X
+
+> t∈T
+
+∇f (Wt) 2 
+
+> F
+
+≤ f (W1) − f (W⋆)
+
+T Ω + η2ψ2
+
+2Ω + 3Lη 2ψ  η2ψ + 2 C2
+
+> A
+
+
+
+2Ω + 1
+
+T Ω
+
+X
+
+> t∈T
+
+2ηψ ˜C2
+
+> A
+
+∆t
+
+> proc
+
+N σ min 
+
+ ˜At(At−1)⊺
+
+ . (38) This completes the proof of Theorem 2. A.6 HYPERPARAMETER SETTING 
+
+In our experiments, the batch size is set to be 4 by searching over a range of {2, 4, 8, 16 }. Each local training epoch is set to be 1. We select the optimal learning rate from the range {5e − 4, 1e −
+
+4, 5e − 5, 1e − 5}. The maximum sequence length is set to be 128, following the common practice in fine-tuning. We choose AdamW as the optimizer. We set the scaling factor α to be 16 for all algorithms. A.7 ADDITIONAL EXPERIMENTAL RESULTS 
+
+Table 8: Comparison of the per-round client-side computation overhead (in FLOPs), per-round server-side computation overhead (in FLOPs), and memory usage (in MB). Symbol “ −” means that the overhead is negli-gible.                                           
+
+> Metrics FLoRG FedIT FeDeRA FFA-LoRA FedSA-LoRA FedEx-LoRA
+> Client-side FLOPs 1.18 ×10 12 1.24 ×10 12 1.24 ×10 12 8.25 ×10 11 1.24 ×10 12 1.18 ×10 12
+> Server-side FLOPs 8.50 ×10 10 “−”2.22 ×10 11 “−”“−”2.09 ×10 9
+> Memory Usage 2815 2117 2117 2110 2117 3117
+
+A.8 THE USE OF LARGE LANGUAGE MODELS (LLM S)We used large language models (e.g., ChatGPT) for the general purpose of writing assistants to revise and polish the manuscript’s prose: improving grammar, wording, clarity, and fixing mi-nor LaTeX/formatting issues. The models were not used for research ideation, designing algo-rithms/experiments, deriving proofs, selecting citations, or writing substantive technical content. 18 Published as a conference paper at ICLR 2026 
+
+Table 9: Comparison of the exact match (EM) and F1 scores on SQuAD v1.1.                                               
+
+> Base Model Metric FLoRG FedIT FeDeRA FFA-LoRA FedSA-LoRA FedEx-LoRA
+> OPT-125M EM 68.52 62.31 64.78 63.19 67.14 66.85 F1 78.23 72.08 74.52 73.04 77.31 76.18 RoBERTa-large EM 86.34 81.53 83.12 81.69 84.47 86.02 F1 91.15 88.09 90.03 88.68 90.23 90.84 Llama-3.2-3B EM 89.83 84.21 86.58 85.37 87.12 88.25 F1 92.74 89.53 91.08 90.31 91.35 91.82
+
+Table 10: Additional comparison of the testing accuracy across different baseline schemes. 
+
+Base Model Dataset FLoRG FedIT FeDeRA FFA-LoRA FedSA-LoRA 
+
+OPT-125M MRPC 88.30 82.09 85.70 84.78 86.51 QQP 89.72 84.18 87.09 86.30 87.92 RoBERTa-large MRPC 90.80 85.16 88.30 87.50 89.21 QQP 91.52 87.89 89.30 88.51 90.01 
+
+Table 11: Additional comparison of the testing accuracy under different ranks. 
+
+Rank Dataset FLoRG FedIT FeDeRA FFA-LoRA FedSA-LoRA 
+
+r = 2 
+
+MRPC 85.91 79.66 83.17 82.32 83.00 QQP 87.62 81.88 84.90 84.09 85.65 MNLI 86.14 80.70 83.44 82.64 84.22 QNLI 89.70 86.67 87.22 86.40 88.10 
+
+r = 4 
+
+MRPC 90.80 85.16 88.30 87.50 89.21 QQP 91.52 87.89 89.30 88.51 90.01 MNLI 91.39 84.76 88.20 89.12 90.90 QNLI 92.44 87.63 89.91 90.82 91.69 
+
+r = 8 
+
+MRPC 91.70 85.55 87.12 88.20 89.91 QQP 91.80 86.39 89.26 88.45 90.10 MNLI 91.70 86.40 89.29 90.44 90.41 QNLI 92.50 87.77 90.20 90.41 91.13 
+
+19 Published as a conference paper at ICLR 2026 
+
+Table 12: Additional comparison of the testing accuracy under different degrees of data heterogeneity. 
+
+Non-IIDness Dataset FLoRG FedIT FeDeRA FFA-LoRA FedSA-LoRA 
+
+ρ = 0 .1
+
+MRPC 85.06 78.19 81.91 81.00 83.01 QQP 86.95 78.80 84.15 83.21 85.00 MNLI 81.35 75.44 78.42 77.57 79.36 QNLI 88.88 83.31 86.20 85.33 87.19 
+
+ρ = 0 .5
+
+MRPC 90.80 85.16 88.30 87.50 89.21 QQP 91.52 87.89 89.30 88.51 90.01 MNLI 91.39 84.76 88.20 89.12 90.90 QNLI 92.44 87.63 89.91 90.82 91.69 
+
+ρ = 1 
+
+MRPC 90.76 85.77 89.26 88.91 88.20 QQP 91.88 88.61 89.93 89.37 90.39 MNLI 91.75 86.47 90.05 91.70 91.33 QNLI 92.17 88.03 90.52 90.79 92.72 
+
+20

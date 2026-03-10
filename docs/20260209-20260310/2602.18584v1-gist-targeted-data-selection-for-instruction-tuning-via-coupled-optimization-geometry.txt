@@ -1,0 +1,1881 @@
+Title: GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry
+
+URL Source: https://arxiv.org/pdf/2602.18584v1
+
+Published Time: Tue, 24 Feb 2026 01:06:59 GMT
+
+Number of Pages: 27
+
+Markdown Content:
+# GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+Guanghui Min 1 Tianhao Huang 1 Ke Wan 1 Chen Chen 1
+
+## Abstract 
+
+Targeted data selection has emerged as a crucial paradigm for efficient instruction tuning, aiming to identify a small yet influential subset of train-ing examples for a specific target task. In practice, influence is often measured through the effect of an example on parameter updates. To make selection scalable, many approaches leverage op-timizer statistics (e.g., Adam states) as an axis-aligned surrogate for update geometry (i.e., di-agonal precondition), implicitly treating param-eters as coordinate-wise independent. We show that this assumption breaks down in parameter-efficient fine-tuning (PEFT) methods such as LoRA. In this setting, the induced optimization ge-ometry exhibits strong cross-parameter coupling with non-trivial off-diagonal interactions, while the task-relevant update directions are confined to a low-dimensional subspace. Motivated by this mismatch, we propose GIST (Gradient Isometric 
+
+Subspace Transformation), a simple yet princi-pled alternative that replaces axis-aligned scaling with robust subspace alignment. GIST recovers a task-specific subspace from validation gradi-ents via spectral filtering (SVD), projects training gradients into this coupled subspace, and scores examples by their alignment with target directions. Extensive experiments have demonstrated that 
+
+GIST matches or outperforms the state-of-the-art baseline with only 0.29% of the storage and 25% of the computational time under the same selection budget. Our code is available at https: //github.com/GuanghuiMin/GIST .
+
+## 1. Introduction 
+
+Instruction tuning has become the de facto standard for aligning Large Language Models (LLMs) with human in-      
+
+> 1Department of Computer Science, University of Vir-ginia, Charlottesville, USA. Correspondence to: Guanghui Min
+> <jjm8vr@virginia.edu >.Preprint. Work in progress.
+
+tent (Touvron et al., 2023; Ouyang et al., 2022). While early approaches relied on scaling up the volume of in-struction data, recent findings have precipitated a paradigm shift: the quality and relevance of data are far more criti-cal than mere quantity. Seminal works like LIMA (Zhou et al., 2023) and AlpaGasus (Chen et al., 2024) demonstrate that a small, carefully curated subset of high-quality exam-ples can rival or even surpass the performance of models trained on massive, unfiltered datasets. This “less is more” phenomenon has catalyzed a surge of interest in automated data selection, aiming to identify the most effective training samples from large-scale pools to maximize downstream performance (Liu et al., 2024; Zhang et al., 2025). Beyond general alignment, a more practical and challenging problem is Targeted Instruction Tuning (Xia et al., 2024), where the goal is to select a data subset that maximizes performance on a specific target distribution under a lim-ited budget. Existing approaches generally fall into three categories. First, hard example mining prioritizes training samples based on scalar metrics like perplexity or loss mag-nitude (Zhao et al., 2024; Yin & Rush, 2025; Antonello et al., 2021). Second, similarity-based methods utilize embedding retrieval to identify semantically relevant examples in the representation space (Zhang et al., 2018; Hanawa et al., 2020; Ivison et al., 2025). Finally, optimizer-based methods, exemplified by the state-of-the-art framework LESS (Xia et al., 2024), quantify data contribution directly in the gra-dient space via influence functions (Koh & Liang, 2017). Notably, LESS incorporates optimization geometry by lever-aging Adam states, offering a scalable solution for LLMs. However, relying on optimizer statistics imposes a funda-mental geometric limitation, prioritizing computational ef-ficiency over the precision of the quadratic approximation. Designed for linear scalability, optimizers like Adam ap-proximate the local curvature, referring to the Hessian ge-ometry describing the loss landscape, via a diagonal precon-ditioner (Kingma & Ba, 2015). While efficient, this imposes a hard expressivity bottleneck: diagonal matrices lack the off-diagonal terms necessary to represent parameter inter-actions (e.g., the bilinear coupling in LoRA). Consequently, this structural incapacity inevitably distorts the intrinsic metric (Amari, 1998) of the parameter space. Furthermore, 1
+
+> arXiv:2602.18584v1 [cs.LG] 20 Feb 2026 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry
+
+Adam’s element-wise inversion indiscriminately amplifies directions with small gradients. In the context of low-rank adaptation, where the vast majority of the parameter space constitutes a noisy null space (Aghajanyan et al., 2021), this scaling boosts noise rather than preserving the sparse update structure. Ultimately, unlike Newton’s method which lever-ages full curvature to identify optimal descent paths, this approximation fails to capture the true descent potential of induced updates, fundamentally misestimating their impact on loss reduction. Motivated by this mismatch, we introduce GIST (Gradient 
+
+Isometric Subspace Transformation), a data selection frame-work that prioritizes geometric alignment over unstable di-agonal approximations. GIST extracts a low-rank, task-specific subspace from validation gradients and scores train-ing examples by projected gradient alignment, yielding an efficient selection rule that naturally respects parameter cou-pling without requiring full second-order information. Our contributions are threefold: • Theoretical Unification & Analysis: We unify prior tar-geted selection methods as approximations to a common geometry-aware objective, revealing that diagonal precon-ditioners are inherently limited under rotated low-rank cou-pling. We then derive a principled, tractable non-diagonal estimator using the spectral structure of target gradients. • GIST Algorithm: We introduce a scalable subspace-based selection method: GIST extracts a low-rank task subspace from validation gradients via SVD and ranks examples using projected gradient alignment, enabling efficient selection under coupled PEFT geometry. • Empirical Superiority: Extensive experiments on MMLU (Hendrycks et al., 2020), T YDI QA (Clark et al., 2020), and BBH (Suzgun et al., 2023) demonstrate that 
+
+GIST matches or outperforms the state-of-the-art baseline with only 0.29% of the storage and 25% of the computa-tional time under the same selection budget. 
+
+## 2. Preliminaries 
+
+Notations. We denote the large-scale instruction tuning dataset as D = {zi}|D|  
+
+> i=1
+
+with zi = ( xi, yi). The Large Language Model (LLM) is denoted as Mθ . We distinguish between the sample-wise loss on a data instance z = ( x, y),denoted as ℓ(z, θ), and the empirical risk over a dataset S,denoted as L(S, θ) = 1
+
+> |S|
+
+P 
+
+> z∈S
+
+ℓ(z, θ). All notations and symbols are summarized in Table 5. 
+
+2.1. Problem Definition 
+
+We formalize the targeted data selection task as a con-strained bi-level optimization problem. Our goal is to select a subset S ⊂ D with a cardinality constraint |S| = k (where 
+
+k ≪ |D| is the budget), such that the LLM trained on S
+
+minimizes the loss on the target distribution Dval , following the setting in Xia et al. (2024). Formally, this is defined as: 
+
+Problem 1 (Targeted Data Selection) . Find the optimal subset S∗ that solves the following bi-level optimization: 
+
+min  
+
+> S⊆D
+
+L(Dval , θ∗S )
+
+s.t. |S| = k, 
+
+θ∗S = arg min 
+
+> θ
+
+L(S, θ).
+
+(1) 
+
+2.2. Optimization Dynamics of Instruction Tuning 
+
+We analyze the optimization trajectory by examining the parameter update from step t to t + 1 . For clarity, we consider a per-sample (batch size = 1 ) update, and denote the instantaneous training objective at step t by ℓ(zt, θ).We study the local behavior of ℓ(zt, θ) around the current parameters θt.
+
+Newton’s Method. Ideally, the parameter update is derived by minimizing a local quadratic approximation of the instan-taneous loss. We perform a second-order Taylor expansion of ℓ(zt, θ) around θt:
+
+ℓ(zt, θ) ≈ ℓ(zt, θt) + g⊤ 
+
+> t
+
+∆θ + 12 ∆θ⊤Ht∆θ, (2) where gt ≜ ∇θ ℓ(zt, θt) and Ht ≜ ∇2 
+
+> θ
+
+ℓ(zt, θt) de-note the gradient and Hessian, respectively. Minimizing this quadratic surrogate yields the stationarity condition 
+
+gt + Ht∆θ = 0 (assuming Ht is locally invertible or ap-propriately regularized). Solving for θ yields the classical Newton update step: 
+
+θt+1 = θt − ηH−1 
+
+> t
+
+gt, (3) where η is the learning rate. Here, −H−1 
+
+> t
+
+gt is the minimizer of the local quadratic surrogate, i.e., the optimal second-order direction under this approximation. 
+
+Adam Optimizer. In practice, LLMs are fine-tuned via the Adam optimizer (Kingma & Ba, 2015), utilizing exponential moving averages of gradient moments for adaptive updates. Structurally, the inverse second-moment term functions as a diagonal surrogate for the curvature matrix to precondi-tion the optimization steps; we provide the detailed update formulations in Appendix D. 
+
+## 3. Theoretical Analysis 
+
+In this section, we analyze the data selection problem from the perspective of influence functions and optimization ge-ometry. We first establish a unified view connecting data selection to gradient preconditioning. We then scrutinize standard approximations in prior work, specifically diago-nal preconditioners from optimizer states, and demonstrate 2GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+their theoretical failure modes in data selection. Finally, we derive a principled, tractable non-diagonal estimator based on the spectral structure revealed by target gradients. 
+
+3.1. A Unified Optimization View of Data Selection 
+
+We aim to select a training sample z ∈ D such that train-ing on it maximizes the reduction in the validation risk 
+
+L(Dval , θ). To quantify the effect of one-step parameter update on Dval , we perform a first-order Taylor expansion of the validation loss L(Dval , θ) around the current parameters 
+
+θt, with ∆θt = θt+1 − θt:
+
+L(Dval , θt+1 ) ≈ L (Dval , θt) + ∇θ L(Dval , θt)⊤∆θt. (4) Ideally, using a Hessian-preconditioned local update as in Koh & Liang (2017), the one-step change of the validation loss can be approximated by substituting a preconditioned update ∆θt into the first-order expansion. In particular, taking ∆θt ≈ − η H†
+
+> val ,t
+
+∇θ ℓ(z, θt) yields 
+
+∆Lval (z) = L(Dval , θt+1 ) − L (Dval , θt)
+
+≈ − η∇θ L(Dval , θt)⊤H†
+
+> val ,t
+
+∇θ ℓ(z, θt), (5) where Hval ,t ≜ ∇2 
+
+> θ
+
+L(Dval , θt). 1 This matrix characterizes the instantaneous curvature of the target task manifold. For a subset S ⊆ D , we add the per-sample contributions due to linearity of empirical risk, yielding: 
+
+∆Lval (S) ≈ X
+
+> z∈S
+
+∆Lval (z)
+
+∝ −∇ θ L(Dval , θt)⊤H†
+
+> val ,t
+
+∇θ L(S, θt). (6) 
+
+Theorem 3.1 (Single-level Approximate Optimization) . Fix the current parameters θt. Under the first-order approxima-tion, Problem 1 is approximately reduced to maximizing the predicted reduction in validation loss: 
+
+max  
+
+> S⊆D
+
+∇θ L(Dval , θt)⊤H†
+
+> val ,t
+
+∇θ L(S, θt)
+
+s.t. |S| = k, 
+
+(7) 
+
+up to constants independent of S and higher-order terms. 
+
+A full proof is provided in Appendix E.1. Theorem 3.1 reveals a geometric view of targeted data selection: each candidate subset S is scored by alignment under the metric induced by H† 
+
+> val ,t
+
+between the target gradient ∇θ L(Dval , θt)
+
+and the subset gradient ∇θ L(S, θt). Crucially, this metric implies that selection should target the the optimal local 
+
+> 1
+
+When Hval ,t is singular or ill-conditioned (typical for over-parameterized models), we use the Moore–Penrose pseudoin-verse H† 
+
+> val ,t
+
+(which is same with H−1 
+
+> val ,t
+
+when Hval ,t is invert-ible). Equivalently, H† 
+
+> val ,t
+
+yields the minimum-norm solution to 
+
+Hval ,t ∆θ = −∇ θ ℓ(z, θt) and ignores directions in the null space. 
+
+update direction under the target metric (the Newton-type step) governed by the true parameter geometry, rather than relying on efficiency-driven optimizer statistics which often trade geometric fidelity for computational speed. In modern LLM fine-tuning, however, forming Hval ,t (let alone H†
+
+> val ,t
+
+) is intractable. Consequently, existing selection criteria can be viewed as optimizing Eq. (7) under different structural surrogates of H† 
+
+> val ,t
+
+and/or simplified assumptions about the gradient geometry, which we formalize next. 
+
+Hard Example Mining (Assumption: Magnitude Prior). 
+
+Let ˜gval ,t ≜ (H†
+
+> val ,t
+
+)1/2∇θ L(Dval , θt) and ˜gt(S) ≜
+
+(H†
+
+> val ,t
+
+)1/2∇θ L(S, θt). Then we have 
+
+∇θ L(Dval )⊤H†
+
+> val,t
+
+∇θ L(S, θt) = ˜ g⊤ 
+
+> val
+
+˜gS
+
+=∥˜gval ∥2 ∥˜gS ∥2 cos ∠(˜ gval , ˜gS ). (8) Hard-example mining implicitly assumes that the directional term cos ∠(˜ gval , ˜gS ) varies little across candidate subsets (or is weakly informative), so maximizing the influence is approximated by maximizing the magnitude ∥˜gS ∥2. In prac-tice, hard-mining ranks individual samples by length of to-kens (Zhao et al., 2024) or perplexity (Yin & Rush, 2025) as a proxy for ∥g(z)∥2, and then forms S from top-ranked sam-ples. For cross-entropy losses, low predicted probability on the ground-truth token(s) yields both larger loss and larger output-layer residuals, which typically increases the back-propagated gradient norm under mild smoothness/bounded-Jacobian conditions. 
+
+Similarity-based Methods (Assumption: Representation Kernel Matching). Embedding- or retrieval-based methods like RDS (Zhang et al., 2018; Hanawa et al., 2020) and RDS+ (Ivison et al., 2025) implicitly assume that the util-ity/influence in Eq. (7) can be well-approximated by a simi-larity kernel defined on a chosen representation (e.g., last-layer hidden states or external embedding models). Equiva-lently, they replace the H†
+
+> val,t
+
+-induced parameter-space align-ment in Eq. (7) with a representation-space kernel score and select nearest neighbors of Dval under this kernel. This bypasses explicit modeling of the parameter-space metric induced by H† 
+
+> val,t
+
+and induces a geometry determined by the chosen representation/kernel, which may miss task-relevant anisotropy present in parameter space. 
+
+Optimizer-based Methods (Assumption: Locally Orthog-onal Parameter Coordinates). Scalable influence approxi-mations, such as LESS (Xia et al., 2024), implicitly assume 
+
+that the local metric induced by H† 
+
+> val,t
+
+is approximately diagonal in the chosen parameter coordinates, i.e., cross-parameter couplings are negligible and the coordinates are (locally) orthogonal under this metric. Concretely, they use a diagonal surrogate of the form diag( √ˆvt + ϵ)−1 in Eq. (22) derived from optimizer statistics (e.g., Adam’s second-moment estimates). While this captures element-3GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+wise rescaling, it discards off-diagonal correlations in H†
+
+> val,t
+
+and thus cannot represent cross-parameter interactions en-coded by curvature, which can change the ranking of utilities when off-diagonal correlations are non-negligible. 
+
+3.2. The Limitation: Diagonal Surrogates Cannot Handle Coupling 
+
+State-of-the-art methods like LESS (Xia et al., 2024) typ-ically approximate the optimization geometry using diag-onal preconditioners derived from optimizer states (e.g., Adam). This approach implicitly assumes that parameters are coordinate-wise independent. Figure 1 shows that the validation-gradient matrix concen-trates most of its variance in a low-dimensional principal subspace (rapid spectral decay and early saturation of ex-plained variance), a consequence of the targeted setting where rank( Gval ) ≤ |D val | ≪ d. Importantly, low-rank does not imply axis-alignment . The resulting principal direc-tions are generally linear combinations of coordinates, i.e., a rotated subspace that encodes genuine parameter coupling. We show that coupling in PEFT is structural rather than inci-dental. Under LoRA (Hu et al., 2022) with W = W0 + BA ,even a local quadratic model in W produces off-diagonal 
+
+curvature in LoRA parameter space (Theorem 3.2). 
+
+Theorem 3.2 (LoRA induces off-diagonal curvature) . Let 
+
+L(W ) be twice differentiable and consider the LoRA parameterization W = W0 + BA . Let HW =
+
+∇2vec( W )L(W )|W =W0+BA . For any k ∈ [r] and any 
+
+j1̸ = j2,
+
+∂2L
+
+∂A kj 1 ∂A kj 2
+
+= ( B:k ⊗ ej1 )⊤HW (B:k ⊗ ej2 ), (9) 
+
+where B:k is the k-th column of B and ej is the standard basis vector. In particular, whenever the W -space curvature couples coordinates j1 and j2 along a nonzero direction 
+
+B:k, the LoRA-parameter Hessian contains a nonzero off-diagonal entry. 
+
+Theorem 3.2 shows that coupling is not an artifact of op-timization noise: it is structurally induced by the bilinear parameterization BA and manifests as genuine off-diagonal curvature in LoRA parameter space. The full proof is pro-vided in Appendix E.2. Geometrically, a diagonal preconditioner can only rescale 
+
+coordinate axes; it cannot represent the rotation/shear 
+
+encoded by off-diagonal curvature. Concretely, even in 2D, if H =
+
+1 ρρ 1
+
+
+
+with ρ̸ = 0 , then for any diagonal 
+
+D = diag( d1, d 2),
+
+∥H − D∥2 
+
+> F
+
+= (1 − d1)2 + (1 − d2)2 + 2 ρ2 ≥ 2ρ2, (10) 50 100 150 200 250 
+
+> Component index
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Cumulative explained variance
+> Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+> 95% variance
+
+(a) Cumulative explained vari-ance. 50 100 150 200 250  
+
+> Component index
+> 10 1
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> Singular value (log scale)
+> Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+
+(b) Singular value spectrum. 
+
+Figure 1. Spectral analysis of the MMLU validation gradient Gval 
+
+on Llama2-7B. We decompose the gradient matrix via SVD to obtain singular values σi. (a) Cumulative explained variance. A steeper curve indicates that a smaller principal subspace dimen-sion is sufficient to capture the majority of the variance (e.g., Rank 
+
+150 captures 95% ), confirming high directional information den-sity. (b) The singular values ( σk ) exhibit precipitous decay, further verifying the intrinsic low-rank structure. 
+
+so a diagonal surrogate suffers an irreducible error floor whenever curvature is rotated/coupled. 
+
+3.3. The Solution: Optimal Geometry Recovery via Spectral Filtering 
+
+Section 3.2 suggests that diagonal surrogates cannot rep-resent the rotated, coupled geometry that governs targeted improvement. Thus, rather than refining a diagonal scaling, we construct a tractable non-diagonal operator that captures cross-parameter couplings while remaining computable at LLM scale. In the ideal influence proxy (Eq. (7) ), the metric 
+
+H† 
+
+> val ,t
+
+measures alignment between the target gradient and a candidate update, but forming Hval ,t (let alone H†
+
+> val ,t
+
+)is infeasible. Crucially, for ranking data we do not need an entrywise approximation of Hval ,t ; it suffices to recover a low-dimensional coupled subspace that concentrates the dominant task-relevant directions, which diagonal methods cannot express by construction. Our construction starts from per-example validation gra-dients, which are already required to define the targeted direction. Let Gval ,t ∈ R|D val |× d be the stacked gradient matrix whose rows are ∇θ ℓ(zval , θt)⊤ for zval ∈ D val .Define the gradient covariance proxy 
+
+bFval ,t ≜ G⊤
+
+> val ,t
+
+Gval ,t ∈ Rd×d, (11) which is positive semidefinite (PSD) and non-diagonal .
+
+Theorem 3.3 (Eigenspace stability of the proxy) . Let 
+
+Sr (M) denote the top-r eigenspace of a PSD matrix M,and let Θ( ·, ·) denote the principal-angle matrix between two subspaces. For negative log-likelihood (NLL) objec-tives, the per-example Hessian admits the classical Gauss– Newton/Fisher decomposition, and there exists a quantity 
+
+εt ≥ 0 that summarizes (i) the residual-curvature magni-
+
+4GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry LoRA    
+
+> Training
+> LoRA params
+> Step1: Lightweight Warmup
+> Compute
+> Gradients
+> Sample
+> Target Projector 𝜫
+> subspace
+> sim
+> val Top -𝑘
+
+𝑮 𝐯 𝐚𝐥  𝜮 𝑼  𝑽 
+
+> Step2: Spectral Filtering
+> SVD
+> Data selection
+> Step3: Geometric Scoring
+> Max
+
+Figure 2. Overview of GIST . Step 1: Lightweight warmup performs a short LoRA warmup on a sampled subset and computes validation gradients. Step 2: Spectral filtering applies an SVD on the validation gradient matrix to construct a low-rank target subspace (Target projector). Step 3: Geometric scoring projects candidate gradients onto the target subspace and selects Top-k samples. 
+
+tude and (ii) the proxy mismatch, such that 
+
+sin Θ  Sr (Hval ,t ), Sr (bFval ,t ) 
+
+> 2
+
+≤ C ε t, (12) 
+
+where the constant C depends only on the leading eigengap of the validation curvature. 
+
+A full proof and formal conditions are provided in Ap-pendix E.3. Theorem 3.3 implies that exact entrywise match-ing is unnecessary; instead, it suffices for the loss to de-crease to a low magnitude to bound the subspace approx-imation error. This insight elucidates the requirement of a warm-up phase: it is required to steer the optimization tra-jectory out of the initial high-noise regime into a local basin where the curvature stabilizes. Crucially, since pre-trained models facilitate a rapid initial descent, this warm-up can be extremely brief . Empirical validation of these dynamics is provided in Appendix I.2. We therefore recover the task subspace directly from Gval ,t 
+
+via a compact SVD: 
+
+Gval ,t = UtΣtV⊤ 
+
+> t
+
+, (13) and define the rank-r projector Pr ≜ Vt,r V⊤ 
+
+> t,r
+
+using the top-r right singular vectors. By Eckart–Young–Mirsky (Eckart & Young, 1936), Pr is the optimal rank-r linear op-erator for capturing the dominant variation of Gval ,t under squared reconstruction error. Importantly, Pr is explicitly non-diagonal: it represents a rotation in parameter space and can encode the coupled directions that diagonal pre-conditioners provably miss, yielding a tractable surrogate geometry for comparing candidate updates in Eq. (7). 
+
+## 4. GIST : The Proposed Methodology 
+
+Based on the theoretical analysis in Section 3, we propose 
+
+GIST , a data selection framework that leverages spectral subspace filtering to robustly identify high-value training samples. GIST operates in three main steps: (1) captur-ing gradient trajectories via lightweight LoRA warmup, (2) extracting the intrinsic target geometry via SVD, and (3) selecting data based on projected alignment. Full pipeline is illustrated in Fig. 2. 
+
+4.1. Subspace Gradient Feature Computation Step 1: Trajectory Collection via Lightweight Warmup. 
+
+To efficiently approximate the evolution of the optimization landscape without incurring the cost of full training, we per-form a lightweight warmup. We randomly sample a small subset of the candidate pool (e.g., 5% ), denoted as D′ ⊂ D ,and fine-tune the base LLM on D′ using LoRA adapters (Hu et al., 2022) for an epoch. We collect the checkpoint 
+
+θt. Let d denote the number of trainable LoRA parameters. For each target example zval ∈ D val and candidate example 
+
+z ∈ D , we compute their gradients ∇θ ℓ(·; θt) ∈ Rd in the LoRA parameter space. 
+
+Step 2: Extracting the Task Subspace. Construct the target gradient matrix Gval ,t ∈ R|D val |× d. Then we perform Singular Value Decomposition (SVD) on Gval ,t :
+
+Gval ,t = UtΣtV⊤ 
+
+> t
+
+. (14) We determine the effective rank rt by analyzing the singular value spectrum (e.g., capturing 95% explained variance). The Target Projector is then defined by the top-r right singular vectors: 
+
+Π ≜ V⊤ 
+
+> r
+
+∈ Rr×d. (15) This operator captures the principal directions of the task while discarding the orthogonal noise. 
+
+Step 3: Geometric Scoring via Projected Alignment. Let 
+
+g(j) 
+
+> val ,t
+
+≜ ∇θ ℓ(z(j) 
+
+> val
+
+; θt) ∈ Rd. With the target projector Π,we map gradients into the r-dimensional target subspace. For a candidate zi and a specific target example z(j) 
+
+> val
+
+∈ D val ,we define their Subspace Alignment Score at step t as the cosine similarity of their projected gradients: Sim t(zi, z(j) 
+
+> val
+
+) ≜ (Πg i,t )⊤(Πg (j)
+
+> val ,t
+
+)
+
+∥Πg i,t ∥2 ∥Πg (j)
+
+> val ,t
+
+∥2
+
+, (16) Note that gi = ∇θ ℓ(zi; θt) aggregates token-level contri-butions (average over tokens), so its norm can vary substan-tially with sequence length and local loss scale. To prevent such magnitude effects from dominating the ranking, we 5GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+use cosine similarity after projecting to the learned task sub-space: normalization removes per-example scale variations, while Π retains only the coupled directions that are repro-ducible on Dval . As a result, GIST scores candidates by directional agreement with the target geometry, rather than by raw gradient inner product that can be confounded by token aggregation. 
+
+4.2. Multi-Task Aggregation and Selection 
+
+In standard setting, the target set Dval = {z(1)  
+
+> val
+
+, . . . , z(M ) 
+
+> val
+
+}
+
+is constructed such that each example represents a distinct task or capability. A candidate data point might be highly relevant to one specific task (e.g., math) but orthogonal to others (e.g., coding). Averaging the target gradients would dilute these specific gradient directions. Instead, we employ a Maximum Relevance strategy, following Xia et al. (2024); Ivison et al. (2025). For each candidate zi, we compute its alignment with every target example j ∈ { 1, . . . , M } using Eq. (16) and retain the maximum score: FinalScore (zi) = max   
+
+> j∈{ 1,...,M }
+
+Sim t(zi, z(j) 
+
+> val
+
+). (17) This strategy prioritizes specialist candidates that effectively support at least one target requirement, regardless of their utility for others. Finally, we select the top-k candidates with the highest FinalScore for fine-tuning. 
+
+## 5. Experiments 
+
+5.1. Experimental Setup Training Datasets. We adopt the settings from Xia et al. (2024) and utilize a heterogeneous pool of instruction tuning data, comprising approximately 270K examples. The pool integrates (1) task-specific datasets aggregated from sources like FLAN V 2 (Longpre et al., 2023) and COT (Wei et al., 2022), with (2) open-ended, human-authored generation datasets such as DOLLY (Conover et al., 2023) and OPEN ASSISTANT 1 (K ¨opf et al., 2023). These sources exhibit significant variance in both instruction format and under-lying reasoning logic. We note that this pool is designed to be disjoint from the target domain, ensuring that the se-lection process is tested in a rigorous transfer setting. See Appendix G.1 for additional details.                      
+
+> Table 1. Statistics of evaluation datasets. We select tasks covering diverse output formats, including multiple-choice, extractive spans, and generative reasoning.
+> Data Size Dataset Shots Tasks Val. Test Output Format
+> MMLU 557 285 18,721 Multiple Choice TYDIQA 1991,713 Extractive Span BBH 323 81 920 Generation (CoT)
+
+Evaluation datasets. Following the evaluation protocol es-tablished by Xia et al. (2024), we benchmark our method on three diverse datasets: MMLU (Hendrycks et al., 2020), T Y-
+
+> DI
+
+QA (Clark et al., 2020), and BBH (Suzgun et al., 2023). MMLU serves as a broad knowledge test, covering 57 sub-jects ranging from elementary mathematics to law. T YDI QA evaluates multilingual reading comprehension across 9 typo-logically diverse languages, requiring the model to extract exact answers from passages. BBH is a curated suite of 27 challenging tasks from BIG-Bench, designed to probe complex reasoning capabilities. Table 1 provides detailed statistics. Consistent with Xia et al. (2024), we utilize the few-shot examples provided in each subtask for a dual pur-pose: they serve as the target set Dval to guide our data selection and subsequently act as in-context demonstrations during evaluation. See Appendix H for further details. 
+
+Models for data selection and training. We evaluate GIST 
+
+with three representative base models: Llama2-7B (Tou-vron et al., 2023), Llama3.2-3B (Dubey et al., 2024), and Qwen2.5-1.5B (Team, 2024). Following standard efficient fine-tuning protocols, all training stages are conducted us-ing LoRA (Hu et al., 2022). We report the average perfor-mance and standard deviation across three random seeds. Appendix G.3 provides further implementation details. 
+
+5.2. Baselines 
+
+We compare GIST against methods spanning four cate-gories. First, as a naive baseline, we employ Random Selection . Second, we evaluate heuristics prioritizing intrin-sic difficulty, including Length (Zhao et al., 2024) and PPL. 
+
+(Yin & Rush, 2025; Antonello et al., 2021), where we select examples with the highest perplexity. Third, we include similarity-based retrievers targeting semantic proximity to the validation set: standard Embedding similarity via GTR-Base (Ni et al., 2022) and RDS+ (Ivison et al., 2025), which exploits the model’s own hidden states. Finally, we com-pare against LESS (Xia et al., 2024), the state-of-the-art optimizer-based method selecting data via gradient projec-tion and Adam-state rescaling. See Appendix F for details. 
+
+5.3. Main Results 
+
+Results are reported in Table 2. For LESS, following the offi-cial default setting, we run 4 epochs with random projection dimension 8192. For GIST , we run 1 warmup epoch, and use projection dimensions 150, 9, and 50 for MMLU, T Y-
+
+> DI
+
+QA, and BBH, respectively. Gradient spectral analysis and rank selection are detailed in Appendix I.1. 
+
+GIST matches or outperforms the state-of-the-art base-line across diverse model architectures. As shown in Table 2, GIST achieves the greatest average improvement (Avg. ∆) across all three models, outperforming heuris-tic baselines and the previous SOTA method, LESS. On 6GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+Table 2. Accuracy across datasets and models. Base denotes 0% (no selection) and Full denotes 100% (full dataset). All other methods select 5% of the data under the same finetuning budget. Gray ± values report standard deviations. Bold numbers denote the best selected subset in each row, and underlined numbers denote the second best selected subset. Avg. ∆ reports the average absolute improvement over Base over MMLU, T YDI QA and BBH. 
+
+Model Dataset Base (0%) Full (100%) Rand. Length PPL. Embed. RDS+ LESS GIST 
+
+Llama2-7B MMLU 45.6 51.6 46.5 ±0.5 50.5 ±0.3 38.9 ±0.9 47.3 ±0.3 46.1 ±0.6 50.2 ±0.5 51.2 ±0.7 
+
+TYDI QA 46.4 54 52.7 ±0.4 51.1 ±0.3 32.9 ±0.4 49.8 ±0.8 51.0 ±0.3 56.2 ±0.7 55.8 ±0.6 
+
+BBH 38.3 43.2 38.9 ±0.5 39.8 ±0.7 34.5 ±0.2 38.6 ±0.6 39.0 ±0.7 41.5 ±0.6 41.8 ±0.8 
+
+Avg. ∆ – +6.2 +2.6 +3.7 -8.0 +1.8 +1.9 +5.9 +6.2 
+
+Llama3.2-3B MMLU 53.9 55.2 53.2 ±0.6 57.6 ±0.9 51.8 ±0.3 53.9 ±0.6 51.9 ±0.2 56.5 ±0.6 56.1 ±0.4 
+
+TYDI QA 60.4 66.6 64.1 ±0.4 63.9 ±1.3 57.1 ±0.7 62.8 ±0.4 62.6 ±0.5 67.1 ±0.8 69.2 ±0.3 
+
+BBH 45.5 47.8 45.1 ±0.2 45.3 ±0.3 43.0 ±0.4 44.6 ±0.5 45.1 ±0.4 46.1 ±0.7 48.0 ±0.5 
+
+Avg. ∆ – +3.3 +0.9 +2.3 -2.6 +0.5 -0.1 +3.3 +4.5 
+
+Qwen2.5-1.5B MMLU 62.0 62.3 61.5 ±0.3 62.8 ±0.1 61.7 ±0.2 62.3 ±0.2 62.4 ±0.2 62.2 ±0.2 62.9 ±0.6 
+
+TYDI QA 57.8 59.9 55.6 ±0.3 56.7 ±0.3 58.4 ±0.4 54.1 ±0.3 56.2 ±0.3 61.4 ±0.8 61.2 ±0.5 
+
+BBH 43.8 44.0 43.0 ±0.4 42.8 ±0.2 43.1 ±0.2 43.6 ±0.2 39.0 ±0.6 43.2 ±0.5 44.1 ±0.4 
+
+Avg. ∆ – +0.9 -1.2 -0.4 -0.1 -1.2 -2 +1.1 +1.5 
+
+Llama2-7B, GIST achieves a +6.2 average improvement, matching the Full fine-tuning upper bound. The advantage is still pronounced on the more capable Llama3.2-3B and Qwen2.5-1.5B models, where GIST delivers improvements of +4.5 and +1.5, respectively, surpassing LESS (which achieves +3.3 and +1.1). This demonstrates that GIST ’s ge-ometric subspace approach can scale effectively to modern, stronger base models. 
+
+GIST validates “less is more” by surpassing fine-tuning on the full dataset . A remarkable finding is that GIST ,using only 5% of the data, frequently matches or exceeds the performance of fine-tuning on the full dataset (100%). Specifically, on Llama3.2-3B, GIST outperforms Full fine-tuning by a substantial margin (+4.5 vs. +3.3), and on Qwen2.5-1.5B, it achieves nearly double the gain of the full dataset (+1.5 vs. +0.9). This indicates that the full dataset likely contains redundant or noisy samples that hinder opti-mization, whereas GIST isolates task-relevant update direc-tions, allowing the model to learn more effectively. 
+
+GIST demonstrates superior robustness compared to heuristic and optimizer-based baselines. While heuristics like Length occasionally perform well on specific metrics (e.g., MMLU on Llama3.2), they lack consistency, often degrading performance on other tasks (e.g., negative av-erage gains on Qwen). Similarly, while LESS generally performs well, it struggles on Qwen2.5-1.5B, degrading on BBH (43.2 vs. Base 43.8). In contrast, GIST maintains sig-nificant positive gains across all tasks and models, proving that subspace alignment is a more robust proxy for Eq. (7) than curvature-based influence or simple surface statistics. 
+
+5.4. Sensitivity Using only early checkpoints is sufficient; later check-points can even hurt performance. Our findings offer a 1 2 3 4 
+
+> Epoch Index
+> 63
+> 64
+> 65
+> 66
+> 67
+> 68
+> 69
+> 70
+> 71
+> Accuracy (%)
+> 69.2 69.0
+> 66.0
+> 64.3
+
+(a) Single Epoch Performance Epoch 1 Epoch 1-2 Epoch 1-3 Epoch 1-4  
+
+> Aggregated Checkpoints
+> 66
+> 67
+> 68
+> 69
+> 70
+> 71
+> Accuracy (%)  69.2
+> 70.2
+> 68.1
+> 67.3
+
+(b) Cumulative Performance 
+
+Figure 3. Impact of Checkpoint Selection. (a) Using single-epoch gradients shows a clear performance drop in later epochs. (b) Aggregating multiple checkpoints (weighted) does not outperform the early-stop strategy, confirming that early gradients contain the essential task optimization directions. 
+
+Table 3. Number of checkpoints ( N ) used for select data with 
+
+GIST for Llama3.2-3B. 
+
+MMLU TYDI QA BBH Avg. 
+
+LESS 56.5 ±0.6 67.1 ±0.8 46.1 ±0.7 56.6 
+
+N = 4 56.3 ±0.3 67.3 ±0.1 46.8 ±0.4 56.8 
+
+N = 1 (default) 56.1 ±0.4 69.2 ±0.3 48.0 ±0.2 57.8 
+
+nuanced perspective on checkpoint aggregation compared to Xia et al. (2024). While aggregating influence scores can effectively stabilize the zig-zagging Adam trajectory near convergence (illustrated in Figure 5b), we observe that for geometric subspace alignment, the most valuable directional information is intrinsically concentrated in the early training stage . As illustrated in Figure 3a, the performance of data selection using single-epoch gradients shows a monotonic decline on T YDI QA with Llama3.2-3B, dropping from 69.2% (Epoch 1) to 64.3% (Epoch 4). Even when aggregating checkpoints using the weighted scheme proposed in LESS (Figure 3b), adding later check-points yields diminishing returns and eventually harms per-7GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry Projected Subspace Rank     
+
+> 62.1
+> 62.4
+> 62.7
+> 63
+> 10 50 150 285
+> GIST 5% LESS 5%
+> 62.1
+> 62.3
+> 62.9
+> 62.5
+> Accuracy  (%)
+
+Figure 4. Accuracy as a function of the projection rank used by 
+
+GIST , compared with LESS at the same selection budget. 
+
+formance: while combining Epochs 1-2 yields a slight peak (70.2%), incorporating all four epochs degrades accuracy to 67.3%, significantly lower than using the early checkpoints alone. This aligns with the results in Table 3. We attribute this phenomenon to the evolution of the gradient geometry shown in Figure 1. As training progresses, the spectral dis-tribution of the target gradient matrix becomes increasingly concentrated on the leading singular values. This shrink-age in intrinsic dimension suggests that late-stage gradients may lose the diverse directional information present in early checkpoints, discarding critical optimization directions re-quired for robust data selection. 
+
+Spectral filtering is essential, yet identifying the dom-inant optimization direction is the primary driver of performance. Figure 4 presents the sensitivity analysis of 
+
+GIST regarding subspace rank r on MMLU ( |D val | = 285 ). We observe that performance does not increase monotoni-cally with rank; instead, it peaks at r = 150 (62.9%) and drops to 62.5% using full rank ( r = 285 ). This confirms the necessity of spectral filtering to exclude noisy tail compo-nents that may harm generalization. Surprisingly, even at an extremely low rank r = 10 which captures only 40% of the cumulative explained variance, GIST achieves an accuracy of 62.1%, comparable to LESS. This further validates our core idea: effective data selection depends on maintaining directional consistency with task subspace instead of pre-serving the exact inner products of gradients. We include a detailed subspace analysis in Appendix J. 
+
+5.5. Efficiency Compared to LESS, GIST is highly efficient in prac-tice, achieving better performance with only about one-quarter of LESS’s wall-clock runtime for a sin-gle task. Table 4 summarizes the asymptotic complex-ity and wall-clock runtime of each stage in GIST com-pared with LESS. All wall-clock time is measured in sin-gle A100 (80GB) GPU hours. Similar to LESS, the domi-nant cost comes from computing per-example gradient fea-tures, which scales linearly with the candidate dataset size 
+
+|D| and the per-step training cost. In practice, GIST is substantially cheaper overall because it requires only one 
+
+epoch (i.e., a single checkpoint) to form the target geometry, 
+
+Table 4. Efficiency comparison between GIST (Ours) and LESS. Runtime is measured in single A100 GPU hours . GIST signif-icantly reduces the overhead in Warmup and Feature Extraction stages (approx. 4× speedup) and requires negligible time for SVD.                          
+
+> Method Metric Warmup Target SVD Grad. Feats. LESS Time 6.0h–48 .0hCompl. O(|D ′| · N)–O(|D| · N)
+> GIST Time 1.5 h <1 m 12.0 h
+> Compl. O(|D ′|)O(|D val |2d)O(|D| )
+
+whereas LESS typically aggregates gradients across multi-ple epochs/checkpoints; this yields an end-to-end runtime that is roughly ∼ 4× smaller under the same setup. 
+
+The target SVD is cheap to compute in GIST . A key additional cost unique to GIST is the target SVD used to construct the low-rank projector. Importantly, this step is in-expensive in both theory and practice. Concretely, we avoid forming any d × d matrix and instead compute the Gram matrix on the target set, followed by an eigendecomposition on an |D val | × |D val | matrix (with chunked multiplication), so the compute primarily scales with the small target size 
+
+|D val | and the chosen rank r. Empirically, constructing the projection is fast: for T YDI QA with |D val | = 9 , it takes only 3.51s on average; for BBH ( |D val | = 69 ) and MMLU (|D val | = 285 ), the average time is 22.54s and 61.06s, re-spectively. This confirms that the target-SVD overhead is negligible compared to gradient feature computation, and the overall runtime improvement of GIST mainly comes from using a single-epoch gradient store. 
+
+GIST is extremely storage-efficient in practice. For ex-ample, when storing gradient features for Qwen2.5-1.5B over the three tasks, GIST uses only 217MB on disk, while LESS requires 75GB under the same setting, i.e., ≈ 350 ×
+
+larger storage (about 99 .7% more disk usage). We follow the standard LESS setup with four training datasets totaling 
+
+∼ 270 k examples and a projection dimension of 8192. In contrast to LESS, which applies a Johnson–Lindenstrauss random projection (Johnson et al., 1984) with entries drawn from a Rademacher distribution and stores the resulting pro-jected gradient features across multiple checkpoints, GIST 
+
+performs a lightweight target SVD to recover a very low-dimensional task-relevant subspace and then projects gradi-ents onto this target subspace. Together with single-epoch extraction, this leads to a dramatically smaller disk footprint. 
+
+## 6. Conclusion 
+
+In this work, we presented a unified optimization perspec-tive on data selection, revealing that prior methods funda-mentally suffer from geometric misalignment—either by ignoring curvature or relying on restrictive diagonal approx-imations. We demonstrated that in PEFT, the optimization 8GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+landscape exhibits a rotated, low-rank structure that diagonal preconditioners fail to capture. To address this, we proposed 
+
+GIST , which leverages spectral filtering to recover the cou-pled task geometry. GIST achieves state-of-the-art perfor-mance with significantly reduced computational overhead, validating that correctly modeling optimization geometry, rather than merely scaling up selection complexity, is key to efficient targeted instruction tuning. 
+
+## Impact Statement 
+
+This paper studies influence-based data selection for tar-geted instruction tuning of large language models, with the goal of improving data efficiency and training effectiveness. The primary intended benefits are reduced compute and cost for fine-tuning, faster iteration, and better performance on specified target tasks or domains. Our methods may also introduce or amplify risks. Because influence scores prioritize examples that most affect a cho-sen target set, they can reinforce target-set biases, overfit to narrow benchmarks, or de-emphasize underrepresented groups and topics if the target distribution is skewed. In ad-dition, data selection can inadvertently increase the presence of toxic, copyrighted, private, or otherwise sensitive content if such examples are deemed influential for the target objec-tive. These concerns are not unique to our approach but are particularly relevant when automating dataset curation. To mitigate these risks, we recommend pairing influence-based selection with standard data governance practices, including privacy and licensing checks, toxicity and safety filtering, and audits of demographic and topical coverage. We also encourage reporting target-set construction, selec-tion criteria, and downstream evaluation beyond the tar-get benchmarks (e.g., robustness and safety) to reduce the chance of unintended harms. Overall, this work aims to advance machine learning methodology, and its broader impacts will depend on how the selected data and resulting models are deployed and governed. 
+
+## References 
+
+Aghajanyan, A., Gupta, S., and Zettlemoyer, L. Intrin-sic dimensionality explains the effectiveness of language model fine-tuning. In Proceedings of the 59th annual meeting of the association for computational linguistics and the 11th international joint conference on natural language processing (volume 1: long papers) , pp. 7319– 7328, 2021. Amari, S.-I. Natural gradient works efficiently in learning. 
+
+Neural computation , 10(2):251–276, 1998. Ankner, Z., Blakeney, C., Sreenivasan, K., Marion, M., Leavitt, M. L., and Paul, M. Perplexed by perplexity: Perplexity-based data pruning with small reference mod-els. In Proceedings of the 13th International Conference on Learning Representations , 2025. Antonello, R., Beckage, N., Turek, J., and Huth, A. Se-lecting informative contexts improves language model fine-tuning. In Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers) , pp. 1072–1085, 2021. Chen, L., Li, S., Yan, J., Wang, H., Gunaratna, K., Yadav, V., Tang, Z., Srinivasan, V., Zhou, T., Huang, H., et al. Alpagasus: Training a better alpaca with fewer data. In 
+
+The Twelfth International Conference on Learning Repre-sentations , 2024. Clark, J. H., Choi, E., Collins, M., Garrette, D., Kwiatkowski, T., Nikolaev, V., and Palomaki, J. Tydi qa: A benchmark for information-seeking question answering in ty pologically di verse languages. Transactions of the Association for Computational Linguistics , 8:454–470, 2020. Cohen, J., Kaur, S., Li, Y., Kolter, J. Z., and Talwalkar, A. Gradient descent on neural networks typically occurs at the edge of stability. In International Conference on Learning Representations , 2021. Conover, M., Hayes, M., Mathur, A., Xie, J., Wan, J., Shah, S., Ghodsi, A., Wendell, P., Zaharia, M., and Xin, R. Free dolly: Introducing the world’s first truly open instruction-tuned llm. 2023. Davis, C. and Kahan, W. M. The rotation of eigenvectors by a perturbation. iii. SIAM Journal on Numerical Analysis ,7(1):1–46, 1970. Dubey, A., Jauhri, A., Pandey, A., Kadian, A., Al-Dahle, A., Letman, A., Mathur, A., Schelten, A., Yang, A., Fan, A., et al. The llama 3 herd of models. arXiv e-prints , pp. arXiv–2407, 2024. Eckart, C. and Young, G. The approximation of one matrix by another of lower rank. Psychometrika , 1(3):211–218, 1936. Ghorbani, B., Krishnan, S., and Xiao, Y. An investigation into neural net optimization via hessian eigenvalue den-sity. In International Conference on Machine Learning ,pp. 2232–2241. PMLR, 2019. Hanawa, K., Yokoi, S., Hara, S., and Inui, K. Evaluation of similarity-based explanations. In International Confer-ence on Learning Representations , 2020. 9GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+Hendrycks, D., Burns, C., Basart, S., Zou, A., Mazeika, M., Song, D., and Steinhardt, J. Measuring massive multitask language understanding. In International Conference on Learning Representations , 2020. Hu, E. J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L., Chen, W., et al. Lora: Low-rank adaptation of large language models. ICLR , 1(2):3, 2022. Ivison, H., Zhang, M., Brahman, F., Koh, P. W., and Dasigi, P. Large-scale data selection for instruction tuning. arXiv preprint arXiv:2503.01807 , 2025. Johnson, W. B., Lindenstrauss, J., et al. Extensions of lipschitz mappings into a hilbert space. Contemporary mathematics , 26(189-206):1, 1984. Kingma, D. P. and Ba, J. Adam: A method for stochastic optimization. In Bengio, Y. and LeCun, Y. (eds.), Pro-ceedings of the 3rd International Conference on Learning Representations , 2015. Koh, P. W. and Liang, P. Understanding black-box predic-tions via influence functions. In International conference on machine learning , pp. 1885–1894. PMLR, 2017. K ¨opf, A., Kilcher, Y., Von R ¨utte, D., Anagnostidis, S., Tam, Z. R., Stevens, K., Barhoum, A., Nguyen, D., Stan-ley, O., Nagyfi, R., et al. Openassistant conversations-democratizing large language model alignment. Ad-vances in neural information processing systems , 36: 47669–47681, 2023. Li, C., Farkhoor, H., Liu, R., and Yosinski, J. Measur-ing the intrinsic dimension of objective landscapes. In 
+
+International Conference on Learning Representations ,2018a. Li, H., Xu, Z., Taylor, G., Studer, C., and Goldstein, T. Visualizing the loss landscape of neural nets. Advances in neural information processing systems , 31, 2018b. Li, M., Zhang, Y., Li, Z., Chen, J., Chen, L., Cheng, N., Wang, J., Zhou, T., and Xiao, J. From quantity to quality: Boosting llm performance with self-guided data selec-tion for instruction tuning. In Proceedings of the 2024 Conference of the North American Chapter of the Associ-ation for Computational Linguistics: Human Language Technologies (Volume 1: Long Papers) , pp. 7602–7635, 2024. Liu, W., Zeng, W., He, K., Jiang, Y., and He, J. What makes good data for alignment? a comprehensive study of auto-matic data selection in instruction tuning. In The Twelfth International Conference on Learning Representations ,2024. Longpre, S., Hou, L., Vu, T., Webson, A., Chung, H. W., Tay, Y., Zhou, D., Le, Q. V., Zoph, B., Wei, J., et al. The flan collection: Designing data and methods for effec-tive instruction tuning. In International Conference on Machine Learning , pp. 22631–22648. PMLR, 2023. Marion, M., ¨Ust ¨un, A., Pozzobon, L., Wang, A., Fadaee, M., and Hooker, S. When less is more: Investigating data pruning for pretraining llms at scale. arXiv preprint arXiv:2309.04564 , 2023. Ni, J., Qu, C., Lu, J., Dai, Z., Abrego, G. H., Ma, J., Zhao, V., Luan, Y., Hall, K., Chang, M.-W., et al. Large dual encoders are generalizable retrievers. In Proceedings of the 2022 Conference on Empirical Methods in Natural Language Processing , pp. 9844–9855, 2022. Nikdan, M., Cohen-Addad, V., Alistarh, D., and Mirrokni, V. Efficient data selection at scale via influence distillation. 2025. Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C., Mishkin, P., Zhang, C., Agarwal, S., Slama, K., Ray, A., et al. Training language models to follow instructions with human feedback. Advances in neural information processing systems , 35:27730–27744, 2022. Papyan, V. Traces of class/cross-class structure pervade deep learning spectra. Journal of Machine Learning Research ,21(252):1–64, 2020. Park, S. M., Georgiev, K., Ilyas, A., Leclerc, G., and Madry, A. Trak: Attributing model behavior at scale. In Inter-national Conference on Machine Learning , pp. 27074– 27113. PMLR, 2023. Sagun, L., Bottou, L., and LeCun, Y. Eigenvalues of the hessian in deep learning: Singularity and beyond. arXiv preprint arXiv:1611.07476 , 2016. Smith, S. L., Kindermans, P.-J., Ying, C., and Le, Q. V. Don’t decay the learning rate, increase the batch size. In 
+
+International Conference on Learning Representations ,2018. Suzgun, M., Scales, N., Sch ¨arli, N., Gehrmann, S., Tay, Y., Chung, H. W., Chowdhery, A., Le, Q., Chi, E., Zhou, D., et al. Challenging big-bench tasks and whether chain-of-thought can solve them. In Findings of the Association for Computational Linguistics: ACL 2023 , pp. 13003–13051, 2023. Team, Q. Qwen2.5: A party of foundation models, Septem-ber 2024. URL https://qwenlm.github.io/ blog/qwen2.5/ .Touvron, H., Martin, L., Stone, K., Albert, P., Almahairi, A., Babaei, Y., Bashlykov, N., Batra, S., Bhargava, P., 10 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+Bhosale, S., et al. Llama 2: Open foundation and fine-tuned chat models. arXiv preprint arXiv:2307.09288 ,2023. Wang, Y., Ivison, H., Dasigi, P., Hessel, J., Khot, T., Chandu, K., Wadden, D., MacMillan, K., Smith, N. A., Beltagy, I., et al. How far can camels go? exploring the state of instruction tuning on open resources. Advances in Neural Information Processing Systems , 36:74764–74786, 2023. Wei, J., Wang, X., Schuurmans, D., Bosma, M., Xia, F., Chi, E., Le, Q. V., Zhou, D., et al. Chain-of-thought prompting elicits reasoning in large language models. Advances in neural information processing systems , 35:24824–24837, 2022. Xia, M., Malladi, S., Gururangan, S., Arora, S., and Chen, D. Less: selecting influential data for targeted instruction tuning. In Proceedings of the 41st International Confer-ence on Machine Learning , pp. 54104–54132, 2024. Yin, J. and Rush, A. M. Compute-constrained data selection. In Proceedings of the 13th International Conference on Learning Representations , 2025. Zhang, B., Wang, J., Du, Q., Zhang, J., Tu, Z., and Chu, D. A survey on data selection for llm instruction tuning. 
+
+Journal of Artificial Intelligence Research , 83, 2025. Zhang, R., Isola, P., Efros, A. A., Shechtman, E., and Wang, O. The unreasonable effectiveness of deep features as a perceptual metric. In Proceedings of the IEEE conference on computer vision and pattern recognition , pp. 586–595, 2018. Zhao, H., Andriushchenko, M., Croce, F., and Flammarion, N. Long is more for alignment: a simple but tough-to-beat baseline for instruction fine-tuning. In Proceedings of the 41st International Conference on Machine Learning , pp. 60674–60703, 2024. Zhou, C., Liu, P., Xu, P., Iyer, S., Sun, J., Mao, Y., Ma, X., Efrat, A., Yu, P., Yu, L., et al. Lima: Less is more for alignment. Advances in Neural Information Processing Systems , 36:55006–55021, 2023. 11 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+## A. Limitations and Future Work 
+
+While GIST offers a principled geometric view, our current instantiation is intentionally simple—a minimal, proof-driven realization of the theory. Empirically, we find that applying GIST early in training (after a lightweight warmup) is often most beneficial; in our experiments, using it within the first two epochs can yield stronger performance. Developing more expressive variants and adaptive mechanisms that automatically decide when and how to apply GIST remains an important direction. 
+
+Granularity and Magnitude. First, following standard practices in efficient data selection (Xia et al., 2024; Nikdan et al., 2025), we utilize sequence-level gradients and cosine similarity. While computationally robust, this choice emphasizes 
+
+directional alignment and de-emphasizes gradient magnitude (a proxy for difficulty) as well as token-level granularity. As a result, GIST may under-separate samples whose gradients share similar directions but differ substantially in scale, and token-level signals are averaged out within each sequence representation. 
+
+Warmup Requirement. Second, our approximation relies on the Gauss–Newton decomposition (Lemma E.2), which is most accurate once optimization enters a relatively stable regime. We satisfy this with a short warmup phase. While our experiments suggest the relevant subspace stabilizes quickly, our current analysis does not yet characterize the transient dynamics in the very early optimization steps before warmup, which could potentially be leveraged for further gains. 
+
+Scale vs. Direction. Third, unlike optimizer-based approaches that implicitly capture curvature scale (e.g., Adam’s second moment), GIST focuses on recovering principal directions (an eigenspace). This is a deliberate design to avoid numerical issues associated with ill-conditioned curvature in LLMs. However, how to incorporate reliable scaling for the recovered directions (e.g., via lightweight diagonal or low-rank scale estimates) remains open. 
+
+Future Directions. Motivated by the above trade-offs, future work includes: (1) improving the fidelity of the recovered subspace (e.g., reducing information loss introduced by spectral filtering), and (2) developing principled and practical esti-mators for the effective dimensionality and stage-dependent geometry of the optimization manifold. A deeper understanding of what dominant optimization directions represent may further inform data selection and related downstream interventions grounded in optimization geometry. 
+
+## B. Extended Discussion on Related Work 
+
+Instruction Data Selection. The transition from data quantity to quality has become a central theme in LLM training. Early work focused on heuristic filtering based on surface-level metrics like perplexity or instruction length (Zhou et al., 2023; Chen et al., 2024; Li et al., 2024). While efficient, these methods are often task-agnostic , ignoring the specific requirements of the target distribution. To address this, similarity-based approaches utilize embedding retrieval to select data semantically close to the target (Ni et al., 2022; Liu et al., 2024). However, semantic similarity in the pre-trained embedding space does not necessarily translate to gradient alignment during fine-tuning. Our work targets the more rigorous gradient-based setting, aiming to select data that explicitly optimizes the training objective on a target domain. 
+
+Scalable Influence Approximations. Influence functions (Koh & Liang, 2017) provide a principled framework for data selection by estimating the effect of removing a sample on validation loss. However, the classical formulation requires inverting the Hessian matrix, which is computationally intractable for billion-scale models. Recent state-of-the-art methods like LESS (Xia et al., 2024) and TRAK (Park et al., 2023) circumvent this bottleneck by projecting gradients into lower dimensions and approximating the Hessian inverse using optimizer statistics (e.g., Adam’s second moment). Critically, these methods rely on a diagonal approximation of the curvature. This implicitly assumes that model parameters are statistically independent and the optimization landscape is axis-aligned. Unlike prior optimizer-based methods (e.g., LESS (Xia et al., 2024)) that rely on intermediate optimizer states (such as Adam’s moments) to approximate influence, we posit that data selection should not be constrained by the efficiency-driven simplifications of specific optimizers . Instead, it should aim to approximate the ideal Newton step determined by the underlying parameter geometry of the target task. While optimizer states provide a computationally cheap diagonal approximation, they often fail to capture the coupled geometry inherent in PEFT fine-tuning. The effectiveness of GIST demonstrates that identifying and aligning with the principal optimization directions of the target subspace is more critical than merely preserving gradient inner products or applying heuristic rescaling. By prioritizing directional consistency over magnitude reconstruction, GIST marks a paradigm shift from optimizer-dependent heuristics to intrinsic geometric subspace recovery. 
+
+Spectral Properties of Deep Optimization. Our approach is grounded in the spectral analysis of neural network opti-12 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+mization. It is well-established that the Hessian and gradient covariance of deep networks exhibit a “bulk-and-outlier” or heavy-tailed spectral structure (Sagun et al., 2016; Papyan, 2020; Ghorbani et al., 2019). Specifically, the optimization trajectory is often confined to a low-dimensional manifold (low effective rank), while the remaining dimensions are dom-inated by stochastic noise (Li et al., 2018a;b). Standard influence methods that attempt to invert the full curvature often inadvertently amplify this noise, particularly in the early stages of training. GIST aligns with these insights by adopting a spectral filtering perspective: instead of unstable curvature inversion, we perform robust subspace projection. This connects data selection with the intrinsic dimension of the optimization trajectory, ensuring that selection is driven by stable signal components rather than noise. 
+
+## C. Notations and Symbols 
+
+We summarize the mathematical notations used throughout the paper in Table 5. Table 5: Summary of notations used in this paper. 
+
+Symbol Description 
+
+Datasets and Models 
+
+D Large-scale instruction tuning candidate pool, D = {zi}|D| 
+
+> i=1
+
+z A data instance z = ( x, y)
+
+Dval Target validation set defining the target distribution/task 
+
+Dtest Held-out test set for evaluation 
+
+S Selected subset from the candidate pool, S ⊆ D 
+
+k Selection budget (cardinality constraint), |S| = kJ Number of target tasks/requirements represented in Dval 
+
+z(j)val The j-th target/validation example (task requirement), j ∈ { 1, . . . , J }Mθ LLM with trainable parameters θ ∈ Rd (e.g., LoRA parameters) 
+
+d Number of trainable parameters (e.g., LoRA parameters) 
+
+θt Trainable parameters at checkpoint/step tN Number of Collected checkpoints along warmup trajectory 
+
+Losses, Gradients, and Curvature 
+
+ℓ(z, θ) Sample-wise loss at parameters θ
+
+L(S, θ) Empirical risk over a dataset S: L(S, θ) = 1
+
+> |S|
+
+P 
+
+> z∈S
+
+ℓ(z, θ)
+
+gt Instantaneous (per-sample) training gradient at step t: gt = ∇θ ℓ(zt, θt)
+
+Ht Instantaneous (per-sample) Hessian at step t: Ht = ∇2 
+
+> θ
+
+ℓ(zt, θt)
+
+Hval ,t Validation Hessian: Hval ,t = ∇2 
+
+> θ
+
+L(Dval , θt)
+
+H† 
+
+> val ,t
+
+Moore–Penrose pseudoinverse of Hval ,t 
+
+η Learning rate (step size) 
+
+ϵ Numerical stability constant in Adam update 
+
+Adam Optimizer Statistics 
+
+mt First-moment estimate (EMA of gradients) at step t
+
+vt Second-moment estimate (EMA of squared gradients) at step t
+
+ˆmt Bias-corrected first moment at step t
+
+ˆvt Bias-corrected second moment at step t
+
+Target Gradient Matrix and Spectral Subspace 
+
+gi,t Per-sample gradient for candidate zi at checkpoint t: gi,t = ∇θ ℓ(zi, θt) ∈ Rd
+
+g(j)val ,t Per-sample gradient for target example z(j)val at checkpoint t: g(j)val ,t = ∇θ ℓ(z(j)val , θt) ∈ Rd
+
+Gval ,t Stacked target gradient matrix at checkpoint t: rows are (g(j)val ,t )⊤, Gval ,t ∈ R|D val |× d
+
+Ut, Σt, Vt Compact SVD: Gval ,t = UtΣtV⊤
+
+> t
+
+rt Effective rank estimated from the spectrum at checkpoint tr Global subspace dimension used for scoring (e.g., r = max t rt)
+
+Vr Top-r right singular vectors of Gval ,t , Vr ∈ Rd×r
+
+Π Spectral projector to target subspace, Π = V⊤ 
+
+> r
+
+∈ Rr×d
+
+Continued on next page 
+
+13 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry Symbol Description 
+
+Pr Rank-r orthogonal projector in parameter space, Pr = Vr V⊤ 
+
+> r
+
+∈ Rd×d
+
+Projected Alignment and Selection Scores 
+
+Sim t(zi, z(j)val ) Subspace cosine similarity at checkpoint t (Eq. (16)) 
+
+FinalScore( zi) Aggregated score for selection, FinalScore( zi) = max j∈{ 1,...,J } Sim t(zi, z(j)val )
+
+## D. Details of the Adam Optimizer and Gradient Rescaling 
+
+In this section, we provide the detailed formulation of the Adam optimizer (Kingma & Ba, 2015) used in fine-tuning Large Language Models (LLMs) and discuss how its second-moment statistics are utilized to approximate the optimization landscape for data selection methods like LESS (Xia et al., 2024). 
+
+D.1. Standard Adam Update Rule 
+
+Let ℓ(z, θ) denote the loss function for a data sample z and model parameters θ ∈ Rd. At each training step t, we compute the stochastic gradient on a mini-batch Bt:
+
+gt ≜ 1
+
+|B t|
+
+X
+
+> z∈B t
+
+∇θ ℓ(z, θt). (18) Adam estimates the first moment (mean) mt and the second raw moment (uncentered variance) vt of the gradients using exponential moving averages (EMA): 
+
+mt+1 = β1mt + (1 − β1)gt, (19) 
+
+vt+1 = β2vt + (1 − β2)( gt ⊙ gt), (20) where ⊙ denotes the element-wise product, and β1, β 2 ∈ [0 , 1) are the decay rates (typically β1 = 0 .9, β 2 = 0 .999 ). To counteract the initialization bias (since m0 and v0 are initialized to zero vectors), bias-corrected estimates are computed as: 
+
+ˆmt+1 = mt+1 
+
+1 − βt+1 1
+
+, ˆvt+1 = vt+1 
+
+1 − βt+1 2
+
+. (21) The parameters are then updated via: 
+
+θt+1 = θt − η · ˆmt+1 
+
+pˆvt+1 + ϵ , (22) where η is the learning rate and ϵ is a small constant for numerical stability. Structurally, the term (pˆvt+1 + ϵ)−1 acts as a 
+
+diagonal preconditioner , rescaling the gradient based on the historical curvature of the optimization landscape. 
+
+D.2. Toy Example: Diagonal vs. Full-Matrix Preconditioning under Coupling 
+
+To complement the Adam update in Eq. (22) , we visualize a 2D quadratic objective under non-coupled (axis-aligned) versus 
+
+coupled (rotated) curvature. Consider 
+
+L(θ) = 12 θ⊤Hθ, ∇L(θ) = Hθ, (23) with the common initialization θ0 = ( −2.5, 0) ⊤. This choice places the start on a coordinate axis so that, in the non-coupled 
+
+case, the update direction does not introduce an artificial “orbit” caused by momentum; hence the visual difference is dominated by coupling rather than initialization. 
+
+Two geometries (same spectrum, different orientation). We compare an axis-aligned quadratic and its rotated counterpart: 
+
+Non-coupled (axis-aligned): Hdiag = diag(20 , 1) , (24) 
+
+Coupled (rotated): Hcpl = R H diag R⊤, (25) 14 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 3 2 1 0 1 2 3
+
+> 1
+> 3
+> 2
+> 1
+> 0
+> 1
+> 2
+> 3
+> 2
+> Adam Trajectory
+> Newton Step
+> Start
+> Global Minima
+
+(a) Non-coupled (axis-aligned) quadratic: Hdiag =diag(20 , 1) .3.0 2.5 2.0 1.5 1.0 0.5 0.0 0.5 1.0 
+
+> 1
+> 1.0
+> 0.5
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> 2.5
+> 3.0
+> 2
+> Adam Trajectory
+> Newton Step
+> Start
+> Global Minima
+
+(b) Coupled (rotated) quadratic: Hcpl has large off-diagonal entries. 
+
+Figure 5. Toy 2D optimization dynamics with the same initialization θ0 = ( −2.5, 0) . Newton (full-matrix) follows the direct descent direction, while Adam (diagonal) cannot express the rotation induced by coupling, leading to a “zig-zag” trajectory on the coupled landscape. 
+
+where R is a 2D rotation matrix. Thus, both cases share the same eigenvalues (and condition number), but Hcpl is not diagonal in the coordinate basis , yielding tilted level sets due to off-diagonal coupling. For visualization we instantiate 
+
+Hcpl =
+
+10 .5 9.59.5 10 .5
+
+
+
+.
+
+Newton step (full-matrix preconditioning). Newton’s method uses the full curvature: 
+
+θt+1 = θt − ηNewton H−1∇L(θt). (26) With ηNewton = 1 and ∇L(θt) = Hθt, Newton reaches the minimizer 0 in a single step on this quadratic, correcting both 
+
+scaling and rotation .
+
+Adam (diagonal preconditioning). We run standard Adam with (β1, β 2) = (0 .9, 0.999) for T = 45 steps, using initial learning rate η = 0 .25 with a linear decay schedule. Since Adam’s preconditioner is diagonal, it can only rescale coordinates independently and cannot represent the off-diagonal coupling present in Hcpl . As a result, on the coupled landscape, Adam may drift across the narrow valley and exhibit a less direct trajectory, whereas on the non-coupled landscape it behaves in a more stable, axis-consistent manner. 
+
+Takeaway. This toy example highlights the key geometric distinction: full-matrix curvature information can correct parameter coupling (rotation), whereas diagonal preconditioning cannot, which can lead to inefficient trajectories when the optimization landscape is strongly coupled. 
+
+## E. Theoretical Proof 
+
+E.1. Proof of Theorem 3.1 Theorem 3.1 (Single-level Approximate Optimization). Fix the current parameters θt. Under the first-order approximation, Problem 1 is approximately reduced to maximizing the predicted reduction in validation loss: 
+
+max  
+
+> S⊆D
+
+∇θ L(Dval , θt)⊤H†
+
+> val ,t
+
+∇θ L(S, θt)
+
+s.t. |S| = k, 
+
+(27) 
+
+up to constants independent of S and higher-order terms. 
+
+15 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+Proof. We write Lval (θ) := L(Dval , θ). Let 
+
+gval ,t := ∇θ Lval (θt), Hval ,t := ∇2 
+
+> θ
+
+Lval (θt), (28) and for any subset S,
+
+gS,t := ∇θ L(S, θt). (29) Problem 1 selects S to minimize the validation loss after training on S, i.e., it compares Lval (θ∗ 
+
+> S
+
+) across different S, where 
+
+θ∗ 
+
+> S
+
+is the output of the inner optimization (exact minimizer or the terminal point of a training procedure) starting from θt.First, we approximate the intractable mapping S 7 → θ∗ 
+
+> S
+
+around θt by a single geometry-aware descent step using the validation curvature: eθS ≜ θt − η H† 
+
+> val ,t
+
+gS,t , (30) where η > 0 is a small stepsize and H† 
+
+> val ,t
+
+denotes the Moore–Penrose pseudoinverse. This surrogate is a first-order approximation in the sense that it uses only first-order information of the subset loss at θt and a fixed local metric at θt.Then we assume Lval is twice continuously differentiable in a neighborhood of θt. Applying Taylor’s theorem to Lval (eθS )
+
+around θt yields 
+
+Lval (eθS ) = Lval (θt) + g⊤
+
+> val ,t
+
+(eθS − θt) + 12 (eθS − θt)⊤Hval ,t (eθS − θt) + RS , (31) where the remainder term satisfies RS = o(∥eθS − θt∥2) as η → 0.Substituting (30) into the linear term in (31) gives 
+
+g⊤
+
+> val ,t
+
+(eθS − θt) = −η g⊤
+
+> val ,t
+
+H†
+
+> val ,t
+
+gS,t . (32) The quadratic term in (31) scales as O(η2):
+
+12 (eθS − θt)⊤Hval ,t (eθS − θt) = η2
+
+2 g⊤
+
+> S,t
+
+H†
+
+> val ,t
+
+Hval ,t H†
+
+> val ,t
+
+gS,t , (33) which is O(η2) and hence is a higher-order term relative to the O(η) linear improvement term. (Here H†HH † is well-defined even when H is singular.) Therefore, combining the above, 
+
+Lval (eθS ) = Lval (θt) − η g⊤
+
+> val ,t
+
+H†
+
+> val ,t
+
+gS,t + O(η2) + o(η2), (34) where the O(η2) term collects the quadratic Taylor term and the remainder. Since Lval (θt) is independent of S, minimizing Lval (eθS ) over S is, up to an S-independent constant and higher-order terms in η, equivalent to maximizing the first-order predicted decrease term g⊤
+
+> val ,t
+
+H†
+
+> val ,t
+
+gS,t . Formally, ignoring O(η2) and o(η2)
+
+terms in (34), we obtain the surrogate outer problem 
+
+max   
+
+> S⊆D ,|S|=k
+
+g⊤
+
+> val ,t
+
+H†
+
+> val ,t
+
+gS,t , (35) which is exactly (7) after substituting the definitions of gval ,t and gS,t .Finally, because eθS is a first-order local surrogate of the inner solution θ∗ 
+
+> S
+
+around θt (Eq. (30) ), this yields the claimed single-level approximation to Problem 1, up to S-independent constants and higher-order terms. 
+
+E.2. Proof of Theorem 3.2 Theorem 3.2 (LoRA induces off-diagonal curvature). Let L(W ) be twice differentiable and consider the LoRA parameteri-zation W = W0 + BA . Let HW = ∇2vec( W )L(W ) W =W0+BA . For any k ∈ [r] and any j1̸ = j2,
+
+∂2L
+
+∂A kj 1 ∂A kj 2
+
+=  B:k ⊗ ej1
+
+⊤ HW
+
+ B:k ⊗ ej2
+
+, (36) 16 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+where B:k is the k-th column of B and ej is the standard basis vector. In particular, whenever the W -space curvature couples coordinates j1 and j2 along a nonzero direction B:k, the LoRA-parameter Hessian contains a nonzero off-diagonal entry. Proof. Let w ≜ vec( W ) ∈ Rdout din , and define the LoRA parameters ϕ ≜ (vec( A), vec( B)) . Consider the composition 
+
+f (ϕ) ≜ L(W (ϕ)) , W (ϕ) = W0 + BA. (37) Since L is twice differentiable in W and W (ϕ) is smooth in ϕ, f is twice differentiable in ϕ.Let J(ϕ) ≜ ∇ϕw(ϕ) denote the Jacobian of w w.r.t. ϕ. A standard second-order chain rule gives the Hessian of the composition: 
+
+∇2
+
+> ϕ
+
+f (ϕ) = J(ϕ)⊤ ∇2
+
+> w
+
+L(W (ϕ)) J(ϕ) + 
+
+> dout din
+
+X
+
+> i=1
+
+∂L
+
+∂w i
+
+(W (ϕ)) · ∇ 2
+
+> ϕ
+
+wi(ϕ). (38) The second term involves the second derivatives of the parameterization w(ϕ).In the local quadratic setting used in the main text, L(W ) is approximated by a quadratic function of w, so ∇2
+
+> w
+
+L(W (ϕ)) = 
+
+HW is constant and ∇wL is affine in w. Equivalently, one may assume we analyze curvature at a point where 
+
+∇wL(W (ϕ)) = 0 (e.g., a local minimizer of the quadratic model), in which case the second term in (38) vanishes. Under either viewpoint, we obtain the Gauss–Newton style identity 
+
+∇2
+
+> ϕ
+
+f (ϕ) = J(ϕ)⊤ HW J(ϕ). (39) Since the theorem concerns an explicit entry of the Hessian, it suffices to compute the relevant columns of J(ϕ).Fix k ∈ [r] and j ∈ [din ]. Let E(k,j ) ∈ Rr×din be the matrix with a 1 at entry (k, j ) and zeros elsewhere. Perturbing A by 
+
+ϵE (k,j ) yields 
+
+W (A + ϵE (k,j ), B ) = W0 + B(A + ϵE (k,j )) = W0 + BA + ϵ BE (k,j ). (40) Thus the directional derivative is ∂W ∂A kj 
+
+= BE (k,j ) = B:k e⊤ 
+
+> j
+
+, (41) where B:k is the k-th column of B and ej is the j-th standard basis vector in Rdin . Vectorizing (41) and using vec( uv ⊤) = 
+
+v ⊗ u gives 
+
+∂ vec( W )
+
+∂A kj 
+
+= vec  B:ke⊤
+
+> j
+
+ = ej ⊗ B:k. (42) Let ϕA ≜ vec( A) denote the A-block of parameters. From (39), the (Akj 1 , A kj 2 ) Hessian entry equals 
+
+∂2L
+
+∂A kj 1 ∂A kj 2
+
+=
+
+ ∂ vec( W )
+
+∂A kj 1
+
+⊤
+
+HW
+
+ ∂ vec( W )
+
+∂A kj 2
+
+
+
+. (43) Using (42) for j = j1 and j = j2 yields 
+
+∂2L
+
+∂A kj 1 ∂A kj 2
+
+=  ej1 ⊗ B:k
+
+⊤ HW
+
+ ej2 ⊗ B:k
+
+, (44) which is exactly Eq. (37) . Therefore, if the W -space curvature HW couples the two directions ej1 ⊗ B:k and ej2 ⊗ B:k (i.e., the quadratic form is nonzero), then the LoRA-parameter Hessian has a nonzero off-diagonal entry. The same argument applies to B. For i ∈ [dout ] and k ∈ [r], with F (i,k ) the matrix with a 1 at (i, k ),
+
+∂W ∂B ik 
+
+= F (i,k )A = ei(Ak:), ⇒ ∂ vec( W )
+
+∂B ik 
+
+= vec  eiAk:
+
+ = A⊤ 
+
+> k:
+
+⊗ ei. (45) Hence ∂2L
+
+∂B i1k ∂B i2k
+
+=  A⊤ 
+
+> k:
+
+⊗ ei1
+
+⊤HW
+
+ A⊤ 
+
+> k:
+
+⊗ ei2
+
+, (46) and similarly for the mixed blocks (A, B ).17 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+E.3. Proof of Theorem 3.3 Notation and definitions. A symmetric matrix M ∈ Rd×d is positive semidefinite (PSD) if x⊤Mx ≥ 0 for all x ∈ Rd.For two r-dimensional subspaces U, V ⊂ Rd with orthonormal bases U, V ∈ Rd×r , the principal angles Θ( U, V) = diag( θ1, . . . , θ r ) are defined by cos θi = σi(U⊤V), where σi(·) denotes singular values. We use ∥ sin Θ( U, V)∥2 =sin θmax as the subspace distance. 
+
+Setup. Let the validation objective be the average negative log-likelihood (NLL) 
+
+Lval (θ) = 1
+
+nval 
+
+> nval
+
+X
+
+> i=1
+
+ℓi(θ), ℓi(θ) = − log pθ (yi | xi). (47) Denote the validation Hessian Hval ,t = ∇2 
+
+> θ
+
+Lval (θt). Let gi(θt) = ∇θ ℓi(θt) and Gval ,t ∈ Rnval ×d stack gi(θt)⊤ as rows. We define the empirical Fisher-type proxy 
+
+bFval ,t ≜ 1
+
+nval 
+
+G⊤
+
+> val ,t
+
+Gval ,t . (48) Note that Scaling by 1/n val does not affect eigenspaces. 
+
+Assumption E.1 (Eigenspace separation) . Let λ1(bFval ,t ) ≥ · · · ≥ λd(bFval ,t ) ≥ 0. Assume the top-r eigenspace of bFval ,t 
+
+is separated by an eigengap 
+
+γt ≜ λr (bFval ,t ) − λr+1 (bFval ,t ) > 0. (49) 
+
+Lemma E.2 (Gauss–Newton/Fisher decomposition for NLL (Papyan, 2020)) . Consider an NLL objective ℓ(θ) =
+
+− log pθ (y | x). Under standard regularity assumptions (twice differentiability and interchange of derivatives), the Hessian admits the decomposition 
+
+∇2 
+
+> θ
+
+ℓ(θ) = F(θ) + R(θ), (50) 
+
+where F(θ) is a Fisher/Gauss–Newton-type PSD curvature term, and R(θ) collects residual curvature terms involving second derivatives of the model map (e.g., the “non-Gauss–Newton” component). Consequently, for the validation objective, 
+
+Hval ,t = Fval ,t + Rt. (51) 
+
+Lemma E.3 (Davis–Kahan Theorem (Davis & Kahan, 1970)) . Let A, B ∈ Rd×d be symmetric, and let Sr (A) and Sr (B)
+
+denote their top-r eigenspaces. Assume B has an eigengap γ = λr (B) − λr+1 (B) > 0. Then 
+
+sin Θ  Sr (A), Sr (B) 
+
+> 2
+
+≤ ∥A − B∥2
+
+γ . (52) 
+
+Theorem 3.3 (Eigenspace stability of the proxy). Let Sr (M) denote the top-r eigenspace of a PSD matrix M. Assume Assumption E.1. For NLL objectives, let Hval ,t be the validation Hessian and bFval ,t = 1 
+
+> nval
+
+G⊤
+
+> val ,t
+
+Gval ,t . Let Fval ,t be a Fisher/Gauss–Newton-type curvature term from Lemma E.2, so that Hval ,t = Fval ,t + Rt. Define 
+
+εt ≜ ∥Rt∥2 + ∥Fval ,t − bFval ,t ∥2. (53) 
+
+Then the dominant subspaces are close: 
+
+sin Θ  Sr (Hval ,t ), Sr (bFval ,t ) 
+
+> 2
+
+≤ εt
+
+γt
+
+. (54) 
+
+Proof. By Lemma E.2, we have the decomposition 
+
+Hval ,t = Fval ,t + Rt. (55) Hence 
+
+Hval ,t − bFval ,t = ( Fval ,t − bFval ,t ) + Rt. (56) Taking operator norms and applying the triangle inequality yields 
+
+∥Hval ,t − bFval ,t ∥2 ≤ ∥ Fval ,t − bFval ,t ∥2 + ∥Rt∥2 = εt. (57) 18 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+Under Assumption E.1, bFval ,t has an eigengap γt > 0 at rank r. Applying Lemma E.3 with A = Hval ,t and B = bFval ,t 
+
+gives 
+
+sin Θ  Sr (Hval ,t ), Sr (bFval ,t ) 
+
+> 2
+
+≤ ∥Hval ,t − bFval ,t ∥2
+
+γt
+
+≤ εt
+
+γt
+
+, (58) which proves the claim. 
+
+Remark E.4 (Theoretical Necessity of Warmup) . Theorem 3.3 establishes that the fidelity of our subspace recovery is bounded by the ratio εt/γ t. At initialization ( t = 0 ), the high negative log-likelihood implies a large non-Gauss-Newton residual term ∥Rt∥2 (inflating εt) and a chaotic gradient spectrum with a negligible eigengap γt. Therefore, a lightweight warmup is not merely a heuristic but a theoretical prerequisite. It drives the optimization trajectory into a local basin where the residual curvature decays ( ∥Rt∥2 → 0, validating the Gauss-Newton approximation H ≈ F) and the intrinsic task-specific structure emerges (maximizing γt). This ensures GIST operates in a regime where the empirical proxy is mathematically guaranteed to align with the true Hessian geometry. 
+
+## F. Baseline Details 
+
+In this section, we provide detailed implementation specifications for all baseline methods compared in our experiments. We categorize these methods into four groups: Random Selection, Hardness-aware Heuristics, Similarity-based Methods, and Optimizer-based Methods. For baseline approaches that involve stochasticity, we perform three runs with different random seeds and report the average performance and standard deviation. 
+
+F.1. Random Selection 
+
+We employ Random Selection as a standard baseline, which uniformly samples data points from the candidate pool D until the target budget k is met. Despite its simplicity, random selection often serves as a strong baseline in instruction tuning. 
+
+Random. We uniformly sample data points from the entire candidate pool D until the budget is met. 
+
+F.2. Hard Example Mining 
+
+These methods select data based on intrinsic properties of the examples (e.g., difficulty or length), independent of the specific target task. In our geometric view (Section 3.1), these methods typically prioritize gradient magnitude over direction. 
+
+Length. We sort examples by length (in tokens) and take the longest samples. This has been shown to be a strong baseline by Zhao et al. (2024), and is computationally cheap, only requiring computing the length of each sample in our data pool. 
+
+Perplexity (PPL). We compute the loss (perplexity) of each sample d ∈ D using the pre-trained base model, following prior work (Yin & Rush, 2025; Antonello et al., 2021; Marion et al., 2023; Ankner et al., 2025). Consistent with Yin & Rush (2025), we select samples with the highest loss values (hardest samples). 
+
+F.3. Similarity-based Methods 
+
+These methods select training samples d ∈ D that are semantically close to the target validation examples v ∈ D val .
+
+Embedding. Following standard practices in Ivison et al. (2025), we employ the GTR-Base model (Ni et al., 2022) as the external encoder. For every candidate sample d and validation sample v, we compute their embeddings using GTR-Base and calculate the cosine similarity score. The final score for a candidate d is its maximum similarity to any example in the validation set. 
+
+RDS+. We adopt the RDS+ method proposed by Ivison et al. (2025). Unlike standard embedding approaches, RDS+ utilizes the base model’s own internal representations to measure similarity. Following Ivison et al. (2025), we extract the hidden states from the last layer and apply a position-weighted mean pooling to derive the representation for each sequence. This weighted pooling strategy is designed to better capture the instruction-following semantics compared to standard mean pooling. We use the official codebase provided by the authors 2 for implementation. 
+
+> 2https://github.com/hamishivi/automated-instruction-selection
+
+19 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+F.4. Optimizer-based Methods 
+
+These methods estimate the gradient-based influence of training samples derived from optimizer statistics (e.g., Adam’s second-moment estimates on the validation loss. 
+
+LESS. We follow the procedure outlined in Xia et al. (2024). We first train an auxiliary LoRA model on a random subset of the data. Then, we compute the influence score for each pair (v, d ) using gradient projections. Crucially, LESS utilizes the optimizer states (Adam’s moments) to re-scale gradients. We use the official codebase provided by the authors 3 for implementation. We follow the paper’s default setup, using 4 epochs and setting the random projection dimension to 8192. Also we adopt the reported performance of LESS on Llama2-7B from the original paper. 
+
+## G. Training 
+
+G.1. Training Datasets 
+
+We use the same four preprocessed training datasets as in Wang et al. (2023). All are human-written or human-annotated; details are provided in Table 6. FLAN V 2 and COT are derived from existing NLP benchmarks, whereas DOLLY and OPEN ASSISTANT 1 contain open-ended generation examples with human-written responses. These datasets differ substantially in format, length, and task type, highlighting the diversity of instruction-tuning data. Following Wang et al. (2023), we standardize them using the same “Tulu” format. 
+
+<|user |>
+
+Why can camels survive for long without water? 
+
+<|assistant |>
+
+Camels use the fat in their humps to keep them filled with energy and hydration for long periods of time.                            
+
+> Table 6. Datails of training dataset from Wang et al. (2023). Len. is short for token length.
+> Dataset # Instance Sourced from # Rounds Prompt Len. Completion Len.
+> FLAN V 2100,000 NLP datasets and human-written instructions 1355.7 31.2
+> COT 100,000 NLP datasets and human-written CoTs 1266 53.2
+> DOLLY 15,011 Human-written from scratch 1118.1 91.3
+> OPEN ASSISTANT 155,668 Human-written from scratch 1.6 34.8 212.5
+
+G.2. Infrastructure and Implementation. 
+
+All experiments were conducted on a system equipped with NVIDIA A100 GPU and AMD EPYC 7473X 24-core processor (48 threads). 
+
+G.3. Training Details 
+
+We adopt the training configuration from Xia et al. (2024). We implemented parameter-efficient fine-tuning across all experiments using LoRA (Hu et al., 2022). Training was performed for 4 epochs with a batch size of 128, utilizing a learning rate scheduler that combines linear warm-up with cosine decay, peaking at 2 × 10 −5.For the LoRA configuration, we targeted all attention matrices with a rank of 128, α = 512 , and a dropout rate of 0.1. This setup resulted in 135M trainable parameters ( 1.95% ) for Llama2-7B, 73M ( 2.23% ) for Llama3.2-3B, and 34M ( 2.21% ) for Qwen2.5-1.5B.To ensure robustness, each experiment was repeated over three trials using distinct random seeds. For random selection baselines, this involved sampling three unique subsets from the training data. For our proposed method, distinct subsets were selected from separate models that had undergone warmup training on varied data partitions. Optimization seeds remained consistent throughout all experiments. 
+
+> 3https://github.com/princeton-nlp/LESS
+
+20 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+## H. Evaluation 
+
+We follow Wang et al. (2023) to evaluate the performance of the models on the target tasks. For MMLU, we measure the 5-shot accuracy of the test set averaged across 57 subtasks. For T YDI QA, we measure the 1-shot macro-averaged F1 score across all 11 languages. We adopt the gold-passage setup where one passage containing the reference answer is provided to the model. For BBH, we report the average 3-shot exact match score across all tasks. Chain-of-thought reasoning is provided in each in-context learning example to prompt the model to generate chain-of-thought reasoning traces for test examples. We evaluate on the validation set Dval (the same reference set used for data selection) at the end of each epoch and select the best checkpoint to evaluate on the final test set for each experiment. Note that this procedure might introduce some bias to the final test set, given that the validation set is relatively small (e.g., T YDI QA only has 9 validation examples in total). According to Xia et al. (2024), this bias doesn’t affect the comparisons between different methods. 
+
+## I. More Experiment Results 
+
+I.1. Gradient Spectrum Analysis 50 100 150 200 250  
+
+> Component index
+> 10 1
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> Singular value (log scale)  Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+
+(a) Llama2-7B (Singular Values) 50 100 150 200 250   
+
+> Component index
+> 10 1
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> Singular value (log scale)  Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+
+(b) Llama3.2-3B (Singular Values) 50 100 150 200 250   
+
+> Component index
+> 10 1
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> Singular value (log scale)  Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+
+(c) Qwen2.5-1.5B (Singular Values) 50 100 150 200 250 
+
+> Component index
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Cumulative explained variance
+> Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+> 95% variance
+
+(d) Llama2-7B (Explained Variance) 50 100 150 200 250  
+
+> Component index
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Cumulative explained variance
+> Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+> 95% variance
+
+(e) Llama3.2-3B (Explained Variance) 50 100 150 200 250  
+
+> Component index
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Cumulative explained variance
+> Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+> 95% variance
+
+(f) Qwen2.5-1.5B (Explained Variance) 
+
+Figure 6. Spectral Analysis of Gradient Subspaces across Models and Epochs. Top Row: Singular value spectra (log scale) of the gradient covariance matrix. Early epochs (blue solid lines) show slower decay, indicating a higher-dimensional optimization landscape. 
+
+Bottom Row: Cumulative explained variance. Later epochs (dotted red lines) reach 95% variance with fewer components, signaling dimensional shrinkage. Notably, larger models (e.g., Llama2-7B) exhibit a slower spectral decay compared to smaller counterparts, reflecting a higher intrinsic dimensionality for task adaptation. 
+
+Early training stages preserve a higher effective dimension, while larger models exhibit richer intrinsic structures. 
+
+Figure 6 visualizes the spectral properties of the target gradient covariance matrices across different training epochs and model architectures. First, we observe that earlier epochs (e.g., Epoch 1) consistently exhibit a “heavier tail” in their singular value distribution compared to later epochs. As training progresses, the spectrum decays more rapidly, and the cumulative variance rises sharper, indicating a collapse of the optimization trajectory into a lower-dimensional subspace. This suggests that the “warm-up” stage contains diverse and exploratory gradient signals crucial for robust data selection, whereas later stages become over-specialized. Regarding model scale, models with larger parameter counts demonstrate a higher intrinsic dimension. By comparing the singular value decay rates, larger models maintain significant singular values across a wider range of components, whereas smaller models show a faster spectral drop-off. This implies that larger models rely on a 21 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 50 100 150 200 250   
+
+> Component index
+> 10 2
+> 10 1
+> 10 0
+> 10 1
+> 10 2
+> 10 3
+> Singular value (log scale)
+> Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+
+(a) MMLU ( |D val | = 285 )10 20 30 40 50 60 70 80    
+
+> Component index
+> 10 2
+> 10 1
+> 10 0
+> 10 1
+> Singular value (log scale)
+> Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+
+(b) BBH ( |D val | = 81 )1 2 3 4 5 6 7 8 9 
+
+> Component index
+> 10 1
+> 10 2
+> Singular value (log scale)
+> Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+
+(c) T YDI QA ( |D val | = 9 )50 100 150 200 250 
+
+> Component index
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Cumulative explained variance
+> Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+> 95% variance
+
+(d) MMLU (Explained Variance) 10 20 30 40 50 60 70 80  
+
+> Component index
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Cumulative explained variance
+> Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+> 95% variance
+
+(e) BBH (Explained Variance) 1 2 3 4 5 6 7 8 9 
+
+> Component index
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Cumulative explained variance
+> Epoch 1
+> Epoch 2
+> Epoch 3
+> Epoch 4
+> 95% variance
+
+(f) T YDI QA (Explained Variance) 
+
+Figure 7. Impact of Dataset Scale and Task Type on Gradient Geometry. We analyze the spectral properties of Llama3.2-3B gradients across three datasets with varying sizes. Top Row: Singular value spectra show that intrinsic dimension scales with data size. MMLU exhibits a smooth, heavy-tailed decay, whereas T YDI QA suffers from extreme spectral sparsity due to data scarcity. Bottom Row: 
+
+Cumulative explained variance. Note that across all scales, Epoch 1 (blue solid lines) consistently preserves a higher effective dimension (slower variance saturation) compared to later epochs (red dotted lines). This confirms that early-stage gradients are essential for preventing subspace collapse, especially in low-resource regimes like T YDI QA. 
+
+more complex and high-dimensional feature subspace for task adaptation, necessitating a rank-adaptive selection strategy like GIST .
+
+Spectral filtering is essential to counteract subspace underspecification in low-resource regimes. Figure 7 reveals a critical disparity in gradient geometry across data scales. While the data-rich MMLU exhibits a smooth, heavy-tailed singular value distribution (indicating a well-covered feature space), BBH and T YDI QA display marked spectral sparsity. Specifically, for these smaller datasets, the limited sample size is insufficient to span the effective optimization subspace. Unlike MMLU, the eigenvalues of BBH and T YDI QA decrease precipitously, indicating that the empirical geometry is severely rank-deficient. Consequently, the vast majority of the parameter space collapses into the null space of the empirical estimator. In this underspecified regime, any full-rank approximation (like diagonal inversion) would be ill-posed: the variance of the preconditioner would be erroneously dominated by these null-space directions (where curvature is near-zero and inversion explodes), amplifying noise rather than signal. This observation fundamentally justifies GIST ’s spectral filtering : we must rigorously filter for the dominant principal components to recover the valid subspace, explicitly discarding the noisy null space to prevent subspace collapse. 
+
+Adaptive Rank Selection Strategy. To determine the optimal subspace rank r across diverse tasks, we adopt a spectral-thresholding strategy with a few-shot safety constraint . Generally, we define the rank r as the minimum number of components required to capture 95% of the spectral variance of the gradient covariance matrix (calibrated on Llama2-7B). However, for extremely low-resource tasks, we introduce a full-rank retention rule to prevent information loss due to estimation variance. Specifically: • MMLU ( r = 150 ): The validation gradients exhibit a heavy-tailed distribution, requiring ≈ 53% of the components (150 out of 285) to reach the 95% variance threshold, confirming the high intrinsic dimensionality of the task. • BBH ( r = 50 ): The spectrum saturates more rapidly. A rank of 50 captures the dominant 95% of signals (out of 81), effectively filtering out the tail components associated with optimization noise. 22 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+• TYDI QA ( r = 9 ): Although the 95% variance threshold is met at r ≈ 5, the absolute sample size ( |D val | = 9 ) is critically small. In such extreme few-shot regimes , the statistical stability of spectral estimation is limited, and the computational cost of full-rank retention is negligible. Therefore, we override the threshold and retain the full rank ( r = |D val | = 9 ) to ensure zero information loss. This hybrid strategy balances theoretical rigor with practical robustness for data-scarce scenarios. 
+
+I.2. Warmup and Training Dynamics of LoRA Finetuning 0.0 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0 
+
+> Epoch
+> 1.0
+> 1.5
+> 2.0
+> 2.5
+> 3.0
+> Loss
+
+(a) Qwen2.5-1.5B (270k) 0.0 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0  
+
+> Epoch
+> 1.0
+> 1.5
+> 2.0
+> 2.5
+> 3.0
+> Loss
+
+(b) Qwen2.5-1.5B (13.5k) 0.0 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0  
+
+> Epoch
+> 1.0
+> 1.5
+> 2.0
+> 2.5
+> 3.0
+> 3.5
+> Loss
+
+(c) Llama3.2-3B (13.5k) 0.0 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0  
+
+> Epoch
+> 1
+> 2
+> 3
+> 4
+> 5
+> Loss
+
+(d) Llama2-7B (13.5k) 
+
+Figure 8. Rapid loss convergence in the first epoch creates a stable geometric basin. We observe consistent training dynamics across varying data scales (13.5k vs. 270k) and model architectures, where the loss drops precipitously within the initial phase ( < 0.5 epoch) before entering a bounded oscillatory regime. 
+
+To verify the assumptions underlying Theorem 3.3, we analyze the training dynamics of multiple instruction-tuned models (Qwen2.5, Llama3.2, Llama2) across different data scales. As illustrated in Figure 8, we consistently observe a distinct two-phase phenomenon: a precipitous drop in loss within the first epoch, followed by a stable oscillatory regime. This behavior is critical for the validity of our spectral approximation. The rapid initial descent effectively minimizes the non-Gauss-Newton residual term ∥Rt∥2 (Eq. (57) ), fulfilling the prerequisite for the Fisher information to dominate the Hessian geometry. Furthermore, this transition aligns with the characterization of the Adam optimizer as an ”oscillator” in the later stages of training (Cohen et al., 2021; Smith et al., 2018). Once the adaptive second-moment estimates ˆvt stabilize after the initial shock, the optimization trajectory becomes confined to a low-dimensional basin. In this regime, while the parameters may oscillate locally, the principal subspace of the gradients remains directionally consistent, thereby justifying our strategy of extracting geometric signals from the early-stabilized warmup checkpoints. 
+
+I.3. Cross-Model Transferability 
+
+In this section, we ask whether a subset selected by one model can also benefit other models . We denote by GIST-T 
+
+the transfer setting where we select data using Qwen2.5-1.5B and then fine-tune Llama2-7B and Llama3.2-3B on the selected subset; results are reported in Table 7. Overall, transfer remains effective and consistently improves over the base model, but it is generally weaker than running GIST with the target model. Interestingly, unlike T YDI QA and MMLU, the performance drop on BBH is negligible under transfer. 
+
+Table 7. Main results with GIST and transfer GIST-T . GIST selects 5% of training data using the target model itself. GIST-T selects 5% data once using Qwen2.5-1.5B and then reuses the same selected subset to fine-tune other models. 
+
+Llama2-7B Llama3.2-3B Base GIST GIST-T Base GIST GIST-T 
+
+MMLU 45.6 51.2 ±0.7 47.0 ±0.4 MMLU 53.9 56.1 ±0.4 54.5 ±0.1 
+
+TYDI QA 46.4 55.8 ±0.6 52.7 ±0.7 TYDI QA 60.4 69.2 ±0.3 65.0 ±1.4 
+
+BBH 38.3 41.8 ±0.8 41.2 ±0.3 BBH 45.5 48.0 ±0.5 46.8 ±0.6 
+
+I.4. Ablation of Warmup Stage 
+
+Because our analysis in Theorem 3.3 relies on a Newton–Gauss decomposition of the Hessian, we clarify that a brief warmup phase is necessary to drive the loss to a sufficiently small regime. In this section, we empirically validate the importance 23 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+of warmup. As shown in Table 8, GIST with a one-epoch warmup consistently outperforms its no-warmup variant across MMLU, T YDI QA, and BBH. 
+
+Table 8. Warmup ablation on Llama3.2-3B under the same 5% selection budget. Removing warmup consistently degrades performance across tasks. 
+
+Task Base GIST w/o warmup GIST 
+
+MMLU 53.9 53.0 ±0.2 56.1 ±0.4 
+
+TYDI QA 60.4 64.5 ±1.7 69.2 ±0.3 
+
+BBH 45.5 46.2 ±0.4 48.0 ±0.5 
+
+I.5. Influence of LoRA Rank 
+
+Table 9 reveals that GIST remains exceptionally robust under a tighter PEFT bottleneck (LoRA rank r=8 with 4.6M trainable parameters, accounting 0.14% for Llama3.2-3B), while the baseline LESS degrades noticeably. On T YDI QA, reducing the rank causes LESS to drop from 67.1% to 65.0%, whereas GIST effectively retains its performance (67.5%), outperforming LESS by a clear margin. Remarkably, on BBH, GIST at r=8 (48.4%) even slightly exceeds its own r=128 
+
+result (48.0%), confirming that our selected subsets are highly data-efficient. 
+
+Table 9. LoRA rank ablation on Llama3.2-3B (5% selection budget). We compare the robustness of GIST against LESS under different LoRA rank constraints. Our method ( GIST ) maintains significant gains even in the low-rank setting ( r=8 ). Gray scripts denote standard deviations across 3 runs. 
+
+Dataset Base Random Default Setting Low-rank Ablation    
+
+> (LoRA r=128 )(LoRA r=8 )
+
+LESS GIST LESS GIST 
+
+MMLU 53.9 53.2 ±0.6 56.5 ±0.6 56.1 ±0.4 56.4 ±0.2 55.2 ±0.3 
+
+TYDI QA 60.4 64.1 ±0.4 67.1 ±0.8 69.2 ±0.3 65.0 ±0.9 67.5 ±0.6 
+
+BBH 45.5 45.1 ±0.2 46.1 ±0.7 48.0 ±0.5 46.1 ±0.6 48.4 ±0.3 
+
+Average 53.3 54.1 56.6 57.8 55.8 57.0 
+
+We hypothesize that reducing LoRA rank amplifies parameter coupling : updates are constrained to a narrower bilinear subspace, making the optimization geometry more “rotated” and less axis-aligned. Methods relying on diagonal surrogates (like LESS) struggle to represent this coupled geometry and thus become sensitive to rank reduction. In contrast, GIST 
+
+scores examples via alignment within a task-specific subspace extracted from validation gradients. This approach inherently preserves cross-parameter structures, allowing GIST to identify high-value training signals that remain effective even when the trainable degrees of freedom are heavily restricted. 
+
+I.6. Influence of Tail Principle Directions 
+
+Table 10 compares GIST against a tail-only variant ( GIST-tail ) under the same 5% selection budget. While, in optimization view, directions associated with the smallest eigenvalues (tail components) can in principle yield the largest instantaneous decrease in the validation loss, they are also the most vulnerable to overfitting the validation signal and to stochastic gradient noise. 
+
+Table 10. Tail ablation on Llama3.2-3B under the same 5% selection budget. While GIST consistently improves over Base and Random ,selecting only the smallest principal direction ( GIST-tail ) can be unstable and may hurt task performance. 
+
+Task Base Random GIST GIST-tail 
+
+MMLU 53.9 53.2 ±0.6 56.1 ±0.4 56.4 ±0.2 
+
+TYDI QA 60.4 64.1 ±0.4 69.2 ±0.3 63.1 ±1.5 
+
+BBH 45.5 45.1 ±0.2 48.0 ±0.5 38.5 ±1.8 
+
+Empirically, GIST is consistently strong across tasks, whereas GIST-tail exhibits highly task-dependent behavior: it is 24 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+competitive on MMLU (56.4 vs. 56.1), but drops substantially on T YDI QA (63.1 vs. 69.2) and collapses on BBH (38.5 vs. 48.0). These results suggest that relying only on the decrease of validation loss is brittle, and motivate automatically 
+
+selecting (or weighting) principal directions in a task-adaptive manner, which we leave as an important direction for future work. 
+
+## J. Target Set Subspace Analysis 
+
+Since the task projector for T YDI QA in our experiments maps original gradients to a low-dimensional subspace (specifically, a 9-dimensional space), we employ T YDI QA on Qwen2.5-1.5B as a tractable case study to analyze the semantic distribution of subsets selected along each principal direction. Specifically, utilizing the compact SVD from Eq. (13) , we decompose the Gram matrix as G⊤
+
+> val ,t
+
+Gval ,t = Vr Σ2 
+
+> r
+
+V ⊤ 
+
+> r
+
+. As established in Section 3.3, we adopt this matrix as a first-order surrogate for the Hessian, implying Hval ,t ≈ Vr ΛV ⊤ 
+
+> r
+
+(where 
+
+Λ ≈ Σ2 
+
+> r
+
+). Consequently, the pseudoinverse H† 
+
+> val ,t
+
+within the influence function (Eq. (7)) is approximated by Vr Λ−1V ⊤ 
+
+> r
+
+.From an optimization perspective, this spectral analysis highlights a critical trade-off between theoretical acceleration and empirical robustness. The leading principal directions (associated with larger singular values of Gval ,t ) correspond to dominant consensus patterns with a high signal-to-noise ratio. While these directions ensure reliable descent, they typically contribute to smaller step updates due to high curvature constraints. Conversely, the trailing directions theoretically offer the potential for larger loss reductions (attributable to the inverse scaling effect of Λ−1 in the influence approximation). However, in practice, these directions are often dominated by stochastic gradient noise and estimation errors, rendering them unreliable for generalization despite their theoretical efficiency. Table 11 illustrates the most influential training examples retrieved along distinct principal directions for a sample Telugu QA instance from the validation set. The English translation of the Telugu query is provided below: 
+
+<|user |>
+
+Context: P ¯atap ¯ad. ¯ eru is a village in Paderu Mandal, Visakhapatnam district. It is 0 km from the mandal headquarters Paderu and 76 km from the nearest town Anakapalli. According to the 2011 Indian Census, the village has 830 households, a population of 3,687, and covers 268 hectares. The number of males is 1,398 and the number of females is 2,289. The Scheduled Castes population is 26, and the Scheduled Tribes population is 2,944. The census location code is 584655. PIN code: 531077. Question: How many females were there in P¯ atap¯ ad . ¯ eru village in 2011? 
+
+<|assistant |>
+
+2,289 Surprisingly, Table 11 reveals that the samples selected by individual principal directions of Gval ,t exhibit a distinct hierarchy of task levels. As previously discussed, leading principal directions represent high-confidence descent directions that, while contributing to smaller loss reductions, align with fundamental and general-purpose language tasks. For instance, PC1 retrieves sentiment analysis reviews, while PC2 selects multi-step multiple-choice questions (MCQs), indicative of general reasoning capabilities. In contrast, trailing directions target more granular and specific tasks, such as fact-checking (PC8) and non-English sentences (PC9). While incorporating data along these directions yields larger loss reductions on the validation set, these directions are also more prone to falling into the null space. Consequently, such aggressive loss reductions may stem from overfitting, potentially detrimental to generalization. We observe that these semantic patterns across different principal directions remain consistent among the top-scoring samples. Ultimately, when aggregating all principal directions for selection, the retrieved data semantically converges toward the validation example, heavily favoring Natural Language Inference (NLI) tasks. It also captures specific translation examples; notably, sample (4) flan v2 79833 explicitly selects an English-to-Telugu translation pair. 25 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry 
+
+Table 11: We use one Telugu T YDI QA validation instance to retrieve the most relevant training examples under GIST .Target Projector (nine principal directions) is precomputed via SVD on the original target set and reused here. For each direction, candidate examples are scored by their projection-based alignment, and the highest-scoring examples are retrieved. We then aggregate the nine directional scores to obtain a single overall score per example, and report the Top-5 examples with the largest aggregated scores. 
+
+A Telugu QA Example in Validation Set 
+
+Multilingual QA in Telugu User: Context: !ాత!ా$ేర' , ()ాఖపట-ం /ల1 2, !ా$ేర' మండల1567 8ెం:;న =ా >మమ? .[1] ఇ:; మండల 6AందCDEFన !ా$ేర' నుం$H 0
+
+67 . I. దూరం లKను , సIప పటMణDEFన అన6ాపP2 నుం$H 76 67 . I. దూరంలKనూ ఉం:; . 2011 RSరత జనగణన గణVం6ాల పC6ారం ఈ
+
+=ా >మం 830 ఇళ2YZ , 3687 జ[VRSYZ 268 \]6ా Mర2లK (స^_`ంa ఉం:; . =ా >మంలK మగbా_` సంఖc 1398, ఆడbా_` సంఖc 2289. efడూcgh 
+
+కjల1ల సంఖc 26 6ా=ా efడూcgh Yెగల సంఖc 2944. =ా >మం kకl జనగణన లm6Aషo 6pq 584655[2]. rిo 6pq : 531077 .
+
+Question: 2011 లK !ాత!ా$ేర' =ా >మంలK ఎంతమం:; uీ^wలj ఉ[V-ర' ?
+
+Assistant: 2289 
+
+PC1 PC2 PC3 
+
+PC1: Review Sentiment Classification 
+
+User: Title: It’s a cute movie!! Review: It Takes Two is a cute movie that is loosely based on The Parent Trap but also seems loosely based on The Prince and the Pauper . Mary-Kate and Ashley are very good and so are Kirstie Alley and Steve Gut-tenberg. This movie is a lot of fun to watch and worth buying or renting. Question: Is the review positive or negative? 
+
+Assistant: Positive 
+
+PC2: Multi-step Reasoning (MCQ) 
+
+User: Given a multiple-choice question, rea-son step by step and output the selected op-tion. Example: Question: What describes something that requires activation energy to get started? Options: (A) igniting fuel and oxidiser . . . (G) chemical equations . . . (H) Firecrack-ers Let’s think first: All chemical reactions re-quire activation energy to get started. Chem-ical equations describe chemical reactions. . . . So the answer is [(G)]. . . . (additional questions omitted) 
+
+Assistant: . . . So the answer is [(H)] .
+
+PC3: Common-sense Contradiction 
+
+User: See question below:Choose the sentence that goes against common sense.Options:- Sentence A: “she’s asleep, we should keep noisy”- Sentence B: “she’s asleep, we should keep quiet” Reason slowly and give your answer. 
+
+Assistant: If you are loud when someone is asleep you will wake them up.The final answer: Sentence A. 
+
+PC4 PC5 PC6 
+
+PC4: Word Game (Scrabble) 
+
+User: I’m playing Scrabble with my family. My seven letters are: A P N W Q V E. What words can I spell with those? 
+
+Assistant: APE, AWE, ANEW, PAW, PEW, PAN, PEN, PEA, PAVE, PAWN, PANE, PEAN, NAP, NEW, NAVE, NAPE, VAN, VAPE, EW 
+
+PC5: Multilingual Mixed Task (Spanish) 
+
+User: ¿Que sabes sobre el integrador de Mulesoft? ¿Es mejor plataforma de inte-graci´ on que SAP PI? 
+
+Assistant: MuleSoft is an integration soft-ware company that provides the Anypoint platform to connect applications, data, and devices. SAP PI is SAP’s tool for centraliz-ing information exchange between SAP and non-SAP systems. They have similar goals but different focuses; the choice depends on the client’s needs and what they want to de-velop. 
+
+PC6: Multilingual Reasoning 
+
+User: Given the following reasoning and answer, what was the question? Reasoning: Tom served on Monday to 8 ×
+
+10 = 80 clients. So Tom earned 20 /100 ×
+
+80 = 16 bonus points. Answer: 16 
+
+Assistant: In a company, an employee earns bonus points equal to 20% of the number of customers served. Tom served 10 customers per hour for 8 hours on Monday. How many bonus points did Tom earn? 
+
+PC7 PC8 PC9 
+
+Continued on next page 
+
+26 GIST: Targeted Data Selection for Instruction Tuning via Coupled Optimization Geometry PC7 PC8 PC9 
+
+PC7: Translation (Persian → Hebrew) 
+
+User: Translate the Persian sentence into Hebrew. Input (romanized Persian): H ¯al ¯a chetor mitav ¯an ¯ım b ¯a dar nazar gereftan-e raft ¯arh ¯a-ye sal ¯amati be pas-and ¯az beres ¯ım? 
+
+Assistant: כעת כיצד ;נו יכוליM לחשוב על !ההתנהגויות ברי;ות כדי לחשוב על לחסכוN ?
+
+PC8: Verifiable Fact 
+
+User: Decide whether each claim is a fac-tual statement. Example: “In the film Who Framed Roger Rabbit real-life characters interacted with cartoon characters.” Answer: Yes. Claim: “The space opera Babylon 5 was pro-duced by Warner Bros.” Answer: Yes. 
+
+Assistant: Warner Bros ran Babylon 5 from 1993 to 1998. 
+
+PC9: Non-English Sentence (French) 
+
+User: Write a sentence not in English. 
+
+Assistant: Code canadien du travail – et l’Union des employ ´es du transport local et industries diverses, section locale 931, syn-dicat requ ´erant, – et Camionnage Millman Inc., Saint-Laurent (Qu´ ebec), employeur. 
+
+Overall (Top-5) 
+
+Overall: Top-5 Highest-Score Prompts 
+
+(1) flan v2 93448 — NLI User: Test for natural language inference. Premise: A group of young girls is running in a field of yellow flowers. Hypothesis: Young girls are in a field of flowers. Options: yes / no / it is not possible to tell. 
+
+Assistant: Girls who are running in a field of flowers by implication would have to be in a field of flowers. Therefore, the final answer is yes. 
+
+(2) cot 28147 — NLI question reconstruction User: User: The man playing music is not imply to being a slow jam. Is the reasoning for what question and answer pair? 
+
+Assistant: Q: Given the sentence “A man playing his music for a crowd.” can we conclude “A crowd gathers while a man plays a slow jam.”? Options: yes / it is not possible to tell / no. A: it is not possible to tell. 
+
+(3) flan v2 78693 — False-belief story QA User: You will be given a definition of a task first, then some input of the task.Given a story, answer the question about the story. The question is the last sentence in the input. These stories can be difficult due to their length and how each story has at least one of the three following scenarios: the first is when the individual’s belief matches reality, the second is when the individual’s belief does not match reality, and the third is when an individual has a false belief about another individual’s beliefs. The question will ask about the location of an object in the story with respect to either none or one of the three scenarios. Note that there are distractor sentences in each story that are unrelated to the question and are designed to confuse the reader. Logan entered the living room. Ethan entered the living room. The banana is in the red crate. Logan moved the banana to the red cupboard. Logan entered the cellar. Avery entered the cellar. The pumpkin is in the red envelope. Logan moved the pumpkin to the blue suitcase. Phone rang. Abigail entered the kitchen. Ethan entered the kitchen. The cabbage is in the green cupboard. Abigail moved the cabbage to the red drawer. Logan is in the cellar. Abigail entered the cellar. Phone rang. The pumpkin is in the blue suitcase. Logan moved the pumpkin to the red envelope. Where does Logan think that Abigail searches for the pumpkin? Output: 
+
+Assistant: red envelope 
+
+(4) flan v2 79833 — English → Telugu User: Teacher: A text is given in English. Translate it from the English language to the Telugu language. The translation 
+
+must not omit or add information to the original sentence. Teacher: Now, understand the problem? Solve this instance: 2017. 
+
+There are 37,919 Establishments in the the Telangana one. The number of Subscribers stood at 84. Student: 
+
+Assistant: !ెలం%ాణ జ)* ప,-./ల0 37,919 సంస2ల3 ఉ567య9 , :ీఎ= చం?6?6రAల సంఖC 84. 
+
+(5) flan v2 7393 — Persian → Hebrew User: Translate the Persian sentence into Hebrew. Input (romanized Persian): H¯ al¯ a chetor mitav¯ an¯ ım b¯ a dar nazar gereftan-e raft¯ arh¯ a-ye sal¯ amati be pas-and¯ az beres¯ ım? 
+
+Assistant: ! כעת כיצד ;נו יכוליM לחשוב על ההתנהגויות ברי;ות כדי לחשוב על לחסכוN ?
+
+27

@@ -1,0 +1,890 @@
+Title: Train Less, Infer Faster: Efficient Model Finetuning and Compression via Structured Sparsity
+
+URL Source: https://arxiv.org/pdf/2602.09169v1
+
+Published Time: Wed, 11 Feb 2026 01:11:52 GMT
+
+Number of Pages: 20
+
+Markdown Content:
+# Train Less, Infer Faster: Efficient Model Finetuning and Compression via Structured Sparsity 
+
+Jonathan Svirsky Yehonathan Refael Ofir Lindenbaum 
+
+Bar Ilan University jonathan.svirsky@biu.ac.il Tel Aviv University refaelkalim@mail.tau.ac.il Bar Ilan University ofir.lindenbaum@biu.ac.il 
+
+## Abstract 
+
+Fully finetuning foundation language mod-els (LMs) with billions of parameters is of-ten impractical due to high computational costs, memory requirements, and the risk of overfitting. Although methods like low-rank adapters help address these challenges by adding small trainable modules to the frozen LM, they also increase memory usage and do not reduce inference latency. We uncover an intriguing phenomenon: sparsifying specific model rows and columns enables efficient task adaptation without requiring weight tuning. We propose a scheme for effective finetun-ing via sparsification using training stochas-tic gates, which requires minimal trainable parameters, reduces inference time, and re-moves 20–40% of model parameters without significant accuracy loss. Empirical results show it outperforms recent finetuning base-lines in efficiency and performance. Addi-tionally, we provide theoretical guarantees for the convergence of this stochastic gating pro-cess, and show that our method admits a simpler and better-conditioned optimization landscape compared to LoRA. Our results highlight sparsity as a compelling mechanism for task-specific adaptation in LMs. 
+
+## 1 Introduction 
+
+Foundation language models (LMs) have transformed natural language processing by enabling a wide variety of powerful and versatile applications. Pre-trained on extensive amounts of text data, these models demon-strate strong performance in tasks such as text genera-tion, translation, and sentiment analysis. Nonetheless, fine-tuning is often essential to customize these models for specific applications. Finetuning enables the model to adapt to the nuances of a particular task by updating 
+
+Figure 1: CPU inference time reduction (%) and num-ber of removed parameters on the MRPC validation set while finetuning our method on the Llama3.2-1B backbone. See Section 6.6 for details. its parameters based on a smaller, task-specific dataset. However, finetuning presents challenges, particularly when task-specific data is limited, which can constrain the model’s ability to effectively adapt to the target task and may lead to overfitting or suboptimal perfor-mance. Despite these challenges, finetuning remains crucial in leveraging the full potential of large language models for specialized applications. Recently, several methods have been proposed to effi-ciently finetune foundation language models, addressing the challenges of limited data and the high computa-tional cost of updating the full set of model parameters. One such approach is LoRA (Low-Rank Adaptation) [1], which introduces a more efficient method for fine-tuning models by freezing the original parameters and replacing them with trainable, low-rank matrices in each transformer layer. This technique significantly reduces the number of parameters that need to be updated during finetuning, making the process both faster and less resource-intensive. Most recent efforts in making finetuning more efficient [ 2, 3, 4, 5, 6, 7, 1, 8, 9]focus on adding new parameters while keeping the base model frozen, ensuring that the original pre-trained knowledge is retained [10]. When training models using low-rank adapters [ 11 , 2,6, 7, 1], the number of optimized parameters is re-duced, leading to faster convergence during finetuning. However, the inference runtime and memory demands remain the same, as they still depend on the dimen-
+
+> arXiv:2602.09169v1 [cs.LG] 9 Feb 2026 Train Less, Infer Faster: Efficient Model Finetuning and Compression via Structured Sparsity
+
+sions of the base model parameters, which are frozen during the adaptation. Several methods have been proposed for LM compression, such as quantization and pruning, to reduce the inference time for adapted models. Quantization reduces the memory usage of language models by converting their parameters into lower-bit data types [ 12 , 13 ]. Although quantization reduces the memory consumption of language models, its speedup advantages rely on specialized framework support, which limits its flexibility and adaptability. Pruning [ 14 ] aims to improve inference efficiency in language models by removing unimportant parameters. Structured pruning [ 15 , 16 ] eliminates coherent blocks of parameters or entire model dimensions, leading to broad improvements in inference efficiency by reduc-ing computational overhead. However, these methods often require substantial additional training time and involve increasing the number of trainable parameters to facilitate effective self-distillation of knowledge from the layers of a large language teacher model to the smaller student model [17, 15]. In this work, we propose a simple yet effective approach for adapting language models through structured spar-sification, which achieves inference-time efficiency by pruning the overparameterized model and updating only lightweight bias parameters. Instead of learning new parameters or updating main model weights, we learn a set of compact binary masking vectors (gates) that selectively activate a sparse subset of the model’s existing weights. This approach leverages the inherent redundancy in overparameterized models, demonstrat-ing that effective task adaptation can be achieved by identifying and utilizing the relevant subnetwork within the frozen base model. The outcome is a highly efficient adaptation mechanism that restructures the original model through sparsification, enabling impressive task-specific performance and inference-time speedup, as presented in Figure 1. Moreover, the proposed method is broadly applicable to both downstream tasks and pretraining scenarios. Our gating mechanism is trained end-to-end, embed-ding task-specific information directly during the op-timization process. This eliminates the need for post-training pruning or prolonged finetuning, resulting in models that are both compact and effective, particu-larly well-suited for deployment in resource-constrained environments. We evaluate our method on Transformer-based models and demonstrate that up to 40% of the base model’s pa-rameters can be deactivated with minimal performance loss compared to full finetuning and several baselines. In the following sections, we describe the method in de-tail, present empirical results, and provide a theoretical analysis of convergence, including a comparison of the optimization landscape of our gating approach versus LoRA, showing that our method enjoys a simpler and better-conditioned geometry. 
+
+## 2 Related Work 
+
+2.1 Low-Rank Adaptation 
+
+Low-rank adaptation techniques aim to efficiently fine-tune foundation language models (LMs) under resource constraints by updating a small subset of parameters. This is typically achieved by introducing trainable com-ponents such as adapter layers [ 18 , 19 ], prompt or prefix embeddings [ 20 , 21 ], or by imposing low-rank struc-tures on the gradients during training [ 22 ]. A widely adopted method, LoRA [ 1], only trains low-rank matri-ces to reduce memory requirements. However, LoRA still introduces additional parameters and maintains the original model dimensionality, offering no compres-sion benefits during inference. Moreover, it requires selecting a fixed-rank hyperparameter, a choice based on heuristics that often results in suboptimal perfor-mance. Other approaches, such as SparseAdapter [ 23 ], dynamically adjust adapter sparsity during training, while AdaLoRA [ 24 ] gradually prunes singular values to reduce the number of updated parameters. Despite their efficiency during training, these methods do not yield inference-time benefits, as the underlying base model remains uncompressed and fully active. 
+
+2.2 Memory efficient optimizers. 
+
+Another direction for memory reduction does not re-strict the set of trainable parameters but instead op-timizes the training methods, with notable examples including AdaRankGrad, GaLore, Fira, Flora, Adam-mini, GaLore-mini, LDAdam, GoLore, LoQT, Apollo, and SUMO [ 25 , 26 , 27 , 28 , 29 , 30 , 31 , 32 , 8], integrating low-rank gradient projections in optimization. 
+
+2.3 Finetuning with Pruning 
+
+Pruning refers to the process of reducing a model’s size by removing weights or structures deemed unnecessary for its performance. There are two main frameworks for pruning models during finetuning: structured and un-structured . Unstructured pruning [ 33 , 34 ] removes the least important parameters in a model without follow-ing any specific order. In contrast, structured pruning [15 , 35 ] eliminates entire blocks, rows, or columns from the weight matrices. Additionally, a post-training prun-ing method proposed by [ 36 ] aims to prune finetuned models with minimal additional costs, but it requires initialization from fully finetuned models. In contrast, our approach jointly performs task adaptation and Jonathan Svirsky, Yehonathan Refael, Ofir Lindenbaum 
+
+structured pruning during training, allowing the model to specialize while removing up to 40% of the base parameters—without the need for full finetuning or post-hoc pruning. This results in a model that is both task-specific and resource-efficient, reducing inference cost with no additional training overhead. 
+
+2.4 Finetuning with Adaptive Pruning 
+
+A recent work that closely aligns with our goal was proposed by Zhao et al. [35] , where the base model pa-rameters are pruned concurrently with adapter training. Their approach introduces additional low-rank matri-ces, similar in spirit to LoRA [ 23 ], which must also be trained. However, this design comes with substantial overhead: 5 times longer than standard full-model fine-tuning, and compression is achieved through a costly sorting-and-binary-search procedure over weight blocks. Moreover, because the rank of the low-rank adaptation weights is adaptive, the optimization memory footprint remains heavy, reaching about 70% of that required for full-model finetuning. By contrast, our method introduces only lightweight gate vectors, which require orders of magnitude fewer parameters to optimize, incur negligible training-time overhead, and achieve compres-sion without resorting to expensive search procedures. This makes our approach both more memory-efficient and more computationally practical than prior meth-ods. In addition, the gates are trained end-to-end and integrate seamlessly into the training pipeline, making the approach simple to implement and deploy. 
+
+## 3 Problem Formulation 
+
+Assume we are given a pre-trained large language model 
+
+PΘ(y|x) parametrized by Θ based on the Transformer architecture [ 37 ]. The goal of finetuning is to adapt this pre-trained model for downstream natural lan-guage understanding tasks, such as question answering or sentiment analysis. The downstream task is repre-sented by a training dataset of context-target pairs: 
+
+Z = {(xi, yi)}i∈[N ], where xi is a sequence and yi is a target label. For example, in the question-answering task (QQP) in the GLUE benchmark [ 38 ], xi is a ques-tion, and yi is its corresponding answer. To finetune the whole model parameters (full finetuning), the model is initialized to pre-trained weights Θ0 and updated to Θ0 + ∆ Θ by repeatedly following the gradient up-dates to maximize the conditional language modeling objective: 
+
+max 
+
+> Θ
+
+X
+
+> (x,y)∈Z |y|
+
+X
+
+> t=1
+
+log( PΘ(yt|x, y<t )) . (1) In low-rank adaptation methods the task-specific pa-rameter update ∆Θ = ∆ Θ(Γ) is further encoded by a much smaller-sized set of parameters Γ with |Γ| ≪ | Θ0|.The task of finding ∆Θ thus becomes optimizing over 
+
+Γ and not Θ,
+
+max 
+
+> Γ
+
+X
+
+> (x,y)∈Z |y|
+
+X
+
+> t=1
+
+log( PΘ0+∆ Θ(Γ)(yt|x, y<t )) . (2) While beneficial for preserving a common base model across tasks, this approach retains unnecessary infor-mation in the base model and still requires a forward pass through the large number of parameters during inference. 
+
+Finetuning by sparsification. In this work, we propose incorporating gates vectors ωr , ωc such that 
+
+ωr multiplies the rows of the weight matrix and ωc
+
+multiplies its columns in an element-wise way, thereby sparsifying rows and columns. Importantly, the entries of these gate vectors are binary ( 0/1), directly enforcing structured sparsity. The parameters that construct these vectors for all adapted layers in the base model are denoted by Ω. This approach modifies the base model parameters by replacing ∆Θ with our gate vectors. Our method introduces the concept of structured sparsity in the base model [ 39 ], aiming to exclude entire columns or rows from the weight matrices. Therefore, assuming that the number of compressed weight matrices in the base model is L, the goal of the finetuning task becomes: 
+
+L = min 
+
+> ω
+
+"
+
+− X
+
+> (x,y)∈Z |y|
+
+X
+
+> t=1
+
+log ( Pωr ⊙Θ0⊙ωc (yt|x, y<t )) + + λ 1
+
+L
+
+> L
+
+X
+
+> i=1
+
+max( || ωir || 0, s ir ) + max( || ωic|| 0, s ic) #
+
+,
+
+(3) where the parameter λ represents the magnitude of structured sparsity regularization. The term || · || 0
+
+refers to the ℓ0 norm, while sir and sic denote the target sparsity ratios we aim to achieve. These ratios are defined as the number of zero parameters divided by the total number of parameters in the weight matrix 
+
+i. Additionally, ⊙ signifies the element-wise product between the gates at specific indices and the corre-sponding column or row vectors at those same indices. To clarify, structured sparsity is achieved by training two gate vectors, ωr , ωc, where each element scales an entire row or column of a given weight matrix. These gate vectors are optimized without any additional low-rank weight matrices. Once trained, the base model weights of the adapted layers are compressed by simply Train Less, Infer Faster: Efficient Model Finetuning and Compression via Structured Sparsity 
+
+Figure 2: Overview of FineGates: Our method introduces structured sparsity in LM finetuning by training lightweight row and column gating vectors ( ωc, ωr ). These gates selectively retain the most informative weight dimensions, enabling efficient adaptation without modifying the base model’s parameters. Unlike LoRA and other PEFT methods, which introduce additional trainable matrices, FineGates directly optimizes sparsification and updates biases, thereby reducing memory overhead and inference time while maintaining task performance. multiplying the gate vectors with the corresponding rows and columns of the weight matrix. This sparsi-fication mechanism effectively reduces both memory and time complexity in the attention layers. Our empirical results indicate that it is possible to reduce the model size while increasing its efficiency, and still provide accurate predictions, even when training only a small set of gates. 
+
+## 4 The Method 
+
+Consider the Transformer architecture [ 37 ] composed of L blocks, and each block consists of a multi-head self-attention (MHA) layer and a feed-forward (FFN) layer. An MHA layer with Nh heads takes an input 
+
+X ∈ Rb×t×d, where b is the batch size, t is the sequence length (number of tokens), and d is the embedding dimension. This input is either the output of the former encoder layer or the embedding layer. The MHA layer outputs: MHA (X) = 
+
+> Nh
+
+X
+
+> i=1
+
+Att [W(i) 
+
+> q
+
+, (W(i) 
+
+> k
+
+, W(i) 
+
+> v
+
+, W(i) 
+
+> o
+
+, X)] ,
+
+where Wq , Wk, Wv and Wo refer to the query/key/-value/output projection matrices, and Att (·) is an at-tention function. Following the attention head, the out-puts are passed through the feed-forward layer, which consists of intermediate and output-projection layers, parameterized by Wimlp and Womlp :FFN (X) = gelu (XW imlp )Womlp .
+
+Denote by W0 ∈ Rk×d a pre-trained weight matrix out of {Wq , Wk, Wv , Wo, Wimlp , Womlp }. To enforce structured sparsity of the matrix W0, we propose to multiply it by the learnable stochastic gates vectors 
+
+ωr ∈ { 0, 1}1×k, ωc ∈ { 0, 1}1×d which are trained to converge into the binary representation. For simplicity, we denote by ω a general gate vector applied to rows or columns. To approximate binary values for vector ω,we learn a representation μ ∈ [−1, 1] 1×d which is then converted to the approximate Bernoulli variables ω, by utilizing a Gaussian-based relaxation of the Bernoulli variables [ 40 , 41 ]. The relaxation relies on the reparam-eterization trick [ 42 , 43 ] and has been demonstrated to be effective in several applications [ 44 , 45 , 46 ]. During the training, the conversion is done by adding a ran-dom noise vector ϵ ∈ R1×d to the shifted by scalar 0.5
+
+vector μ and clipping the values by the range of [0 , 1] ,
+
+ω(μ) = max(0 , min(1 , 0.5 + μ + ϵ)) , (4) where each value in the vector ϵ is drawn from N (0 , σ 2)
+
+and σ = 0 .5 is fixed throughout training. To encourage the model to produce a sparse ω vector, it is trained with the regularization loss term constrained by the given sparsity ratio s and is minimized during the training: 
+
+Lsparse (ω) = max( || ω|| 0, s ). (5) Assuming that ω is a Bernoulli variable, we calculate its expected ℓ0 norm as follows (the full derivation appears in Appendix A): 
+
+E|| ω|| 0 = 1
+
+d
+
+X
+
+> j
+
+P(ωj > 0) = 1
+
+d
+
+X
+
+> j
+
+P(μj +0 .5+ ϵj > 0) = = 1
+
+d
+
+X
+
+> j
+
+ 12 + 12 erf 
+
+ μj + 0 .5
+
+√2σ
+
+ 
+
+.
+
+When applying the sparsity term in Eq. 5, the model aims to sparsify the matrix W0 and retain only the essential parameters needed for the new task. In addition, we rescale ω by an additional score vector 
+
+k in the sparsity loss term. This rescaling is designed to preserve vector outliers in the weight columns and rows, a crucial aspect for maintaining good performance in pruning and quantization tasks [35, 13, 47]: 
+
+L′
+
+> sparse
+
+(ω) = max( || k ⊙ ω|| 0, s ), (6) Jonathan Svirsky, Yehonathan Refael, Ofir Lindenbaum 
+
+where the ℓ0 term is approximated by: 
+
+E|| k ⊙ ω|| 0 = 1
+
+d
+
+X
+
+> j
+
+kj
+
+ 12 + 12 erf 
+
+ μj + 0 .5
+
+√2σ
+
+ 
+
+,
+
+and 
+
+kj = e−kurt j (O)/X
+
+> j
+
+e−kurt j (O), (7) where kurt j (·) in Eq.7 is a Pearson’s kurtosis [ 48 ]computed for each column j in activations matrix 
+
+O = [[ ωr ⊙ W ⊙ ωc]XT ]. More details can be found in the Appendix I. We require the model to close the gates (sparsify) for rows and columns with lower kurtosis and to attenuate the gate closing for rows and columns with higher kurtosis values. Finally, assuming a latent representation is obtained by H = W0XT + b, our method’s forward pass yields: 
+
+H = [ ωr ⊙ W0 ⊙ ωc]XT + ωr ⊙ b, (8) where ωr , ωc are trainable parameters, and b is a bias parameter. Our method is depicted in Figure 2. At the start of training, we initialize the vectors ω with all elements set to one. During training, we optimize the parameters ω that are used to multiply the matrices 
+
+Wq , Wk, Wv , Wo, and Wmlp . Additionally, we con-duct experiments with an extended version that also trains the Γ parameters. These parameters are used to assemble the matrices WA and WB for each layer, as proposed by [1]. Our method 1 introduces a simple yet powerful mecha-nism for training binary gates that explicitly select the most informative rows and columns of the weight ma-trices. This targeted sparsification not only preserves, but in many cases improves, the accuracy of finetuning tasks compared to existing approaches. At the same time, it delivers substantial parameter reduction in the base model, with only negligible performance loss. In the following section, we present a comprehensive empirical evaluation demonstrating the effectiveness and robustness of our approach. 
+
+## 5 Theoretical Analysis 
+
+5.1 FineGates vs LoRA Landscape 
+
+In Section 6, we provide empirical evidence of match-ing or superior performance of our method compared against LoRA, while requiring fewer trainable parame-ters. We provide the theoretical justification for such performance by comparing the optimization landscapes of LoRA and FineGates.  
+
+> 1Our code is available on GitHub: https://github. com/jsvir/FineGates
+
+To that end, we consider a single layer and a smooth loss function (e.g., cross entropy or MSE) that satisfies the Polyak–Łojasiewicz (PL), a mild assumption often used in optimization, which guarantees that gradient descent on W converges linearly to a global optimum. 
+
+Definition 5.1 (Polyak–Łojasiewicz (PL) Condition) .
+
+A function F (W) satisfies PL condition with parameter 
+
+β > 0 if: 12 ||∇ F (W)|| 2 ≥ β(F (W) − F ∗), where F ∗ =min W F (W).
+
+Proposition 5.2 (FineGates vs LoRA optimization landscape ) . Let W0 ∈ Rm×n to be a weights matrix in a single linear layer trained with a smooth loss function 
+
+L(W) that satisfies the PL condition. Let 
+
+• Wgates (ωr , ωc) = Diag (ωr )W0Diag (ωc), where 
+
+ωr ∈ Rm, ωc ∈ Rn are trainable row/column gates. 
+
+• WLoRA (A, B) = W0 + AB ⊤ with A ∈ Rm×k, B ∈
+
+Rn×k. Then 
+
+1. ∃βgates > 0, s.t. ∀(ωr , ωc), L(Wgates (ωr , ωc)) sat-isfies PL condition with βgates .2. ̸ ∃βLoRA , s.t. L(WLoRA (A, B)) holds PL condition with βLoRA .
+
+Compared to LoRA, the FineGates parameterization yields a substantially simpler optimization landscape. Each gate parameter directly scales a single row or column of the base weight matrix, which results in gradients that decompose into independent row- and column-wise statistics. This structure aligns well with the underlying loss geometry and, under mild assump-tions such as smoothness and the PL condition, guar-antees linear convergence of gradient-based training. In contrast, the LoRA parameterization introduces a bilinear factorization AB ⊤, where many different choices of (A, B) correspond to the same effective up-date. This redundancy induces a k2-dimensional family of flat directions in the loss surface, manifested as zero eigenvalues of the Hessian, and thereby weakens con-vergence guarantees. As a result, optimization with LoRA can be less stable and often requires additional normalization or careful tuning, while gating provides a more direct and well-conditioned optimization path. We provide the detailed proof in the Appendix B. In ad-dition to the empirical results reported in Section 6, we perform a separate experiment on the MRPC dataset to further validate our proposition. Figure 3 shows the mean accuracy along with its standard deviation, computed after each training epoch while running both methods under identical hyperparameters across ten random initialization seeds. Train Less, Infer Faster: Efficient Model Finetuning and Compression via Structured Sparsity 
+
+Figure 3: Validation accuracy trajectories of FineGates and LoRA on the MRPC dataset. 
+
+5.2 FineGates Convergence 
+
+In this section, we present a proof of convergence for our method. This theoretical justification is necessary be-cause including random noise in the gating mechanism could introduce challenges to the training process and affect convergence. To that end, we start by defining smoothness for functions parameterized by tensors. 
+
+Definition 5.3 (L-continuity) . A function h(W) is a L-continues, if for any W1 and W2, ∥h (W1) −
+
+h (W2) ∥F ≤ L∥ W1 − W2∥F .
+
+Lemma 5.4 (Convergence of FineGates) . Consider the FineGates loss function L(W, ωr , ωc) in (3), a network 
+
+Φ( ·). Suppose that the composition L ≡ f ◦ Φ is a L-continuity, non-convex function, where f is the loss (e.g cross entropy), then lim t→∞ ∥∇L (Wt, ωr,t , ωc,t )∥ = 0 .In particular, every accumulation point is a first-order stationary point of L.
+
+The detailed proof of Proposition 5.4 can be found in Appendix H. The proof establishes the convergence of the loss function L(W, ωr , ωc) under gradient descent. First, it shows that the function’s gradient is Lipschitz continuous, meaning that a constant multiple of param-eter differences bounds the gradient differences. Then, it verifies that the regularization term is continuously differentiable and bounded, ensuring a smooth opti-mization process. Using the descent lemma, the proof demonstrates that the loss function decreases mono-tonically with each gradient step. Since the difference in loss is bounded below, the sum of gradient norms is shown to be finite, implying that the gradients ap-proach zero. Consequently, gradient descent converges to a critical point where no further improvement is possible. 
+
+## 6 Experiments 
+
+6.1 Experimental Setup and Datasets 
+
+We assess the performance of our method on down-stream tasks using the RoBERTa-base, RoBERTa-large models [ 49 ], and Llama3.2-1B, and we utilize the widely recognized GLUE benchmark [38]. We simulate real-world scenarios where only limited labeled data is available for finetuning tasks due to the challenging nature of collecting accurate ground truth labels. In addition to the full GLUE benchmark, we conduct separate experiments on a limited GLUE dataset with up to 10,000 samples. Accordingly, we use the small-scale datasets (COLA, STSB, MRPC, RTE) in their entirety and select the first 10,000 labeled samples from the larger datasets (MNLI, QQP, QNLI, SST2). These experiments aim to determine whether the proposed method can compress base models with limited training data. Moreover, we evaluate our method for base-model prun-ing without a specific target task. For these experi-ments, we apply our method during pre-training the Llama-1B model on the C4 dataset [ 50 ]. Additionally, our framework is trained with the Llama-2-7B back-bone frozen and then evaluated on a zero-shot task. We report the median validation accuracy value for each experiment over five random initialization seeds. The number of trainable parameters (TP) excludes the classifier head, following the same setup as in previous works, e.g., Hu et al. [1] . In sparsified pre-training (Section 6.8 and general model pruning experiments (Section 6.7), we report perplexity computed on the validation set from C4 dataset. Additional technical details could be found in the Appendix. 
+
+6.2 Baselines 
+
+We compare our method to full finetuning, in which the model is initialized to the pre-trained weights and bi-ases, and all parameters undergo gradient updates, and several recently proposed efficient finetuning methods: LoRA [ 1] with rank = 4 , BitFit [ 51 ], VeRA [ 11 ], LoRA-XS [ 7 ], RoCoFT 1-Row [52 ], APT [ 35 ], and VeLoRA [ 53 ]. We provide additional descriptions for the baseline methods in the Appendix R. 
+
+6.3 Accuracy Results 
+
+We present the accuracy results in Table 1. We report the overall (matched and mismatched) accuracy for MNLI, Matthew’s correlation for CoLA, Pearson corre-lation for STS-B, and accuracy for other tasks. From Table 1, it can be seen that our model is comparable to LoRA and full finetuning on average when applied Jonathan Svirsky, Yehonathan Refael, Ofir Lindenbaum 
+
+Table 1: Evaluation results on the GLUE benchmark demonstrate that our method outperforms other efficient finetuning approaches as well as full finetuning, while also enabling base model pruning and inference speedup .Method TP CoLA STS-B MRPC RTE SST2 MNLI QNLI QQP Avg.                                                                                                                                                 
+
+> RoBERTa-Base
+> Full Finetune 125M 63.6 90.9 90.2 80.5 94.8 87.6 92.8 91.9 86.5 Galore [26] 125M 60.3 90.7 92.2 79.4 94.0 87.0 92.2 91.1 85.9 LoRA( r= 4 ) [1] 0.7M 64.0 90.9 89.7 83.4 94.4 87.6 92.7 91.0 86.6 BitFit [51] 0.11M 61.8 90.8 92.0 77.8 93.7 85.2 91.3 84.5 84.6 VeRA [11] 0.04M 65.6 90.7 89.5 78.7 94.6 -91.8 -85.2 RoCoFT 1-Row [52] 0.08M 60.2 90.7 87.7 76.6 94.1 85.2 90.7 88.5 84.2 VeLoRA [53] 0.16M 64.6 90.8 91.3 78.0 94.4 86.3 92.1 89.9 85.9 FineGates 0.17M 65.7 91.0 90.2 83.4 94.7 85.8 92.3 89.2 86.6 RoBERTa-Large
+> Full Finetune 355M 68.0 92.3 90.9 86.6 96.4 90.2 94.7 92.2 88.9 LoRA( r= 4 ) [1] 1.8M 71.0 92.3 90.7 89.5 96.4 90.4 94.8 91.7 89.3 LoRA-XS [7] 0.06K 68.5 92.2 91.2 89.5 96.3 -94.3 -88.7 VeRA [11] 0.06M 68.0 91.7 90.9 85.9 96.1 -94.4 -87.8 RoCoFT 1-Row [52] 0.22M 65.7 91.8 90.0 85.3 96.6 90.7 94.2 90.2 88.1 FineGates 0.4M 71.4 92.3 91.2 90.2 96.0 89.1 94.1 89.4 89.2
+
+Table 2: This table compares FineGates with the APT method employing a RoBERTa-Base backbone. In our model, we set the rank to 1, as we are training a single column and a single row of gate vectors. Method Min r Max r TP Sparsity MRPC SST2 STSB RTE CoLA APT 2 4 0.17M 40 % 86.0 90.6 89.4 67.5 45.9          
+
+> FineGates 110.17M 40 %84.8 91.2 88.1 67.5 40.6
+
+Table 3: Performance of our method vs. LoRA on GLUE tasks using Llama3.2-1B backbone.                    
+
+> Model TP CoLA STS-B MRPC RTE SST-2
+> LoRA( r= 4 )2.2M 66.1 90.1 87.7 83.7 95.9 FineGates 0.9M 63.6 91.2 88.5 84.5 93.5
+
+to the RoBERTa-Base base model. In addition, our model outperforms full finetuning on average when applied to the RoBERTa-Large base model. More-over, FineGates outperforms other efficient finetuning methods with both backbones. Table 3 presents a comparison between our method and LoRA using the modern Llama3.2-1B backbone. Despite utilizing fewer trainable parameters, our approach achieves higher accuracy than LoRA on most tasks. Furthermore, our approach not only reduces the train-able parameter count but also compresses the base model itself, resulting in a 10 − 20% reduction in its parameter count while maintaining an insignificant loss in accuracy (as shown in the last two rows of Table 4). This highlights the efficiency and effectiveness of our method in balancing compression and performance. 
+
+6.4 Sparsification Results 
+
+We present the sparsification results of FineGates in Figure 4. We report accuracy measurements for each sparsity level. It could be seen that our method can remove up to 20% of parameters without significant loss in Matthews correlation for the CoLA dataset, up to 40% of parameters trained on the SST2 dataset with only a loss of 4% in accuracy, and up to 40% for the STSB dataset with a loss of only 3% in Pearson Correlation metric. 
+
+6.5 Comparison to the APT method 
+
+To compare our method with the recently proposed APT model, we conducted experiments on the MRPC, STSB, SST2, and RTE datasets. We obtained results for the APT model by running it with LoRA rank val-ues ranging from 2 to 4, using hyperparameters similar to those in our method. We fixed the target sparsity at 40% for both methods. The results are presented in Table 2. FineGates achieves performance compara-ble to the APT model, without the computationally intensive pruning used by APT. We would also like to emphasize the simplicity of our implementation, which does not require the efficient search tools and additional dependencies needed by the APT method. 
+
+6.6 Inference Speedup 
+
+We evaluate the inference time of the compressed model after each training epoch. For every epoch, validation wall-clock time is measured 10 times per run. To ac-count for variability, training is repeated with 3 differ-ent random seeds, yielding a total of 30 inference time Train Less, Infer Faster: Efficient Model Finetuning and Compression via Structured Sparsity 
+
+Table 4: Finetuning accuracy on limited GLUE benchmark datasets. We present the accuracy results achieved by FineGates with various sparsity constraints: s ≥ 0% , s ≥ 10% , and s ≥ 20% . The number of removed parameters is shown in olive, and the relative change in accuracy is depicted in gray compared to full finetuning. Small Limited Large Method TP ↓ CoLA STS-B MRPC RTE SST2 MNLI QNLI QQP                                                                                               
+
+> RoBERTa-Base
+> Full Finetune 125M 63.6 90.9 90.2 80.5 92.8 81.4 87.7 85.2 FineGates, s≥0% 0.17M 65.7 91.0 90.2 83.4 94.0 81.3 89.1 84.9 FineGates, s≥10% (-12M) 0.17M 65.2 (+1.6%) 90.7(-0.2%) 89.2 (-1%) 81.3 (+0.8%) 94.0 (+1.2%) 80.6 (-0.8%) 88.8 (+1.1%) 84.3 (-0.9%) FineGates, s≥20% (-25M) 0.17M 61.4 (-2.2%) 90.5 (-0.4%) 87.7 (-2.5%) 78.0 (-2.5%) 93.8 (+1%) 79.4 (-2%) 87.6 (-0.1%) 83.7 (-1.5%)
+> RoBERTa-Large
+> Full Finetune 355M 68.0 92.3 90.9 86.6 93.5 85.9 92.4 85.8 FineGates, s≥0% 0.4M 71.4 92.3 91.2 90.2 96.2 86.2 92.4 86.1 FineGates, s≥10% (-35M) 0.4M 69.5 (+1.5%) 91.8 (-0.5%) 90.4 (-0.5%) 89.2 (+2.6%) 96.1 (+2.6%) 85.0 (-0.9%) 92.1 (-0.3%) 86.1 (+0.3%) FineGates, s≥20% (-70M) 0.4M 68.1 (+0.1%) 91.3 (-1%) 90.2 (-0.7%) 87.0 (+0.4%) 95.3 (+1.8%) 85.0 (-0.9%) 92.0 (-0.4%) 85.2 (-0.6%)
+
+measurements per epoch. All validation measurements are conducted in CPU-only environments to isolate the benefits of structured pruning. Importantly, our reductions are obtained before any GPU-specific opti-mizations or quantization methods, underscoring the intrinsic efficiency gains of our approach, independent of hardware accelerators or low-level optimizations. In this practical setting, FineGates reduces the inference time of the adopted Llama3.2-1B model on the MRPC task by up to 25%, with only a 4% loss in accuracy. More details are in Appendix F. 
+
+6.7 General Model Sparsification 
+
+Inspired by the recently proposed method for training unstructured and semi-structured pruning masks for the base model, denoted as MaskLLM [ 34 ], we conduct an additional experiment to evaluate FineGates in this scenario. We train our method using the Llama-2-7B backbone with a limited number of training tokens (TT) and evaluate its performance on the C4 validation set. Notably, our method requires only 2M trainable pa-rameters (TP) while MaskLLM requires an additional trainable matrix mask for each base model weight ma-trix. Moreover, MaskLLM proposes a semi-structured sparsity, which is beneficial for GPU execution, whereas our method achieves structured sparsity more suited to CPU inference. In this experiment, we train FineGates without bias and freeze the parameters of the original base model. The perplexity results are shown in Table 5. The evaluation of all methods is done with a maxi-mal sequence length of 256, which is different from the length of 4096, reported by Fang et al. [34]. 
+
+6.8 Sparse Model Pre-training 
+
+We also evaluate our method in the pre-training sce-nario, where the base model is trained from scratch with the gates. We follow the same setup as suggested by Zhao et al. [26] and train the Llama-1B base model with 1,340M parameters on the C4 dataset. We con-Table 5: Validation perplexity of the sparsified Llama-2-7B. Model C4 TP TT Sparsity             
+
+> Pretrained 7.76 6,738M 2T N/A MaskLLM 11.15 6,738M 2B 2:4 FineGates 11.75 2M 82M 21%
+
+Table 6: Pre-training Llama-1B base model from scratch with FineGates under limited training bud-get.                 
+
+> Model PPL TT (B) IP (M) ATP (M)
+> FFT 342.75 1.9 1,340 0FineGates + FFT 24.87 1.9 756 1.21 FineGates + FFT 21.41 4690 1.21
+
+duct a full finetuning of the base model (FFT) and its sparsified version (FineGates + FFT) for a limited number of training tokens (TT) and present the per-plexity (PPL), number of inference parameters (IP), and number of added training parameters (ATP) in Table 6. By adding only 0.09% parameters to the base model during pretraining, our method enables faster convergence of sparsified weights and structured prun-ing of 44% (584M parameters) of the model’s weights. 
+
+## 7 Conclusion 
+
+In this work, we propose FineGates , a sparsification-based finetuning method for foundation language mod-els (LMs). By learning binary stochastic gating vectors on weight matrices, FineGates introduces structured sparsity that can remove up to 40% of parameters in attention layers while preserving accuracy. This ap-proach offers a more efficient alternative to conventional low-rank adaptation methods, reducing inference costs without sacrificing expressiveness. Experiments on the GLUE benchmark show that FineGates matches or out-performs existing finetuning approaches, and we further provide a theoretical analysis of its convergence and op-Jonathan Svirsky, Yehonathan Refael, Ofir Lindenbaum 
+
+timization landscape. Beyond task-specific adaptation, we also demonstrate the effectiveness of FineGates as a pruning strategy during pre-training, enabling faster convergence and improved inference efficiency. Over-all, our results highlight structured sparsification as a powerful mechanism for efficient and scalable LM adaptation. 
+
+## References 
+
+[1] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, and W. Chen, “Lora: Low-rank adaptation of large language models,” arXiv preprint arXiv:2106.09685 , 2021. [2] L. Zhang, L. Zhang, S. Shi, X. Chu, and B. Li, “Lora-fa: Memory-efficient low-rank adaptation for large language models fine-tuning,” arXiv preprint arXiv:2308.03303 , 2023. [3] A. Chavan, Z. Liu, D. Gupta, E. Xing, and Z. Shen, “One-for-all: Generalized lora for parameter-efficient fine-tuning,” arXiv preprint arXiv:2306.07967 , 2023. [4] Y. Xu, L. Xie, X. Gu, X. Chen, H. Chang, H. Zhang, Z. Chen, X. Zhang, and Q. Tian, “Qa-lora: Quantization-aware low-rank adapta-tion of large language models,” arXiv preprint arXiv:2309.14717 , 2023. [5] Y. Li, F. Luo, C. Tan, M. Wang, S. Huang, S. Li, and J. Bai, “Parameter-efficient sparsity for large language models fine-tuning,” arXiv preprint arXiv:2205.11005 , 2022. [6] C. Lin, L. Li, D. Li, J. Zou, W. Luo, W. Xue, and Y. Guo, “Nora: Nested low-rank adaptation for efficient fine-tuning large models,” arXiv preprint arXiv:2408.10280 , 2024. [7] K. Bałazy, M. Banaei, K. Aberer, and J. Tabor, “Lora-xs: Low-rank adaptation with extremely small number of parameters,” arXiv preprint arXiv:2405.17604 , 2024. [8] Y. Refael, G. Smorodinsky, T. Tirer, and O. Lindenbaum, “Sumo: Subspace-aware moment-orthogonalization for accelerating memory-efficient llm training,” 2025. [Online]. Available: https: //arxiv.org/abs/2505.24749 [9] Y. Refael, I. Arbel, O. Lindenbaum, and T. Tirer, “Lorenza: Enhancing generalization in low-rank gradient llm training via efficient zeroth-order adaptive sam,” 2025. [Online]. Available: https://arxiv.org/abs/2502.19571 [10] A. Rozner, B. Battash, L. Wolf, and O. Linden-baum, “Knowledge editing in language models via adapted direct preference optimization,” arXiv preprint arXiv:2406.09920 , 2024. [11] D. J. Kopiczko, T. Blankevoort, and Y. M. Asano, “Vera: Vector-based random matrix adaptation,” 
+
+arXiv preprint arXiv:2310.11454 , 2023. [12] Y. Bondarenko, R. Del Chiaro, and M. Nagel, “Low-rank quantization-aware training for llms,” 
+
+arXiv preprint arXiv:2406.06385 , 2024. [13] J. Lin, J. Tang, H. Tang, S. Yang, W.-M. Chen, W.-C. Wang, G. Xiao, X. Dang, C. Gan, and S. Han, “Awq: Activation-aware weight quantization for on-device llm compression and acceleration,” Pro-ceedings of Machine Learning and Systems , vol. 6, pp. 87–100, 2024. [14] X. Ma, G. Fang, and X. Wang, “Llm-pruner: On the structural pruning of large language models,” 
+
+Advances in neural information processing systems ,vol. 36, pp. 21 702–21 720, 2023. [15] M. Xia, Z. Zhong, and D. Chen, “Structured prun-ing learns compact and accurate models,” arXiv preprint arXiv:2204.00408 , 2022. [16] Y. Refael, I. Arbel, and W. Huleihel, “Learning k-level structured sparse neural networks using group envelope regularization,” 2024. [Online]. Available: https://arxiv.org/abs/2212.12921 [17] G. Hinton, “Distilling the knowledge in a neural network,” arXiv preprint arXiv:1503.02531 , 2015. [18] J. Pfeiffer, A. Kamath, A. Rücklé, K. Cho, and I. Gurevych, “Adapterfusion: Non-destructive task composition for transfer learning,” arXiv preprint arXiv:2005.00247 , 2020. [19] N. Houlsby, A. Giurgiu, S. Jastrzebski, B. Morrone, Q. De Laroussilhe, A. Gesmundo, M. Attariyan, and S. Gelly, “Parameter-efficient transfer learning for nlp,” in International conference on machine learning . PMLR, 2019, pp. 2790–2799. [20] B. Lester, R. Al-Rfou, and N. Constant, “The power of scale for parameter-efficient prompt tun-ing,” arXiv preprint arXiv:2104.08691 , 2021. [21] X. L. Li and P. Liang, “Prefix-tuning: Optimizing continuous prompts for generation,” arXiv preprint arXiv:2101.00190 , 2021. [22] Y. Refael, J. Svirsky, B. Shustin, W. Huleihel, and O. Lindenbaum, “Adarankgrad: Adaptive gradient-rank and moments for memory-efficient llms training and fine-tuning,” arXiv preprint arXiv:2410.17881 , 2024. [23] S. He, L. Ding, D. Dong, M. Zhang, and D. Tao, “Sparseadapter: An easy approach for improv-ing the parameter-efficiency of adapters,” arXiv preprint arXiv:2210.04284 , 2022. [24] Q. Zhang, M. Chen, A. Bukharin, N. Karam-patziakis, P. He, Y. Cheng, W. Chen, and Train Less, Infer Faster: Efficient Model Finetuning and Compression via Structured Sparsity 
+
+T. Zhao, “Adalora: Adaptive budget allocation for parameter-efficient fine-tuning,” arXiv preprint arXiv:2303.10512 , 2023. [25] Y. Refael, J. Svirsky, B. Shustin, W. Huleihel, and O. Lindenbaum, “Adarankgrad: Adaptive gradi-ent rank and moments for memory-efficient LLMs training and fine-tuning,” in The Thirteenth Inter-national Conference on Learning Representations ,2025. [26] J. Zhao, Z. Zhang, B. Chen, Z. Wang, A. Anandku-mar, and Y. Tian, “Galore: Memory-efficient llm training by gradient low-rank projection,” arXiv preprint arXiv:2403.03507 , 2024. [27] H. Zhu, Z. Zhang, W. Cong, X. Liu, S. Park, V. Chandra, B. Long, D. Z. Pan, Z. Wang, and J. Lee, “Apollo: Sgd-like memory, adamw-level performance,” arXiv preprint arXiv:2412.05270 ,2024. [28] X. Chen, K. Feng, C. Li, X. Lai, X. Yue, Y. Yuan, and G. Wang, “Fira: Can we achieve full-rank training of llms under low-rank constraint?” arXiv preprint arXiv:2410.01623 , 2024. [29] Y. Hao, Y. Cao, and L. Mou, “Flora: Low-rank adapters are secretly gradient compressors,” 
+
+ArXiv , vol. abs/2402.03293, 2024. [Online]. Avail-able: https://api.semanticscholar.org/CorpusID: 267412117 [30] Y. Zhang, C. Chen, Z. Li, T. Ding, C. Wu, Y. Ye, Z.-Q. Luo, and R. Sun, “Adam-mini: Use fewer learning rates to gain more,” arXiv preprint arXiv:2406.16793 , 2024. [31] T. Robert, M. Safaryan, I.-V. Modoranu, and D. Alistarh, “Ldadam: Adaptive optimization from low-dimensional gradient statistics,” 2025. [Online]. Available: https://arxiv.org/abs/2410.16103 [32] S. Loeschcke, M. Toftrup, M. J. Kastoryano, S. Belongie, and V. Snæbjarnarson, “Loqt: Low-rank adapters for quantized pretraining,” 2024. [Online]. Available: https://arxiv.org/abs/ 2405.16528 [33] V. Sanh, T. Wolf, and A. Rush, “Movement prun-ing: Adaptive sparsity by fine-tuning,” Advances in neural information processing systems , vol. 33, pp. 20 378–20 389, 2020. [34] G. Fang, H. Yin, S. Muralidharan, G. Heinrich, J. Pool, J. Kautz, P. Molchanov, and X. Wang, “Maskllm: Learnable semi-structured sparsity for large language models,” Advances in Neural Infor-mation Processing Systems , vol. 37, pp. 7736–7758, 2024. [35] B. Zhao, H. Hajishirzi, and Q. Cao, “Apt: Adap-tive pruning and tuning pretrained language mod-els for efficient training and inference,” arXiv preprint arXiv:2401.12200 , 2024. [36] E. Frantar and D. Alistarh, “Sparsegpt: Massive language models can be accurately pruned in one-shot,” in International Conference on Machine Learning . PMLR, 2023, pp. 10 323–10 337. [37] A. Vaswani, “Attention is all you need,” Advances in Neural Information Processing Systems , 2017. [38] A. Wang, Y. Pruksachatkun, N. Nangia, A. Singh, J. Michael, F. Hill, O. Levy, and S. Bowman, “Su-perglue: A stickier benchmark for general-purpose language understanding systems,” Advances in neural information processing systems , vol. 32, 2019. [39] W. Wen, C. Wu, Y. Wang, Y. Chen, and H. Li, “Learning structured sparsity in deep neural net-works,” Advances in neural information processing systems , vol. 29, 2016. [40] Y. Yamada, O. Lindenbaum, S. Negahban, and Y. Kluger, “Feature selection using stochastic gates,” in International Conference on Machine Learning . PMLR, 2020, pp. 10 648–10 659. [41] S. Jana, H. Li, Y. Yamada, and O. Lindenbaum, “Support recovery with projected stochastic gates: Theory and application for linear models,” Signal Processing , vol. 213, p. 109193, 2023. [42] A. Miller, N. Foti, A. D’Amour, and R. P. Adams, “Reducing reparameterization gradient variance,” 
+
+Advances in Neural Information Processing Sys-tems , vol. 30, 2017. [43] M. Figurnov, S. Mohamed, and A. Mnih, “Implicit reparameterization gradients,” Advances in neural information processing systems , vol. 31, 2018. [44] O. Lindenbaum, M. Salhov, A. Averbuch, and Y. Kluger, “L0-sparse canonical correlation anal-ysis,” in International Conference on Learning Representations , 2021. [45] J. Yang, O. Lindenbaum, Y. Kluger, and A. Jaffe, “Multi-modal differentiable unsupervised feature selection,” in Uncertainty in Artificial Intelligence .PMLR, 2023, pp. 2400–2410. [46] E. Naor and O. Lindenbaum, “Hybrid autoen-coders for tabular data: Leveraging model-based augmentation in low-label settings,” The Thirty-ninth Annual Conference on Neural Information Processing Systems , 2025. [47] T. Dettmers, M. Lewis, Y. Belkada, and L. Zettle-moyer, “Gpt3. int8 (): 8-bit matrix multiplication for transformers at scale,” Advances in Neural In-formation Processing Systems , vol. 35, pp. 30 318– 30 332, 2022. Jonathan Svirsky, Yehonathan Refael, Ofir Lindenbaum 
+
+[48] L. T. DeCarlo, “On the meaning and use of kurto-sis.” Psychological methods , vol. 2, no. 3, p. 292, 1997. [49] Y. Liu, “Roberta: A robustly optimized bert pretraining approach,” arXiv preprint arXiv:1907.11692 , 2019. [50] C. Raffel, N. Shazeer, A. Roberts, K. Lee, S. Narang, M. Matena, Y. Zhou, W. Li, and P. J. Liu, “Exploring the limits of transfer learning with a unified text-to-text transformer,” Journal of ma-chine learning research , vol. 21, no. 140, pp. 1–67, 2020. [51] E. B. Zaken, S. Ravfogel, and Y. Goldberg, “Bitfit: Simple parameter-efficient fine-tuning for transformer-based masked language-models,” 
+
+arXiv preprint arXiv:2106.10199 , 2021. [52] M. Kowsher, T. Esmaeilbeig, C.-N. Yu, M. Soltana-lian, and N. Yousefi, “Rocoft: Efficient finetuning of large language models with row-column up-dates,” arXiv preprint arXiv:2410.10075 , 2024. [53] R. Miles, P. Reddy, I. Elezi, and J. Deng, “Velora: Memory efficient training using rank-1 sub-token projections,” Advances in Neural Information Pro-cessing Systems , vol. 37, pp. 42 292–42 310, 2024. [54] H. N. Salas, “Gershgorin’s theorem for matrices of operators,” Linear algebra and its applications ,vol. 291, no. 1-3, pp. 15–36, 1999. [55] M. A. Gordon, K. Duh, and N. Andrews, “Com-pressing bert: Studying the effects of weight pruning on transfer learning,” arXiv preprint arXiv:2002.08307 , 2020. [56] I. Loshchilov and F. Hutter, “Decoupled weight decay regularization,” arXiv preprint arXiv:1711.05101 , 2017. [57] J.-C. Zhang, Y.-J. Xiong, C.-M. Xia, D.-H. Zhu, and X.-H. Qiu, “Parameter-efficient fine-tuning of large language models via de-convolution in subspace,” in Proceedings of the 31st International Conference on Compu-tational Linguistics , O. Rambow, L. Wanner, M. Apidianaki, H. Al-Khalifa, B. D. Euge-nio, and S. Schockaert, Eds. Abu Dhabi, UAE: Association for Computational Linguistics, Jan. 2025, pp. 3924–3935. [Online]. Available: https://aclanthology.org/2025.coling-main.265/ [58] Z. Lei, D. Qian, and W. Cheung, “Fast random-ized low-rank adaptation of pre-trained language models with pac regularization,” in Findings of the Association for Computational Linguistics ACL 2024 , 2024, pp. 5236–5249. [59] S. Wang, L. Yu, and J. Li, “Lora-ga: Low-rank adaptation with gradient approximation,” Ad-vances in Neural Information Processing Systems ,vol. 37, pp. 54 905–54 931, 2024. [60] T. Ceritli, S. Ozkan, J. Min, E. Noh, C. Min, and M. Ozay, “A study of parameter efficient fine-tuning by learning to efficiently fine-tune,” in Find-ings of the Association for Computational Linguis-tics: EMNLP 2024 , 2024, pp. 15 819–15 836. Train Less, Infer Faster: Efficient Model Finetuning and Compression via Structured Sparsity: Supplementary Materials 
+
+## A Expected ℓ0 norm 
+
+E|| ω|| 0 = 1
+
+d
+
+X
+
+> j
+
+P(ωj > 0) = 1
+
+d
+
+X
+
+> j
+
+P(μj + 0 .5 + ϵj > 0) = = 1
+
+d
+
+X
+
+> j
+
+(1 − P(μj + 0 .5 + ϵj ≤ 0)) = = 1
+
+d
+
+X
+
+> j
+
+
+
+1 − Φ
+
+ −μj − 0.5
+
+σ
+
+ 
+
+== 1
+
+d
+
+X
+
+> j
+
+1 − 12
+
+
+
+1 + erf 
+
+
+
+− μj + 0 .5
+
+√2σ
+
+ 
+
+== 1
+
+d
+
+X
+
+> j
+
+ 12 + 12 erf 
+
+ μj + 0 .5
+
+√2σ
+
+ 
+
+.
+
+## B Proof of Proposition 5.2 
+
+Setup and notation. Let L : Rm×n → R+ be differentiable and satisfy the Polyak–Łojasiewicz (PL) inequality on a set W ⊆ Rm×n with parameter β > 0:
+
+12 ∥∇ WL(W)∥2 
+
+> F
+
+≥ β L(W) − L⋆ ∀ W ∈ W , (9) where L⋆ = inf W∈W L(W). Write vec( ·) for vectorization and use the Euclidean/Frobenius norms throughout. 
+
+Two-sided gates parametrization. Fix a base matrix W0 ∈ Rm×n. For row/column gates ωr ∈ Rm, ωc ∈ Rn,define 
+
+W (ωr , ωc) = Diag( ωr ) W0 Diag( ωc),
+
+i.e., Wij = ωr,i W0,ij ωc,j . Consider the feasible set 
+
+Ω = 
+
+n
+
+(ωr , ωc) ∈ { 0, 1}m × { 0, 1}n : ∥ωr ∥0 ≥ 1 − s, ∥ωc∥0 ≥ 1 − s
+
+o
+
+,
+
+where s is the sparsity level and let WΩ := {W (ωr , ωc) : ( ωr , ωc) ∈ Ω}.We also consider its natural continuous relaxation bΩ:
+
+bΩ = 
+
+n
+
+(ωr , ωc) ∈ [α, 1] m × [α, 1] n : ∥ωr ∥0 ≥ 1 − s, ∥ωc∥0 ≥ 1 − s
+
+o
+
+,
+
+with any fixed α ∈ (0 , 1] (so no active row/column is exactly zero during the first iteration of training). Jonathan Svirsky, Yehonathan Refael, Ofir Lindenbaum 
+
+Assumptions. 
+
+1. There exist active index sets Sr ⊆ [m], Sc ⊆ [n] with |Sr | ≥ 1 − s, |Sc| ≥ 1 − s such that on Sr × Sc the base weights are bounded away from zero: 
+
+min  
+
+> i∈Sr, j ∈Sc
+
+|W0,ij | ≥ w0 > 0.
+
+(Equivalently, W0 has no vanishing entries on any row/column that the constraint allows to be active.) 2. We optimize over the relaxed feasible set bΩ (piecewise-smooth; the discrete case is covered as a limit). 
+
+Lemma B.1 (Chain-rule lower bound via Jacobian) . Let F (θ) := L W (θ) where θ := ( ωr , ωc) ∈ bΩ. If, on bΩ,
+
+σmin 
+
+ J(θ) ≥ γ > 0 where J(θ) := ∂ vec( W (θ)) 
+
+∂θ ∈ Rmn ×(m+n),
+
+then F satisfies the PL inequality on bΩ with parameter βγ 2:
+
+12 ∥∇ θ F (θ)∥22 ≥ β γ 2  F (θ) − L⋆, ∀ θ ∈ bΩ.
+
+Proof. By the chain rule, ∇θ F (θ) = J(θ)⊤∇vec( W )L(W (θ)) . Hence 
+
+∥∇ θ F (θ)∥2 = ∥J(θ)⊤∇vec( W )L∥2 ≥ σmin (J(θ)) ∥∇ vec( W )L∥2.
+
+Squaring, using σmin (J) ≥ γ, the Frobenius/Euclidean equivalence, and equation 9 gives the claim. 
+
+Lemma B.2 (Uniform lower bound on the Jacobian for gates) . Under 1–2, there exists γ > 0 depending only on 
+
+(s, α, w 0) such that σmin (J(θ)) ≥ γ for all θ ∈ bΩ.Proof. Write Wij = ωr,i W0,ij ωc,j . The partials are 
+
+∂Wij 
+
+∂ωr,i 
+
+= W0,ij ωc,j , ∂Wij 
+
+∂ωc,j 
+
+= ωr,i W0,ij , others 0.
+
+Thus J(θ) has two block-columns corresponding to (ωr , ωc) whose nonzeros on Sr × Sc are bounded below in magnitude by w0 α. Moreover, the mn × (m + n) Gram matrix G(θ) := J(θ)⊤J(θ) is block-structured: 
+
+G(θ) = 
+
+Diag  gr (ωc) H(θ)
+
+H(θ)⊤ Diag  gc(ωr )
+
+,
+
+where gr (ωc)i = P 
+
+> j
+
+(W0,ij ωc,j )2 and gc(ωr )j = P
+
+> i
+
+(W0,ij ωr,i )2. On the active sets, gr (ωc)i ≥ s w 20 α2 and 
+
+gc(ωr )j ≥ s w 20 α2. By Gershgorin theorem [ 54 ], the minimal eigenvalue of G(θ) is bounded below by a constant c(s, α, w 0) > 0 independent of θ ∈ bΩ (dependent only on the diaogonal values). Hence σmin (J(θ)) = pλmin (G(θ)) ≥ γ := √c > 0.
+
+Proposition B.3 (PL is preserved under two-sided gates) . Since L satisfies PL condition, the composed objective 
+
+F (ωr , ωc) := L Diag( ωr ) W0 Diag( ωc)
+
+satisfies the PL inequality on bΩ with parameter β γ 2, where γ > 0 is the uniform Jacobian lower bound from Lemma B.2. Proof. Combine Lemmas B.1 and B.2. 
+
+Why the LoRA parametrization does not preserve PL. Consider the same base loss L but the LoRA map W (A, B) = W0 + AB with A ∈ Rm×r , B ∈ Rr×n. Even if L is PL in W on Rm×n, the composed 
+
+FLoRA (A, B) := L(W0 + AB )
+
+fails the PL inequality in general. 
+
+Proposition B.4 (Counterexample for LoRA) . Let L(W) = 12 ∥W − W⋆∥2 
+
+> F
+
+, which satisfies the PL inequality on Rm×n with parameter β = 1 . If W⋆̸ = W0, then FLoRA (A, B) = 12 ∥W0 + AB − W⋆∥2 
+
+> F
+
+does not satisfy the PL inequality on Rm×r × Rr×n. Proof. At (A, B) = (0 , 0) we have ∇AFLoRA = ( W0 + AB − W⋆)B⊤ = 0 and 
+
+∇B FLoRA = A⊤(W0 + AB − W⋆) = 0 , so ∥∇ FLoRA (0 , 0) ∥F = 0 . But FLoRA (0 , 0) = 12 ∥W0 − W⋆∥2 
+
+> F
+
+> 0 by 
+
+W⋆̸ = W0. The PL inequality would force ∥∇ F ∥2 ≥ 2β(F − F ⋆), which is violated here since the left-hand side is 0 while the right-hand side is positive (note F ⋆ ≥ 0). Hence FLoRA is not PL. Train Less, Infer Faster: Efficient Model Finetuning and Compression via Structured Sparsity 
+
+## C Sparsification Results 
+
+Sparsification-Accuracy trade-off measured on CoLA, SST2 (full), STSB, and MRPC datasets with RoBERTa-Base, RoBERTa-Large, and Llama3.2-1B backbones is shown in Figure 4. 
+
+Figure 4: Sparsification-Accuracy trade-off measured on CoLA, SST2 (full), STSB, and MRPC datasets with RoBERTa-Base, RoBERTa-Large, and Llama3.2-1B backbones. Our model provides > 40 % of structured sparsity while sacrificing only 4% of accuracy compared to the model without sparsification on the SST2 dataset, where we train ωr , ωc with total 166 K parameters. On CoLA, the method reduces up to 20% of parameters without significant loss in accuracy, and 40% on the STSB dataset with only 3% drop in accuracy. The method removes up to 470 M parameters from the Llama3.2-1B base model with only 6% accuracy loss. 
+
+## D Convergence Experiment 
+
+We train both FineGates and LoRA on MRPC dataset for 50 epochs with a batch size of 16, learning rate 
+
+1 − e10 −3. In Figure 3 we show validation accuracy. We repeat the experiment 10 times and compute mean ±std values after every epoch. 
+
+## E FineGates Modifications 
+
+We conduct additional experiments to examine whether adapting fewer projection matrices in the transformer layers significantly affects the performance of our approach. Furthermore, we investigate the effect of extending our model with additional low-rank weights WA and WB for each adapted layer, following the design proposed by [ 1]. Table 7 reports results for three model variants on RoBERTa-Base and RoBERTa-Large: FineGates w/o 
+
+Wmlp that does not adapt intermediate and output projections for RoBERTa layers, FineGates w/ WB WA
+
+adds low-rank matrices WB , WA with r = 8 and FineGates w WB WA but w/o Wmlp which combines the two modifications. From this experiment, we draw three main conclusions: (1) the base FineGates model, where only gates are trained, achieves accuracy comparable to the other variants; (2) the number of trainable parameters can be reduced by up to 4 times without significantly compromising accuracy (FineGates w/o Wmlp ); and (3) introducing low-rank parameter matrices yields additional accuracy gains. 
+
+## F Inference Time Measurements 
+
+We evaluate the inference time of the compressed model after each training epoch. For each epoch, the wall-clock time of the validation phase is measured 10 times per run. To account for variability, we train with three different random seeds, resulting in a total of 30 inference time measurements per epoch. All validation-time measurements are performed on CPU only. Our experiments use the MRPC dataset with the LLaMA-3.2-1B backbone. To assess inference efficiency, we compute the average validation time over a 5-epoch window and report the relative reduction in inference time using the first epoch as a reference. Specifically, the reduction is defined as (t0 − ti)/t 0,where ti denotes the average validation time after epoch i, aggregated over 30 measurements (3 seeds × 10 repetitions per seed). We report timing results alongside validation accuracy (averaged over three seeds) in Figure 5, and in relation to the number of pruned parameters in Figure 6. Jonathan Svirsky, Yehonathan Refael, Ofir Lindenbaum 
+
+Table 7: Modifications of FineGates. The evaluation is done for the next versions of FineGates: (1) training without gates on feed-forward layers (w/o Wmlp ), (2) training with additional low-rank parameters (w/ WB WA), (3) training with low-rank parameters (w/ WB WA) but excluding feed-forward layers (w/o Wmlp ) matrices from adaptation. Small Sub-sampled Large Method TP ↓ CoLA STS-B MRPC RTE SST2 MNLI QNLI QQP                                                                                       
+
+> Roberta-Base
+> FineGates 0.17M 65.7 91.0 90.0 83.4 94.0 81.3 89.1 84.9 FineGates w/o Wmlp 0.04M 65.1 90.9 90.4 80.5 94.2 81.0 89.2 84.7 FineGates w/ WBWA1.4M 66.5 91.2 90.2 83.8 94.3 81.4 89.4 84.8 FineGates w/ WBWAw/o Wmlp 0.6M 65.8 90.7 89.7 82.3 94.3 81.7 89.7 85.2 Roberta-Large
+> FineGates 0.4M 71.4 92.3 91.2 90.2 96.2 86.2 92.4 86.1 FineGates w/o Wmlp 0.1M 70.5 92.0 91.4 90.6 96.1 86.6 92.3 86.4 FineGates w/ WBWA3.8M 70.1 92.2 90.6 88.1 95.4 86.1 92.1 85.5 FineGates w/ WBWAw/o Wmlp 1.7M 69.9 92.6 91.9 88.5 96.2 87.2 92.7 86.7
+
+Figure 5: CPU Inference time measurements along with validation accuracy averaged across 3 seeds for a single validation epoch of MRPC dataset. 
+
+## G Wall-clock Times measurements for APT and FineGates 
+
+In Table 8 we show the total training time measured for APT and FineGates. Table 8: To compare wall-clock times, we trained both models on the SST-2 data for 50 epochs, measuring the total training time using the RoBERTa-base backbone. 
+
+Model Time (seconds) 
+
+APT 37,515 FineGates 35,010 
+
+## H Proof of Lemma 5.4 
+
+Proof. Write L(W, ωr , ωc) := f  Diag (ωr )W Diag (ωc) and let G := ∇f (fW) ∈ Rk×d evaluated at fW =Diag( ωr )W Diag( ωc). By the chain rule, 
+
+∇WF = Diag( ωr ) G Diag( ωc) = G ⊙ (ωr ω⊤ 
+
+> c
+
+).Train Less, Infer Faster: Efficient Model Finetuning and Compression via Structured Sparsity 
+
+Figure 6: CPU Inference time measurements along with number of removed parameters averaged across 3 seeds for a single validation epoch of the MRPC dataset. For the gate variables, using ∂ fW/∂ (ωr )i = eie⊤ 
+
+> i
+
+W Diag( ωc) and ∂ fW/∂ (ωc)j = Diag( ωr )Wej e⊤ 
+
+> j
+
+, we obtain 
+
+ ∇ωr F  
+
+> i
+
+= G, e ie⊤ 
+
+> i
+
+W Diag( ωc) =
+
+> d
+
+X
+
+> j=1
+
+Gij Wij (ωc)j =
+
+ G ⊙ W ωc
+
+
+
+> i
+
+,
+
+ ∇ωc F  
+
+> j
+
+= G, Diag( ωr )Wej e⊤ 
+
+> j
+
+=
+
+> k
+
+X
+
+> i=1
+
+Gij Wij (ωr )i =
+
+ G ⊙ W⊤ωr
+
+
+
+> j
+
+.
+
+Because ∇f is Lf -Lipschitz, the map (W, ωr , ωc) 7 → G is Lipschitz on any bounded set. Multiplication by 
+
+Diag (ωr ) and Diag (ωc) (with ωr , ωc ∈ [0 , 1] ) is linear and non-expansive, hence the composite maps to ∇WF ,
+
+∇ωr F , and ∇ωc F are Lipschitz on bounded sets. Since hr , h c are smooth on [0 , 1] , their gradients are Lipschitz there; therefore, 
+
+∇L = ∇F + λ 0, ∇hr , ∇hc
+
+
+
+is LL-Lipschitz on a bounded set containing the iterates. Let zt := ( Wt, ωr,t , ωc,t ) and take one gradient step zt+1 = zt − η∇L(zt) with η ∈ (0 , 2/L L). By the descent lemma, 
+
+L(zt+1 ) ≤ L(zt) − η
+
+
+
+1 − ηL L
+
+> 2
+
+
+
+∥∇ L(zt)∥2,
+
+so L(zt) is monotonically non-increasing. Since f is bounded below and hr , h c are bounded below on [0 , 1] , L
+
+is bounded below; summing the inequality yields P 
+
+> t
+
+∥∇ L(zt)∥2 < ∞, hence ∥∇ L(zt)∥ → 0. Any accumulation point therefore satisfies the first-order optimality condition. 
+
+Remark H.1 (Bias gating and one-sided special cases) . If a bias b is gated as eb = ωr ⊙ b (or left ungated), the proof extends verbatim via standard column-augmentation. Setting ωr = 1 or ωc = 1 recovers the one-sided gating case. 
+
+## I Kurtosis Score 
+
+Denote by W ∈ Rk×d a weight matrix selected from {Wq , Wk, Wv , Wo, Wimlp , Womlp } in attention layer. For a given hidden representation X ∈ Rb×t×d, we compute the activation matrix O ∈ Rk×d by first averaging the tensor X in batch size and sequence length dimensions to obtain x′ ∈ R1×d by: 
+
+x′ = 1
+
+b × t
+
+> b
+
+X
+
+> i=1
+> t
+
+X
+
+> j=1
+
+Xi,j (10) and then compute the activation matrix by: 
+
+O = [ ωr ⊙ W ⊙ ωc] ⊙ x′ (11) Jonathan Svirsky, Yehonathan Refael, Ofir Lindenbaum 
+
+where ⊙ denotes element-wise multiplication and ωr , ωc are gating vectors. We then compute the kurtosis vectors kcols = kurt (O) ∈ R1×d and krows = kurt (OT ) ∈ R1×k , where kurt (·)
+
+denotes Pearson’s kurtosis [48]. Note that aggregating tensor X by averaging over the batch and sequence dimensions is a simplification. A more accurate approach would compute kurtosis vectors for each batch and sequence element individually, following by averaging the vectors kcols , krows . However, in practice, this computation is considerably more expensive and requires substantially more GPU memory. 
+
+## J Statistics of the learned gates across different Transformer layers 
+
+We analyze the statistics of the learned gates across different Transformer layers (Figure 7), and observe that the final layers tend to become sparse earlier in training. This behavior is consistent with prior findings, such as Sanh et al. [33] and Gordon et al. [55] , which report that later layers are more amenable to pruning without significantly harming performance. 
+
+Figure 7: For each Transformer layer in Roberta-Base model we present the gates values averaged for each gates row vector, 1
+
+> dr
+
+Pdr 
+
+> i=1
+
+ωir , and gates column vector 1
+
+> dc
+
+Pdc 
+
+> i=1
+
+ωic, where dr , d c are the dimensions of gates vectors 
+
+ωr , ωc correspondingly. 
+
+## K LLAMA-1B Model 
+
+Table 9: Model architecture for the pretraining experiment.             
+
+> Params Hidden Intermediate Heads Layers Steps Data Amount
+> 1B 2,048 5,461 24 32 20K 2B
+
+We set the maximum sequence length to 256 for all models, with a batch size of 512. We apply learning-rate warmup for the first 10,000 training steps, followed by a cosine annealing schedule that decays to 10% of the initial learning rate. Training is stopped after processing 2B tokens from the training dataset. The model architecture is summarized in Table 9, and we use the T5-base tokenizer for this experiment. 
+
+## L MaskLLM Evaluation 
+
+We evaluate the pre-trained model using the original implementation provided by the authors 2 . The masking model we tested was trained by the authors on a subset of the C4 dataset. While the original results were reported with a maximum sequence length of 4096, due to our limited computational budget we evaluate it with 
+
+> 2https://github.com/NVlabs/MaskLLM Train Less, Infer Faster: Efficient Model Finetuning and Compression via Structured Sparsity
+
+Figure 8: Train loss convergence of FineGates + FFT method in Section 5.7 
+
+Figure 9: Validation loss convergence of FineGates + FFT method in Section 5.7 a maximum sequence length of 256. For a fair comparison, we train FineGates on the C4 dataset using the same sequence length. 
+
+## M GLUE Benchmark statistics 
+
+Presented in Table 10. Table 10: The GLUE benchmark datasets statistics 
+
+Dataset MNLI QQP QNLI SST2 COLA STSB MRPC RTE 
+
+Samples 392,702 363,846 104,743 67,349 8,551 5,749 3,668 2,490 
+
+## N Hyperparameters for training 
+
+We present the hyperparameters for RoBERTa models in Table 11, for comparisons with the APT model in Table 12, and for LLaMA experiments in Table 13. Each dataset includes its own validation set, which is used for evaluation. In target-task fine-tuning experiments, we train all models with the Adam optimizer and decoupled weight decay regularization [ 56 ], optimizing Ω with fixed learning rates across tasks. For sparsified base-model pretraining and post-training pruning, we restrict the training budget to 2B tokens and apply learning-rate warmup followed by a cosine scheduler. Jonathan Svirsky, Yehonathan Refael, Ofir Lindenbaum 
+
+Table 11: Hyperparameters for Table 1.                                                                                                         
+
+> Hyperparameter / Dataset CoLA STS-B MRPC RTE SST-2 MNLI QNLI QQP
+> RoBERTa-Base lr bias + head 1e-4 1e-4 1e-4 1e-4 1e-4 1e-4 1e-4 1e-4 lr gates 1e-3 1e-3 1e-3 1e-3 1e-3 1e-3 1e-3 1e-3 lr schedule constant constant constant constant constant constant constant constant epochs 100 100 100 100 50 50 50 50 lambda 50 10 50 50 0.1 0.01 0.01 0.01 max seq length 512 512 512 512 512 512 512 512 RoBERTa-Large lr bias + head 1e-4 1e-4 1e-4 1e-4 1e-4 1e-4 1e-4 1e-4 lr gates 1e-3 1e-3 1e-3 1e-3 1e-3 1e-3 1e-3 1e-3 lr schedule constant constant constant constant constant constant constant constant epochs 50 50 50 50 100 100 100 100 lambda 10 10 10 10 0.1 0.1 0.1 0.1 max seq length 512 512 512 512 512 512 512 512
+
+Table 12: Hyperparameters for Table 2.                                    
+
+> Hyperparameter / Dataset CoLA STS-B MRPC RTE SST-2
+> RoBERTa-Base lr bias + head 1e-4 1e-4 1e-4 1e-4 1e-4 lr gates 1e-3 1e-3 1e-3 1e-3 1e-3 lr schedule constant constant constant constant constant epochs 100 100 100 100 50 lambda 100 100 100 100 100 max seq length 512 512 512 512 512
+
+## O Empirical Loss Convergence Plots 
+
+To support our theoretical claim regarding model convergence, we present the loss curves of the pre-training LLaMA-1B base model with FineGates in Figures 8 and 9. 
+
+## P Hardware used for experiments. 
+
+We conducted training and evaluation of the compressed LLaMA-3.2-1B backbone model on a single NVIDIA RTX 6000 GPU paired with an AMD EPYC 9334 32-core processor. While training was performed on the GPU, evaluation wall-clock time measurements were obtained on the CPU. For all other experiments, we used a single NVIDIA H200 GPU with an Intel ® Xeon ® Platinum 8568Y+ CPU for both training and evaluation. 
+
+## Q Limitations 
+
+While our method demonstrates strong performance and efficiency gains, it is important to acknowledge certain limitations. Our experiments are restricted to the GLUE benchmark. This reflects the practical constraints faced by smaller academic labs, which often lack access to large-scale computing resources. Although we could not evaluate larger models such as LLaMA-2 13B or GPT-style architectures, we contend that results from smaller-scale models remain valuable. They provide rigorous, reproducible insights and can inform innovations that may later scale to larger systems. Moreover, GLUE offers a standardized benchmark for comparison with prior work, making it a meaningful testbed for early-stage progress, and is still used by many recent works, i.e. Zhang et al. [57] ,Lei et al. [58] ,Wang et al. [59] ,Refael et al. [22] ,Bałazy et al. [7] ,Ceritli et al. [60] , Miles et al. [53] .
+
+## R Baselines Description 
+
+We compare our method against full fine-tuning—where the model is initialized with pre-trained weights and all parameters are updated during training—as well as several recently proposed efficient fine-tuning methods: 
+
+• LoRA [ 1] with rank = 4 applied additionally to the weight matrices fWmlp as in our method, which results in total 0.7M trainable parameters for Roberta-Base model and 1.8M for Roberta-Large base model. Train Less, Infer Faster: Efficient Model Finetuning and Compression via Structured Sparsity 
+
+Table 13: Hyperparameters for Table 3.                                    
+
+> Hyperparameter/ Dataset CoLA STS-B MRPC RTE SST-2
+> LLAMA-3.2-1B lr bias + head 1e-4 1e-4 1e-4 1e-4 1e-4 lr gates 1e-3 1e-3 1e-3 1e-3 1e-3 lr schedule constant constant constant constant constant epochs 100 100 100 100 50 lambda 0.01 0.01 0.01 0.01 0.01 max seq length 512 512 512 512 512
+
+• BitFit [ 51 ] - an efficient finetuning method where only biases are trained for each adapted layer in the base model. 
+
+• VeRA [ 11 ] - vector-based random matrix adaptation where the number of trainable parameters is significantly lower than in LoRA without pruning or compression of the base model. 
+
+• LoRA-XS [ 7] further reduces the number of trainable parameters by learning a small matrix positioned between two frozen low-rank matrices. 
+
+• RoCoFT 1-Row [52 ] - the method proposed to directly train a single row or column in the base model without adding adapter weights. 
+
+• APT [ 35 ] - a recently proposed finetuning method that allows compression of the base model while training adapter weights. Our approach differs from APT in two main points: (1) we learn the gates for the base model weights jointly with the finetuning task objective, and (2) our model obtains comparable results without training additional low-rank matrices WA, WB resulting in optimization of less trainable parameters. 
+
+• VeLoRA [53] an adapter-based method similarly to LoRA which is trained with low gradients projections. 
+
+• MaskLLM [ 34 ] is a method that prunes the LLM models in a semi-structured (or “N:M”) way, aimed at reducing computational overhead during inference. Instead of developing a new importance criterion, MaskLLM explicitly models N:M patterns as a learnable distribution through Gumbel Softmax sampling.

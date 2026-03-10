@@ -1,0 +1,544 @@
+Title: Cycle-Consistent Tuning for Layered Image Decomposition
+
+URL Source: https://arxiv.org/pdf/2602.20989v2
+
+Published Time: Tue, 03 Mar 2026 01:39:40 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# Cycle-Consistent Tuning for Layered Image Decomposition 
+
+## Zheng Gu 1 Min Lu 1 Zhida Sun 1 Dani Lischinski 2 Daniel Cohen-Or 3 Hui Huang 1*
+
+> 1
+
+## Shenzhen University 2Hebrew University of Jerusalem 3Tel Aviv University 
+
+{guzheng.szu, lumin.vis, zhdsun, danix3d, cohenor, hhzhiyan }@gmail.com 
+
+Figure 1. Our method learns to disentangle overlaid logos from their supporting surfaces and recompose them seamlessly onto other objects. Each example shows two input photographs of objects with distinct logos. We first decompose each image into its logo and object layers, and then cross-compose the separated logos onto the other objects. These results demonstrate accurate separation and faithful re-integration across challenging non-linear cases involving complex geometry, lighting, and viewpoint changes. 
+
+## Abstract 
+
+Disentangling visual layers in real-world images is a persistent challenge in vision and graphics, as such layers often involve non-linear and globally coupled interactions, including shading, reflection, and perspective distortion. In this work, we present an in-context image decomposition framework that leverages large diffusion foundation models for layered separation. We focus on the challenging case of logo-object decomposition, where the goal is to disentangle a logo from the surface on which it appears while faithfully preserving both layers. Our method fine-tunes a pretrained diffusion model via lightweight LoRA adaptation and intro-duces a cycle-consistent tuning strategy that jointly trains decomposition and composition models, enforcing recon-struction consistency between decomposed and recomposed 
+
+> *Corresponding author
+
+images. This bidirectional supervision substantially en-hances robustness in cases where the layers exhibit complex interactions. Furthermore, we introduce a progressive self-improving process, which iteratively augments the training set with high-quality model-generated examples to refine performance. Extensive experiments demonstrate that our approach achieves accurate and coherent decompositions and also generalizes effectively across other decomposition types, suggesting its potential as a unified framework for layered image decomposition. Project website is here. 
+
+## 1. Introduction 
+
+Image decomposition has long been a challenging prob-lem in computer vision and computer graphics, aiming to factorize images into semantically or physically mean-ingful layers or components. Classic approaches such 1
+
+> arXiv:2602.20989v2 [cs.CV] 28 Feb 2026
+
+as intrinsic decomposition [5, 6, 43] separate reflectance from shading, typically relying on explicit priors and rigid task formulations. More recent methods leverage alpha-channel representations [44] for layered image decompo-sition [34, 38, 42], yielding structured outputs through ad-ditive layer compositing. These techniques, however, are largely confined to set-tings where components interact linearly (e.g., via alpha blending [34, 44]). In contrast, isolating a logo from a prod-uct photographed under non-frontal viewpoints involves highly non-linear and globally coupled interactions driven by shading, perspective distortion, surface reflectance, and material-dependent appearance [23]. Such cases cannot be resolved by local or patch-based analysis alone; they re-quire non-local reasoning and semantic understanding of what constitutes an object versus an overlaid element. Ad-dressing this challenge calls for data-driven priors that cap-ture scene- and object-level context, as encoded by modern foundation models [20, 31]. In this work, we leverage the representational power of large foundation models to tackle logo-object image decom-position. Rather than relying on handcrafted priors or local statistics [6], we adopt a pretrained image inpainting diffu-sion model to separate an overlaid logo from its supporting object, producing (i) a rectified logo layer (fronto-parallel and largely illumination-invariant) and (ii) a “clean” object image. We realize this adaptation via a lightweight LoRA fine-tuning [15] tailored to this task. Our training follows the In-Context Learning (ICL) paradigm [16], where the supervision is presented in a single three-panel grid image. This encourages the model to internalize the operation of removing or isolating overlaid elements while preserving the underlying structure. Importantly, our method is not a training-free, one-shot scheme [3, 13] conditioned on ex-ample pairs during inference; instead, we adopt the data-driven route and train on a carefully curated dataset to en-sure the outputs remain contextual, consistent, and faithful to the input. This design imparts task-specific decomposi-tion capabilities while retaining the broad generalization of the pretrained model, with performance that scales with the availability and quality of training data. To make this training effective and robust, we introduce a coupled decomposition–composition framework with cy-cle consistency. The decomposition module predicts two outputs from a composite input: the rectified logo and the logo-free object. A complementary composition module then reconstructs the original image from these predicted components. A cycle-consistency loss enforces agreement between the reconstruction and the input, allowing the two modules to supervise each other and reducing the need for densely annotated ground truth. Practically, we organize supervision as triplets (composite, logo, clean object) when available, and fall back on the cycle signal when ground-truth layers are incomplete or imperfect. This joint training substantially stabilizes learning and improves fidelity in the presence of real-world non-linearities. We further propose a self-improving data loop that pro-gressively enlarges and refines the training set. Starting from a small seed of annotated triplets, we train an ini-tial LoRA, use it to generate additional candidate labeled triplets, and select high-quality results to refine the LoRA and yield more reliable labeled data. After that, we train the cycle-consistent model and use it to propose additional decompositions on unlabeled images, selecting high-quality results via automated filters and simple human-in-the-loop checks. The accepted results are then added back into the training pool for subsequent rounds. Combined with our cycle-consistent objective, this bootstrapping strategy steadily improves robustness and semantic accuracy across diverse viewing conditions, materials, and lighting. We validate the effectiveness of the approach through extensive experiments, as illustrated in Figure 1. While our primary focus is logo–object decomposition, we also demonstrate the generality of the framework by applying it to two distinct problems: foreground–background separa-tion and ambient-level decomposition of albedo and light-ing. These results suggest a general paradigm for image decomposition that can handle complex, non-linear, and se-mantically coupled interactions well beyond the specific ap-plication studied in this work. 
+
+## 2. Related Work 
+
+2.1. Diffusion Models 
+
+Diffusion models [14] have emerged as the leading frame-work for high-fidelity visual generation in recent years. They model complex data distributions through a progres-sive denoising process [32]. Since the Stable Diffusion [31] and the Diffusion Transformer [28], these approaches have advanced text-to-image synthesis [4], image transla-tion [22], and controllable image editing [27, 45]. Recent variants such as the FLUX family [20, 21] further improves contextual awareness, enabling localized and spatially con-sistent manipulations. Building on this progress, we extend diffusion models to image decomposition, where a single input is split into distinct components. 
+
+2.2. Visual In-Context Learning 
+
+In-Context Learning (ICL) [10], originated from large lan-guage models (LLMs), indicates the ability of pretrained models to adjust their behavior by leveraging contextual signals [19]. Early works of Visual ICL focus on discrimi-native tasks such as image segmentation [35, 36, 46]. Some later works explore generative visual ICL, such as condi-tional image generation [3, 37, 40] and example-based im-age editing [7, 13, 24]. More recently, researchers have 2(a) Data (b) In -Context Image Decomposition Process             
+
+> Image
+> Encoder ℰ!"#
+> Caption:
+> “A three -panel grid showing a task.
+> [LEFT]: Leather journal with 'PenScript’ logo.
+> [MIDDLE]: Isolated 'PenScript' logo .
+> [RIGHT]: Plain leather journal without logo.”
+> decomposition
+> /composition
+> Masked
+> Image 𝑋
+> Text Encoder ℰ$%$
+> DiT  Block
+> LoRA
+> DiT  Block
+> LoRA
+> DiT  Block
+> LoRA
+
+⋯         
+
+> Flux -Fill
+> Decoder 𝒟 Output Image
+> Composite Logo Object
+> Noise 𝑥
+> Mask 𝑀
+> Text Prompt 𝑇
+
+Figure 2. Overview of the image decompostion framework. Given a composite image, the model receives a masked input, a binary mask indicating the logo region, and a noise latent, and predicts both the isolated logo and the clean object. The process is implemented by tuning a LoRA on top of Flux-Fill. The composition scheme is similar but uses a complementary mask to produce the composite image. 
+
+found that existing Diffusion Models possess inherent in-context abilities during their generation process [16], which enables applications such as image editing through text in-structions [21, 47]. Although these techniques demonstrate strong capability, they are mostly confined to single-input-single-output mappings. In this work, we unlock the single-input-multi-output potential of visual ICL. We achieve this via a simple but effective cycle-consistent tuning strategy, which decomposes and recomposes with contextual infor-mation to enforce mutual correspondence between layers. 
+
+2.3. Asset Extraction via Generative Models 
+
+Recent work has explored the use of generative models for extracting reusable assets directly from images. Affara et al. [1] explored asset extraction for urban street assets through rectified object proposals. RRM [12] introduces radiance-guided material extraction to obtain relightable 3D assets. AssetDropper [23] formulates this problem through conditional image-to-image translation, learning to isolate standardized assets from user-specified regions. It employs a reward-driven optimization process that aligns the ex-tracted assets with visual priors. In contrast, we view this problem from a more general layered decomposition an-gle, where the decomposition is learned jointly with another composition process. Rather than relying on explicit masks or fixed extraction views, our approach infers the layered structure directly from context, enabling decomposition that preserves layers faithfully beyond asset extraction. 
+
+## 3. Method 
+
+In this work, we present a framework for image decompo-sition using large generative models. Leveraging the con-textual understanding capabilities of Diffusion Transform-ers, we fine-tune a pretrained image inpainting model with LoRA to specialize in separating components from single composite images (Section 3.1). To ensure consistency and plausibility between input and decomposed layers, we jointly train a complementary composition model under a cycle-consistency constraint (Section 3.2). Furthermore, we adopt a progressive data collection with a self-improvement strategy that iteratively expands the training using generated pseudo-decompositions filtering (Section 3.3). 
+
+3.1. Preliminaries 
+
+Image Inpainting with DiTs. Our method is built upon FLUX.1-Fill-dev [20], a Diffusion Transformer model de-signed for image inpainting. Given a masked image X, a binary mask M , and noise latent x, the model iteratively re-fines the masked region through a conditional Transformer guided by a text prompt T . As shown in Figure 2, at each timestep t, the forward process can be formulated as: 
+
+xt−1 = ϕ (vθ ([ xt, Eimg (X) , M ] , t, Etxt (T ))) , (1) where vθ denotes the model, Eimg and Etxt are image and text encoders, and ϕ is the flow-matching [11] scheduler. After denoising, the latent x0 is fed into the VAE decoder 
+
+D to reconstruct the complete image. 
+
+Low-Rank Adaptation (LoRA). We adopt Low-Rank Adaptation (LoRA) [15] to efficiently fine-tune the Diffu-sion Transformer. Given a parameter matrix W ∈ Rd×k,LoRA learns the following matrices: 
+
+W ′ = W + U V, (2) where U ∈ Rd×r and V ∈ Rr×k are LoRA parameters (r ≪ d). This enables lightweight adaptation while pre-serving the pretrained model’s capacity. Specifically, to finetune the inpainting model for decom-position, flow matching loss is utilized to encourage the Transformer to predict the velocity field of the forward pro-cess as follows: 
+
+Lrec = Ex,t 
+
+"
+
+vθ (xt, M, t, τ ) − ∂x t
+
+∂x 
+
+> 22
+
+#
+
+, (3) where θ = ( U, V ). M is set to zeros in the regions to be preserved and ones in the regions to be inpainted. 3𝓛 𝒓𝒆𝒄         
+
+> 𝓛 𝒄𝒚𝒄
+> 𝑰 𝑨 𝑩
+> ℱ%(Compose)
+> ℱ&(Decompose)
+> 𝑩 ∗
+> 𝑨 ∗
+> 𝑰 ∗
+> 𝑨 𝑩
+> 𝑨 𝑩
+> 𝑰 ∗
+> 𝑰 ∗
+> ℱ%(Compose)
+> ℱ&(Decompose)
+> 𝑩′ 𝑨′
+> 𝑰′
+> 𝑰
+> 𝑰
+> 𝑩′ 𝑨′
+> 𝑩′ 𝑨′ Figure 3. Illustration of our cycle-consistent training. The model jointly learns decomposition and composition, ensuring the de-composed layers recompose into the original image and vice versa.
+
+3.2. Cycle Consistent Decomposition 
+
+Typically, image decomposition is an ill-posed problem since the number of unknowns exceeds the number of in-puts. Although we can collect ground truth decomposition images to some extent, the supervision is still insufficient to constrain the model. To address this challenge, we in-troduce a cycle consistency constraint to provide additional regularization to the solution space. Unlike decomposition, composition is a well-defined and deterministic process. Therefore, by jointly learning decomposition and compo-sition in a cyclic manner, we enable the model to leverage complementary knowledge from both tasks, thereby stabi-lizing the training and reducing ambiguity. As shown in Figure 3, the model is given an example triplet of images ⟨I, A, B ⟩, where I denotes the combina-tion of A and B. Note that this combination can be either linear alpha blending or more complex nonlinear interac-tions, such as logo-object composition. Our goal is to learn the following two functions at the same time: 
+
+(FD (I) = ⟨A, B ⟩ ,
+
+FC (⟨A, B ⟩) = I, (4) where FD is the decomposition function and FC is the composition function. To learn both functions, during each training step, we operate decomposition and composition symmetrically to supervise each other in two parallel tracks: 1. Starting from I, first predict ⟨A′, B ′⟩ = FD (I), then recompose them into I′ = FC (⟨A′, B ′⟩);2. Starting from A and B, first predict I∗ = FC (⟨A, B ⟩),then decompose it into ⟨A∗, B ∗⟩ = FD (I∗).We employ a cycle consistency loss Lcyc to drive the above learning process: 
+
+Lcyc = Ex,t 1
+
+h
+
+∥vθ (xIt1 , M D , t 1, τ D ) − vθ (xI∗ 
+
+> t1
+
+, M D , t 1, τ D )∥22
+
+i
+
++Ex,t 2
+
+h
+
+∥vθ (x⟨A,B ⟩ 
+
+> t2
+
+, M C , t 2, τ C ) − vθ (x⟨A′,B ′⟩ 
+
+> t2
+
+, M C , t 2, τ C )∥22
+
+i
+
+,
+
+(5) where t1 and t2 are two different timesteps. {MD , τ D } and 
+
+{MC , τ C } are the binary mask and text tokens for decom-position and composition, respectively. In practice, the two functions share the same LoRA parameter space θ, which enhances parameter efficiency and stabilizes the training. 
+
+3.3. Progressive Data Collection 
+
+Training high-quality decomposition models usually re-quires large paired datasets. However, collecting such data for our logo–object decomposition is costly and hard to scale. To overcome this data scarcity, we propose a pro-gressive self-improvement strategy that iteratively expands the training corpus using model-generated data. 
+
+Seed Data Collection. We initiate the process with a small seed dataset comprising 100 manually curated 
+
+⟨I, A, B ⟩ triplets, with the assistance of GPT-4o [17] (Fig-ure 4(a)). This seed set is used to train an initial IC-LoRA [16], which is then employed to generate a large can-didate pool of new triplets from text prompts. 
+
+Iterative Data Generation with IC-LoRA. Given the sparse initial data, the first-generation IC-LoRA exhibits instability and often fails to produce plausible decompo-sitions. A naive expansion of the dataset with these low-quality samples would lead to error propagation. To ad-dress this, we generate data iteratively (Figure 4(b)). We use Qwen-VL [2] to filter generated triplets based on visual plausibility and decomposition consistency. This filtered dataset is then used to train IC-LoRA for the next round. This iterative process of generation, filtering, and retraining progressively enhances the data generation stability. 
+
+Self-improving the Cycle-Consistent Model. We ap-ply a similar iterative self-improving methodology to train the cycle-consistent decomposition and composition model (Figure 4(c)). In each iteration, we first generate a large batch of composite images. The cycle model from the pre-vious iteration is then used to perform a full decomposition-recomposition cycle on this new data. Examples that are 4Qwen 
+
+> “A three -panel grid…”
+
+Eval Good IC -LoRA     
+
+> (𝑖 +1)th round
+> 1K samples
+
+IC -LoRA       
+
+> 𝑖 th round
+> (b) Iterative data generation
+> 5K samples
+> (c) Self -improving the Cycle -Consistent Model
+
+Eval Good Decompose 
+
+> &Compose
+
+Cycle Model         
+
+> “I will give you two images, showing a logo,
+> and a product, respectively. Your task is to
+> generate the following image: an image of
+> the product with the logo printed .” GPT -4o
+> (a) Seed data collection
+
+IC -LoRA  
+
+> round 0
+> 100 samples
+> Training
+> Inference
+> Filtering
+> Assignment
+
+Figure 4. Illustration of progressive data collection. (a) We first collect a seed dataset to obtain an IC-LoRA as the initial data generator. (b) In each round, we select high-quality samples generated by the current LoRA and reintroduce them to the training set. (c) During the training of the cycle model, we use it to produce consistent data by decomposing an image, and then re-composing it. High-quality recomposition samples are added back into the training set. 
+
+evaluated as high fidelity are considered pseudo-samples. These samples are retained and incorporated into the train-ing set for each iteration. This self-curation process ensures that the model continuously benefits from increasingly re-liable supervision, resulting in demonstrable improvements in decomposition stability, coherence, and generalizability. 
+
+## 4. Experiments 
+
+4.1. Comparison Methods 
+
+To benchmark our approach, we compare our method against baselines from two categories: asset-focused and instruction-based editing. For asset-focused editing, we compare against AssetDropper [23], in which Ground-ingDINO [26] is required to locate the logo first. For instruction-based editing, we evaluate IC-Edit [47], Flux-Kontext [21], and Gemini [9]. We use the instruction “ Ex-tract the logo, remove the object and background ” to get the logo layer and “ Remove the logo ” to obtain the object layer. 
+
+4.2. Quantitative Results 
+
+Quantitative evaluation is conducted on 1.5K synthetic test samples using two metrics: (a) VQAScore [25], which mea-sures text-image alignment. VQAScore is computed inde-pendently on the decomposed logo and object; (b) VLM-Score, in which we use different VLMs to assess decom-position results on a 1-5 scale across four aspects: Logo Isolation, Logo Consistency, Object Isolation, and Object Consistency. Please check out the supplementary material for more detail on the evaluation. Results in Table 1 demonstrate that we achieve the high-est logo VQAScore and VLMScore, confirming our supe-riority in separating logos. In contrast, while instruction-based models (Gemini [9], Flux-Kontext [21]) excel at logo removal (high object scores), they struggle to accurately isolate the logo. AssetDropper [23], while specialized for asset extraction, degrades in complex non-linear scenarios and, crucially, fails to recover the underlying object. 
+
+4.3. Qualitative Results 
+
+We present a qualitative comparison with baseline methods in Figure 5. The figure showcases five challenging scenar-ios: illumination variation, perspective distortion, logos on non-planar (3D) surfaces, textual elements, and transparent materials. These examples demonstrate the methods’ vary-ing abilities to handle non-linear layer interactions. Across all cases, our approach consistently produces cleaner iso-lated logos and more coherent objects. In contrast, compet-ing methods exhibit noticeable artifacts, incomplete separa-tions, or fail to preserve layer consistency. Figure 6 shows our method’s generalization on in-the-wild photographs. 
+
+4.4. Ablation Studies 
+
+We conduct ablation studies to validate our component de-sign choices, with results in Figure 7. We first establish a baseline by training the decomposition model only on data 5Ours Input AssetDropper+Flux Fill Flux Kontext Gemini ICEdit 
+
+> Lighting Perspective 3D  Effect Text  & Lighting Text  & Transparency
+
+Figure 5. Qualitative comparison on challenging scenarios on synthetic data. The first column shows the inputs, while the following columns present results from our approach and four baselines: AssetDropper [23], Flux-Kontext [21], Gemini [9], and ICEdit [47]. The decomposed object layers appear at the bottom-right of each sample. For AssetDropper [23], we use FLUX-Fill [20] to inpaint the logo region as the object layer. Note that all the synthetic images are generated from a prompt, not composited from a logo and a clean object. Table 1. Quantitative comparison using VQAScore and VLMScore, higher is better. To prevent potential evaluation bias, we utilize three VLMs as evaluators ( i.e. , Qwen, GPT-4o, and Gemini). The best and second best results are highlighted. 
+
+Method VQAScore ↑ VLMScore ↑ (Qwen / GPT4o / Gemini) Logo Object Logo Isolation Logo Consistency Object Isolation Object Consistency Average AssetDropper 0.42 — 4.49 / 2.87 / 4.84 3.84 / 4.00 / 3.90 — — —ICEdit 0.31 0.31 1.09 / 2.70 / 1.02 1.56 / 2.58 / 1.00 2.35 / 3.93 / 3.88 3.80 / 3.42 / 3.32 2.55 
+
+Kontext 0.40 0.32 3.27 / 2.73 / 3.28 4.17 / 4.04 / 2.80 2.80 / 3.75 / 4.64 4.75 / 4.26 / 4.94 3.79 
+
+Gemini 0.42 0.32 4.39 / 2.63 / 4.72 4.05 / 4.36 / 3.72 3.09 / 4.39 / 4.72 4.81 / 4.63 / 4.93 4.20 
+
+Ours 0.43 0.31 4.50 / 2.77 / 4.76 4.22 / 4.43 / 3.94 3.35 / 4.33 / 4.37 4.70 / 4.62 / 4.67 4.22 
+
+6Input Logo Object Input Logo Object Input Logo Object Figure 6. Decomposition results on real photographs. Our approach successfully decomposes both well-known brand logos and uncommon text signs under diverse lighting and perspective conditions, demonstrating strong generalization in real-world environments. Input         
+
+> Base Model +Iterative +Cycle
+> +Self Improv.
+> (Full Model)
+> Input
+
+Figure 7. Ablation study. Each row visualizes the decomposition results with progressively adding the proposed components. The decomposed logos and objects become clearer and more consistent from the base model to the full model. 
+
+from the initial Round 0 IC-LoRA generator, which yields poor separations. Introducing Iterative Data Generation measurably improves decomposition, demonstrating the benefit of higher-quality data. Adding Cycle-Consistency provides a significant enhancement in logo fidelity and iso-lation. Finally, incorporating the Self-Improving Process (our full model) further refines object consistency and re-alism. To validate our progressive data collection strategy, Figure 8 plots the selection rate of high-quality samples per round. The increasing proportion confirms that our model’s Iterative data generation Self -improving 
+
+Figure 8. Selection rate of high-quality samples generated by our approach across different data collection rounds. The selection rate increases steadily as the round number grow from 1 to 10 .
+
+data generation quality iteratively improves, providing su-perior supervision for subsequent training. 
+
+4.5. User Study 
+
+To complement VLM-based evaluation, we conducted a user study consisting of 20 questions with 30 participants. In each question, participants ranked four anonymized de-composition results from best to worst according to two cri-teria: (a) consistency, measuring how accurately the logo is extracted, and (b) perceptual reasonableness, assessing whether the result appears natural without non-linear arti-facts. The results are summarized below. As illustrated in Figure 10, our method is ranked top-1 in over 50% of the cases. AssetDropper [23], as a task specific logo extraction method, outperforms Flux-Kontext [21] and Gemini [9], which is consistent with its design focus. While Gemini [9] achieves strong VLM scores, it does not show the same advantage in user study, likely due to tenden-cies such as preserving original size or producing pseudo-transparent outputs, which are less favored by human. 7Input Albedo Shading               
+
+> Input FG BG
+> Input Albedo Shading
+> (a) Intrinsic Decomposition
+> Input FG BG
+> (b) Foreground -background Decomposition
+> Input Albedo Shading
+> Input FG BG
+
+Figure 9. Our decomposition results on (a) intrinsic decomposition, which decomposes an input image into albedo and shading layers, and (b) foreground-background decomposition, which separates a foreground object from its background scene. These qualitative results are supported by quantitative evaluation (e.g., Table 2), confirming the consistency and reliability of our decomposition framework. Pairwise preference 𝑃 (𝑖 ≻ 𝑗 )Rank distribution 
+
+Figure 10. Visualization of user study results. Left: Rank distribu-tion; Right: Pairwise preference heat map. 
+
+4.6. Generalization to Other Decomposition Tasks 
+
+Intrinsic Decomposition. We evaluate our method on intrinsic decomposition, which factors an image into re-flectance (albedo) and shading. Without task-specific pri-ors, we train our cycle model on the Hypersim dataset [30] and evaluate on the MAW dataset [39]. As shown in Ta-ble 2, our approach achieves comparable accuracy to SOTA methods specifically tailored for this task. Crucially, an ablation against a variant lacking cycle consistency shows consistent improvement, demonstrating its benefit in stabi-lizing this decomposition. Qualitative results in Figure 9(a) further verify our framework’s effectiveness. 
+
+Foreground-background Decomposition. We also test our method on foreground-background decomposition, 
+
+Table 2. Quantitative comparison on intrinsic decomposition. For the compared methods, we report their results presented by Careaga et al. [6]. Lower values indicate better performance. 
+
+Method Intensity ( ×100) ↓ Chromaticity ↓
+
+Careaga et al. [5] 0.57 6.56 Kocsis et al. [18] 1.13 5.35 Chen et al. [8] 0.98 4.12 Careaga et al. [6] 0.54 3.37 
+
+Ours (w/o Cycle) 0.59 3.65 Ours 0.57 3.54 
+
+which aims to disentangle salient objects from their contex-tual environments. We make a training set of ∼5K triplets by generating composite images (FLUX.1-dev [20]), cre-ating the background layer (Flux-Kontext [21]), and extracting the foreground (GroundingDINO [26] and SAMv2 [29]). After training our cycle model on this dataset, it produces clear decompositions, as shown in Fig-ure 9(b). These results further demonstrate the generaliza-tion of our framework to other separation tasks. 
+
+## 5. Conclusions, Limitations, and Future Work 
+
+In this paper, we revisited the problem of layered image de-composition through the lens of in-context learning. While 8diffusion-based in-context models have mostly been ex-plored for composition and editing, we showed that the same paradigm can also be extended to the inverse pro-cess to decompose or unmix an image into its constituent layers. Central to our framework is a cross-cycle train-ing scheme, where decomposition and composition mod-els are trained jointly to validate each other, enabling the handling of non-linear and globally coupled interactions be-tween layers through one model. This is different from pre-vious work DecompDiffusion [33], which addresses image decomposition by training separate models. While our method shows strong and consistent perfor-mance across a wide range of settings, it is not entirely bulletproof. The model still struggles with certain out-of-domain cases, particularly when the overlaid element dom-inates the scene, such as very large brand logos on walls or billboards. These cases often fall outside the distribution of training data and remain challenging for current mod-els trained under limited diversity. Another limitation is the handling of multi-layer decomposition. Our current formu-lation is designed for separating up to two layers and cannot easily generalize to images containing multiple overlaid el-ements, such as posters with several distinct logos or text layers. This constraint mainly arises from the limited-grid paradigm used for inpainting-based visual in-context learn-ing, a limitation shared with other VICL approaches [3, 47]. Beyond these limitations, the formulation reflects a broader idea that generative models can learn not only to compose but also to disassemble. Treating composition and decomposition as dual, cross-linked processes allows the model to internalize how image layers interact, rather than relying on explicit supervision or handcrafted priors. Looking ahead, coupling decomposition and composi-tion through mutual supervision opens several promising directions. The same principle may extend to motion, il-lumination, or multimodal information such as audio and 3D structure. More broadly, it encourages models that dis-cover structure from weak or implicit supervision, moving toward a unified understanding of visual composition. 
+
+## Acknowledgements 
+
+This work was supported in parts by Guangdong Science and Technology Program (2024B0101050004), ICFCRT (W2441020), Shenzhen Science and Technology Program (KJZD20240903100022028, KQTD20210811090044003, RCJC20200714114435012), NSFC (62472288), Israel Sci-ence Foundation (3441/21, 1473/24, 2203/24), and Scien-tific Development Funds from Shenzhen University. 
+
+## References 
+
+[1] Lama Affara, Liangliang Nan, Bernard Ghanem, and Peter Wonka. Large scale asset extraction for urban images. In 
+
+European Conference on Computer Vision (ECCV) , pages 437–452, 2016. 3 [2] Shuai Bai, Keqin Chen, Xuejing Liu, Jialin Wang, Wenbin Ge, Sibo Song, Kai Dang, Peng Wang, Shijie Wang, Jun Tang, et al. Qwen2.5-vl technical report. arXiv preprint arXiv.2502.13923 , 2025. 4, 1, 2 [3] Amir Bar, Yossi Gandelsman, Trevor Darrell, Amir Glober-son, and Alexei Efros. Visual prompting via image inpaint-ing. Conference on Neural Information Processing Systems (NeurIPS) , 35:25005–25017, 2022. 2, 9 [4] James Betker, Gabriel Goh, Li Jing, Tim Brooks, Jianfeng Wang, Linjie Li, Long Ouyang, Juntang Zhuang, Joyce Lee, Yufei Guo, et al. Improving image generation with better captions. Computer Science. https://cdn. openai. com/papers/dall-e-3. pdf , 2(3):8, 2023. 2 [5] Chris Careaga and Ya˘ gız Aksoy. Intrinsic image decompo-sition via ordinal shading. ACM Transactions on Graphics (TOG) , 43(1):1–24, 2023. 2, 8 [6] Chris Careaga and Ya˘ gız Aksoy. Colorful diffuse intrinsic image decomposition in the wild. ACM Transactions on Graphics (TOG) , 43(6):1–12, 2024. 2, 8 [7] Lan Chen, Qi Mao, Yuchao Gu, and Mike Zheng Shou. Edit transfer: Learning image editing via vision in-context rela-tions. arXiv preprint arXiv.2503.13327 , 7, 2025. 2 [8] Xi Chen, Sida Peng, Dongchen Yang, Yuan Liu, Bowen Pan, Chengfei Lv, and Xiaowei Zhou. Intrinsicanything: Learn-ing diffusion priors for inverse rendering under unknown il-lumination. In European Conference on Computer Vision (ECCV) , pages 450–467, 2024. 8 [9] Gheorghe Comanici, Eric Bieber, Mike Schaekermann, Ice Pasupat, Noveen Sachdeva, Inderjit Dhillon, Marcel Blis-tein, Ori Ram, Dan Zhang, Evan Rosen, et al. Gemini 2.5: Pushing the frontier with advanced reasoning, multimodality, long context, and next generation agentic capabilities. arXiv preprint arXiv:2507.06261 , 2025. 5, 6, 7 [10] Qingxiu Dong, Lei Li, Damai Dai, Ce Zheng, Jingyuan Ma, Rui Li, Heming Xia, Jingjing Xu, Zhiyong Wu, Baobao Chang, et al. A survey on in-context learning. In Confer-ence on Empirical Methods in Natural Language Processing (EMNLP) , pages 1107–1128, 2024. 2 [11] Patrick Esser, Sumith Kulal, Andreas Blattmann, Rahim Entezari, Jonas M¨ uller, Harry Saini, Yam Levi, Dominik Lorenz, Axel Sauer, Frederic Boesel, et al. Scaling recti-fied flow transformers for high-resolution image synthesis. In International Conference on Machine Learning (ICML) ,2024. 3 [12] Diego Gomez, Julien Philip, Adrien Kaiser, and ´ Elie Michel. Rrm: Relightable assets using radiance guided material ex-traction. In Computer Graphics International Conference (CGI) , pages 17–41, 2024. 3 [13] Zheng Gu, Shiyuan Yang, Jing Liao, Jing Huo, and Yang Gao. Analogist: Out-of-the-box visual in-context learning with image diffusion model. ACM Transactions on Graphics (TOG) , 43(4):1–15, 2024. 2 [14] Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffu-sion probabilistic models. Conference on Neural Information Processing Systems (NeurIPS) , 33:6840–6851, 2020. 2 
+
+9[15] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al. Lora: Low-rank adaptation of large language models. Inter-national Conference on Learning Representations (ICLR) , 1 (2):3, 2022. 2, 3 [16] Lianghua Huang, Wei Wang, Zhi-Fan Wu, Yupeng Shi, Huanzhang Dou, Chen Liang, Yutong Feng, Yu Liu, and Jin-gren Zhou. In-context lora for diffusion transformers. arXiv preprint arXiv.2410.23775 , 2024. 2, 3, 4, 1 [17] Aaron Hurst, Adam Lerer, Adam P Goucher, Adam Perel-man, Aditya Ramesh, Aidan Clark, AJ Ostrow, Akila Weli-hinda, Alan Hayes, Alec Radford, et al. Gpt-4o system card. 
+
+arXiv preprint arXiv:2410.21276 , 2024. 4 [18] Peter Kocsis, Vincent Sitzmann, and Matthias Nießner. In-trinsic image diffusion for indoor single-view material esti-mation. In IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 5198–5208, 2024. 8 [19] Takeshi Kojima, Shixiang Shane Gu, Machel Reid, Yutaka Matsuo, and Yusuke Iwasawa. Large language models are zero-shot reasoners. Conference on Neural Information Pro-cessing Systems (NeurIPS) , 35:22199–22213, 2022. 2 [20] Black Forest Labs. Flux. https://github.com/ black-forest-labs/flux , 2024. 2, 3, 6, 8 [21] Black Forest Labs, Stephen Batifol, Andreas Blattmann, Frederic Boesel, Saksham Consul, Cyril Diagne, Tim Dock-horn, Jack English, Zion English, Patrick Esser, Sumith Ku-lal, Kyle Lacey, Yam Levi, Cheng Li, Dominik Lorenz, Jonas M¨ uller, Dustin Podell, Robin Rombach, Harry Saini, Axel Sauer, and Luke Smith. Flux.1 kontext: Flow matching for in-context image generation and editing in latent space. 
+
+arXiv preprint arXiv.2506.15742 , 2025. 2, 3, 5, 6, 7, 8 [22] Bo Li, Kaitao Xue, Bin Liu, and Yu-Kun Lai. Bbdm: Image-to-image translation with brownian bridge diffusion models. In IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 1952–1961, 2023. 2 [23] Lanjiong Li, Guanhua Zhao, Lingting Zhu, Zeyu Cai, Lequan Yu, Jian Zhang, and Zeyu Wang. Assetdropper: As-set extraction via diffusion models with reward-driven opti-mization. In Proceedings of the Special Interest Group on Computer Graphics and Interactive Techniques Conference Conference Papers , pages 1–11, 2025. 2, 3, 5, 6, 7 [24] Zhong-Yu Li, Ruoyi Du, Juncheng Yan, Le Zhuo, Zhen Li, Peng Gao, Zhanyu Ma, and Ming-Ming Cheng. Visual-cloze: A universal image generation framework via visual in-context learning. arXiv preprint arXiv.2504.07960 , 2025. 2[25] Zhiqiu Lin, Deepak Pathak, Baiqi Li, Jiayao Li, Xide Xia, Graham Neubig, Pengchuan Zhang, and Deva Ramanan. Evaluating text-to-visual generation with image-to-text gen-eration. In European Conference on Computer Vision (ECCV) , pages 366–384, 2024. 5 [26] Shilong Liu, Zhaoyang Zeng, Tianhe Ren, Feng Li, Hao Zhang, Jie Yang, Qing Jiang, Chunyuan Li, Jianwei Yang, Hang Su, et al. Grounding dino: Marrying dino with grounded pre-training for open-set object detection. In Euro-pean Conference on Computer Vision (ECCV) , pages 38–55, 2024. 5, 8 [27] Chenlin Meng, Yutong He, Yang Song, Jiaming Song, Jia-jun Wu, Jun-Yan Zhu, and Stefano Ermon. Sdedit: Guided image synthesis and editing with stochastic differential equa-tions. International Conference on Learning Representations (ICLR) , 2021. 2 [28] William Peebles and Saining Xie. Scalable diffusion mod-els with transformers. In IEEE International Conference on Computer Vision (ICCV) , pages 4195–4205, 2023. 2 [29] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Roman R¨ adle, Chlo´ e Rolland, Laura Gustafson, Eric Mintun, Junt-ing Pan, Kalyan Vasudev Alwala, Nicolas Carion, Chao-Yuan Wu, Ross B. Girshick, Piotr Doll´ ar, and Christoph Feichtenhofer. SAM 2: Segment anything in images and videos. In International Conference on Learning Represen-tations (ICLR) , 2025. 8 [30] Mike Roberts, Jason Ramapuram, Anurag Ranjan, Atulit Kumar, Miguel Angel Bautista, Nathan Paczan, Russ Webb, and Joshua M Susskind. Hypersim: A photorealistic syn-thetic dataset for holistic indoor scene understanding. In 
+
+IEEE International Conference on Computer Vision (ICCV) ,pages 10912–10922, 2021. 8 [31] Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Bj¨ orn Ommer. High-resolution image syn-thesis with latent diffusion models. In IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 10684–10695, 2022. 2 [32] Yang Song and Stefano Ermon. Generative modeling by es-timating gradients of the data distribution. Conference on Neural Information Processing Systems (NeurIPS) , 32, 2019. 2[33] Jocelin Su, Nan Liu, Yanbo Wang, Joshua B Tenenbaum, and Yilun Du. Compositional image decomposition with diffu-sion models. In International Conference on Machine Learn-ing (ICML) , pages 46823–46842. PMLR, 2024. 9 [34] Tomoyuki Suzuki, Kang-Jun Liu, Naoto Inoue, and Kota Ya-maguchi. Layerd: Decomposing raster graphic designs into layers. arXiv preprint arXiv.2509.25134 , 2025. 2 [35] Xinlong Wang, Wen Wang, Yue Cao, Chunhua Shen, and Tiejun Huang. Images speak in images: A generalist painter for in-context visual learning. In IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 6830–6839, 2023. 2 [36] Xinlong Wang, Xiaosong Zhang, Yue Cao, Wen Wang, Chunhua Shen, and Tiejun Huang. Seggpt: Segmenting ev-erything in context. arXiv preprint arXiv.2304.03284 , 2023. 2[37] Zhendong Wang, Yifan Jiang, Yadong Lu, Pengcheng He, Weizhu Chen, Zhangyang Wang, Mingyuan Zhou, et al. In-context learning unlocked for diffusion models. Conference on Neural Information Processing Systems (NeurIPS) , 36: 8542–8562, 2023. 2 [38] Zitong Wang, Hang Zhao, Qianyu Zhou, Xuequan Lu, Xi-angtai Li, and Yiren Song. Diffdecompose: Layer-wise de-composition of alpha-composited images via diffusion trans-formers. arXiv preprint arXiv.2505.21541 , 2025. 2 [39] Jiaye Wu, Sanjoy Chowdhury, Hariharmano Shanmugaraja, David Jacobs, and Soumyadip Sengupta. Measured albedo in 
+
+10 the wild: Filling the gap in intrinsics evaluation. In Interna-tional Conference on Computational Photography (ICCP) ,pages 1–12, 2023. 8 [40] Jiarui Xu, Yossi Gandelsman, Amir Bar, Jianwei Yang, Jian-feng Gao, Trevor Darrell, and Xiaolong Wang. Improv: Inpainting-based multimodal prompting for computer vision tasks. Transactions on Machine Learning Research (TMLR) ,2023. 2 [41] An Yang, Anfeng Li, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao, Chengen Huang, Chenxu Lv, et al. Qwen3 technical report. arXiv preprint arXiv:2505.09388 , 2025. 1 [42] Jinrui Yang, Qing Liu, Yijun Li, Soo Ye Kim, Daniil Pakho-mov, Mengwei Ren, Jianming Zhang, Zhe Lin, Cihang Xie, and Yuyin Zhou. Generative image layer decomposition with visual effects. In IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 7643–7653, 2025. 2 [43] Zheng Zeng, Valentin Deschaintre, Iliyan Georgiev, Yannick Hold-Geoffroy, Yiwei Hu, Fujun Luan, Ling-Qi Yan, and Miloˇ s Haˇ san. Rgbx: Image decomposition and synthesis us-ing material- and lighting-aware diffusion models. In Special Interest Group on Computer Graphics and Interactive Tech-niques Conference (SIGGRAPH) , 2024. 2 [44] Lvmin Zhang and Maneesh Agrawala. Transparent image layer diffusion using latent transparency. ACM Transactions on Graphics (TOG) , 43(4):1–15, 2024. 2, 1 [45] Lvmin Zhang, Anyi Rao, and Maneesh Agrawala. Adding conditional control to text-to-image diffusion models. In 
+
+IEEE International Conference on Computer Vision (ICCV) ,pages 3836–3847, 2023. 2 [46] Yuanhan Zhang, Kaiyang Zhou, and Ziwei Liu. What makes good examples for visual in-context learning? Conference on Neural Information Processing Systems (NeurIPS) , 36: 17773–17794, 2023. 2 [47] Zechuan Zhang, Ji Xie, Yu Lu, Zongxin Yang, and Yi Yang. In-context edit: Enabling instructional image editing with in-context generation in large scale diffusion transformer. arXiv preprint arXiv.2504.20690 , 2025. 3, 5, 6, 9 
+
+11 Cycle-Consistent Tuning for Layered Image Decomposition 
+
+# Supplementary Material 
+
+## A. Implementation Details 
+
+A.1. Training and Inference Details 
+
+We implement our approach with PyTorch. Our data cu-ration involves a 5-round iterative generation stage ( ∼5k samples) followed by a 5-round self-improving stage ( ∼5k samples), yielding a final corpus of ∼10k samples. In each round of iterative data collection, the model is optimized for 4K steps with the learning rate set to 1. The LoRA rank and alpha is set to 32 for the IC-LoRA adapter. We train the cycle-consistent model for 5K to 10K steps in each round, with the step count increasing across rounds as the dataset grows. The learning rate gradually decays from 1 to 0.5. The LoRA rank and LoRA alpha are also set to 32. We use Qwen-VL-7B [2] as a VLM-based filter to eval-uate and select high-quality generated examples. Inspired by Zhang et al. [44], the newly added high-quality samples in each round are assigned double the sampling weight. Experiments are conducted on eight NVIDIA L40 GPU. The inference takes 35 seconds per image with 50 steps, which is within the normal inference time of Flux-Fill. No-tably, our method does not require multiple runs. The logo and object are produced together in one generation. 
+
+A.2. Cycle Consistency Loss 
+
+In our proposed cycle consistency loss, consider track 1, the model first performs decomposition and then composition. The outputs from the first stage serve as the inputs to the second stage. Since flow-based Diffusion Models do not directly predict images but velocity fields instead, we must convert the first-stage outputs into a clean latent required for the second-stage. To achieve this, in our implementation, we approximate a clean latent after the first stage using the following procedure: 
+
+x0 ≈ xt − t · vθ ([ xt, Eimg (X), M d] , t, Etxt (Td)) , (6) where vθ denotes the model, Eimg and Etxt are image and text encoders, Md and Td are binary mask and text prompts for the decomposition task. Below we show that this ap-proximation is reasonable. During each training step, a random timestep t ∈ [0 , 1] 
+
+is sampled to construct a noisy latent by linearly mixing the clean latent x0 and the random noise x1 by: 
+
+xt = (1 − t) · x0 + t · x1. (7) The model then predicts the velocity v conditioned on xt,together with auxiliary inputs including the masked image, the binary mask, etc. The objective is encouraging the model prediction v to match the direction between x1 and 
+
+x0 by minimizing the following term: 
+
+L = || v − (x1 − x0)|| 22. (8) When this objective becomes sufficiently small (i.e., closely heading zero), combining Equation (7) and Equation (8) yields an approximation of the clean latent: 
+
+x0 ≈ xt − t · v. (9) Given this approximation, we can recover an estimate of the clean latent and feed it into the second stage, which is both computationally efficient and empirically stable. In practice, we sample two timesteps independently for track 1 and track 2 to strengthen the cycle constraints from different noise levels. Algorithm 1 provides a Pytorch-like pseudo-code to calculate the cycle consistency loss in one step. 1
+
+## B. LLM/VLM Prompts and Templates 
+
+B.1. Seed Data Generation 
+
+Given a isolated logo image and a clean object image (which is also synthetic), we use the following instruction to generate the seed dataset under the assistance of GPT-4o.  
+
+> I will give you two images, showing a logo, and a prod-uct, respectively. Your task is to generate the follow-ing image: an image of the product with logo printed.
+> {Logo Image } { Object Image }.
+
+B.2. Iterative Data Generation 
+
+LLM-Generated Prompts. In the iterative data genera-tion process, we adopt IC-LoRA [16] to collect sufficient 
+
+1 × 3 grid-like images. After one training round is finished, we use the following instruction to collect a large and di-verse set of structured text prompts using Qwen3 [41].                  
+
+> You are a text-to-image prompt generation assistant. Your task is to generate diverse and high-quality text prompts for branded product decomposition images. Below are some existing examples that have been suc-cessfully generated: {Last five generated prompts }.Your goal is to create a new prompt that is dif-ferent from these examples in terms of: Product type/category; Brand name and style; Logo design ele-ments; Background setting and color. The generated prompt should maintain the format: A three-panel image grid illustrating the decomposition of a branded product.[LEFT] [MIDDLE] [RIGHT].
+> 1In this pseudo-code, diffusion latents x0, x 1, x tare written as
+> x0, x 1, x tto reserve subscripts for other indices.
+
+1ALGORITHM 1: Pytorch-like pseudo-code for the cal-culate of cycle-consistent loss in one training step 
+
+# X1×3: ground truth image # Md, M c: binary masks # τd, τ c: text embeddings 
+
+Function get pred( X, M, t, τ, x 0=None , x 1=None )# prepare latents 
+
+if x0 is None then 
+
+x0 ← enc img (X)
+
+end if x1 is None then 
+
+x1 ← N (0 , I )
+
+end 
+
+xt ← (1 − t) · x0 + t · x1
+
+c ← [enc img (M ⊙ X) , M ]
+
+# predict velocity 
+
+pred ← transformer  xt, c, t, τ 
+
+tgt ← x1 − x0
+
+x0 ← xt − t · pred 
+
+return  pred , tgt , x 0, x 1
+
+end Function cycle step( X1×3, M d, M c, τ d, τ c)# sample timesteps 
+
+t1, t 2 ← σ (N (0 , 1)) 
+
+# track 1: decompose  pd, g d, x 0
+
+> d
+
+, x 1
+
+> d
+
+ ← get pred (X1×3, M d, t 1, τ d)
+
+# track 2: compose  pc, g c, x 0 
+
+> c
+
+, x 1
+
+> c
+
+ ← get pred (X1×3, M c, t 2, τ c)
+
+# track 1: decompose & compose 
+
+(˜ pc, ·, ·, ·) ← get pred  X1×3, M c, t 2, τ c, x 0
+
+> d
+
+, x 1
+
+> c
+
+
+
+# track 2: compose & decompose 
+
+(˜ pd, ·, ·, ·) ← get pred  X1×3, M d, t 1, τ d, x 0 
+
+> c
+
+, x 1
+
+> d
+
+
+
+# reconstruction loss 
+
+Lrec ← mse (pd, g d) + mse (pc, g c)
+
+# cycle consistency loss 
+
+Lcyc ← mse (pd, ˜pd) + mse (pc, ˜pc)
+
+return Ltotal ← L rec + Lcyc 
+
+end 
+
+Templated Prompts. During the self-improving process, we no longer construct new 1 × 3 ground-truth triplets be-yond those obtained in the iterative data generation phase. Instead, we focus on synthesizing increasingly diverse com-posite images. These composites are then fed into our cycle model, which performs decomposition and recomposition to yield supervision with higher quality and diversity. 
+
+A high-quality photo of a {material } { function } fea-turing a prominently visible logo of type {logo type }.The logo is {logo style }, {logo content }, and rendered in a {logo color scheme } scheme. It appears {logo texture }, positioned at the {logo placement } of the product, naturally following the {geometry } shape and 
+
+{surface state } texture of the surface. The logo con-forms realistically to the material — showing subtle distortions, shading, and reflections that match the un-derlying {material } surface. The overall composition emphasizes the tactile interaction between the logo and the object, revealing slight curvature, depth, and per-spective alignment consistent with a real printed or em-bedded mark. The object is captured with a {viewpoint } viewpoint and is framed in a {composition style } composition, under {lighting type } lighting from the {lighting di-rection } direction, featuring {lighting quality } illumi-nation in a {environment } setting. The background is {background }. The exposure is {exposure } with a 
+
+{color balance } color balance. This image is sourced from a {data source }, showcasing realistic physical in-tegration of the logo with the product surface. 
+
+B.3. VLMScore Evaluation 
+
+We adopt Qwen2.5-VL [2] to evaluate the decomposition results automatically using the following instruction. 
+
+Your task is to analyze a 1x3 grid image containing three square images arranged in one row (left, middle, right). Answer these four questions by outputting scores rang-ing from 1-5 (1 for ”No”, 2 for ”Probably No”, 3 for ”Uncertain”, 4 for ”Probably Yes”, and 5 for ”Yes”): 1. Does the middle image show only a logo with no product visible? 2. Is the logo in the middle image the same as the logo visible in the left image? 3. Does the right image show only a product with no logo visible? 4. Is the product in the right image identical to the product shown in the left image (same item, shape, de-sign, structure)? 
+
+The results for the four questions above are averaged over the entire test set and reported as quantitative metrics for logo isolation, logo consistency, object isolation, and object consistency, respectively. 
+
+## C. Additional Results 
+
+C.1. Decompose&Compose 
+
+Figure S1 illustrates the effectiveness of decompose & com-pose operation in the self-improving process. Before the cycle model is introduced, the generated samples may ex-hibit inconsistent decomposition results (red boxes), which lead to imperfect supervision signals. After enabling the re-composition, the obtained grid provides consistency logo 2Inconsistent object & BG       
+
+> Decompose
+> Consistent object &BG
+> Inconsistent object
+> Re -compose
+> Consistent object
+> Decompose Re -compose
+
+Figure S1. Illustration of the decompose&compose operation. With the bidirectional generation capability of the cycle model, we are able to collect high-quality samples with improved consis-tency. Input    
+
+> Gemini+example Our s
+> Input
+> Gemini Gemini+example Our sGemini
+
+Figure S2. Comparison with Gemini with additional example. 
+
+and objects (green boxes), allowing us to create higher-quality samples to refine the training set. 
+
+C.2. Providing Additional Context to Baselines 
+
+In Figure S2, we evaluated Gemini both with and without an in-context demonstration, and observe that providing ad-ditional context improves its decomposition quality. Im-portantly, even under this strengthened setting, our method continues to produce more coherent decompositions in the presence of non-linear layer interactions. 
+
+C.3. Comparison with Baselines on Composition 
+
+Figure S3 shows additional comparison on compositing ob-jects and logos with Gemini and GPT-4o. Compared with Gemini, our method is less affected by object color (in the first row) and perspective distortions (in the second row). Relative to GPT-4o, we obtain more consistent logo isola-tion and recombination. 
+
+C.4. Comparison with Baselines on Decomposition 
+
+Figure S4 presents additional comparison of our approach with the baseline methods. Our method produces more faithful logo and cleaner object layers under a wide range of Object Logo GPT -4o Gemini Ours 
+
+Figure S3. Comparison on logo-object composition. The first two rows are object and logo image, followed by outputs from Gemini, GPT-4o and our approach. 
+
+challenging cases, including non-uniform lighting, perspec-tive distortion, complex surfaces and transparent objects. 
+
+C.5. Decomposition on Synthetic Images 
+
+Figure S5 shows additional decomposition results on our synthetic test dataset. These input images offer various challenging scenarios in lighting, perspective, material, and transparent objects. The results produce clean and consis-tent layers, demonstrating the effectiveness of our approach. 
+
+C.6. Decomposition on Real-world Images 
+
+Figure S6 presents additional results on real-world pho-tographs. In the first five rows, we show decomposition re-sults on well-known brand logos. The next five rows show decomposition results on less common logos. 
+
+C.7. Intrinsic Decomposition 
+
+Figure S7 shows more results on intrinsic decomposition, where our approach produces reasonable layers of albedo and shading. These results further illustrate that the same in-context generation mechanism can generalize to physics-related decompositions without hand-designed priors. 
+
+C.8. Foreground Background Decomposition 
+
+Figure S8 presents additional results on foreground-background decomposition. Our approach successfully iso-lates the salient objects while producing coherent back-ground layers with the effects of objects (e.g., shadows) re-moved. We believe these results highlight the potential of large foundation models to handle graphic tasks that require contextual consistency with internal correspondence. 3Ours Input AssetDropper+Flux Fill Flux Kontext Gemini ICEdit Figure S4. Additional qualitative comparison on challenging scenarios on synthetic data. The first column shows the inputs, while the following columns present results from our approach and baselines. The decomposed objects appear at the bottom-right of each sample. 
+
+4Input Logo Object Input Logo Object Input Logo Object Figure S5. Additional decomposition results on synthetic images. 
+
+5Input Logo Object Input Logo Object Input Logo Object Figure S6. Additional decomposition results on real images. The first five rows show decomposition results for several well-known logos, while the last five rows present decomposition results for other in-the-wild logos. 
+
+6Input Albedo Shading Input Albedo Shading Input Albedo Shading Figure S7. Additional results on intrinsic decomposition. Input FG BG Input FG BG Input FG BG 
+
+Figure S8. Additional results on foreground-background decomposition. 
+
+7

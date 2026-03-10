@@ -1,0 +1,1077 @@
+Title: SplitCom: Communication-efficient Split Federated Fine-tuning of LLMs via Temporal Compression
+
+URL Source: https://arxiv.org/pdf/2602.10564v2
+
+Published Time: Fri, 13 Feb 2026 01:38:43 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+> 1
+
+# SplitCom: Communication-efficient Split Federated Fine-tuning of LLMs via Temporal Compression 
+
+Tao Li, Yulin Tang, Yiyang Song, Cong Wu, Member, IEEE, Xihui Liu, Member, IEEE, Pan Li, Fellow, IEEE, 
+
+Xianhao Chen, Member, IEEE 
+
+Abstract —Federated fine-tuning of on-device large language models (LLMs) mitigates privacy concerns by preventing raw data sharing. However, the intensive computational and memory demands pose significant challenges for resource-constrained edge devices. To overcome these limitations, split federated learning (SFL) emerges as a promising solution that partitions the model into lightweight client-side and compute-intensive server-side sub-models, thus offloading the primary training workload to a powerful server. Nevertheless, the high-dimension activation exchanges in SFL lead to excessive communication overhead. To overcome this, we propose SplitCom, a communication-efficient SFL framework for LLMs that exploits temporal redundancy in activations across consecutive training epochs. Inspired by video compression, the core innovation of our framework lies in selective activation uploading only when a noticeable devi-ation from previous epochs occurs. To balance communication efficiency and learning performance, we introduce two adaptive threshold control schemes based on 1) bang-bang control or 2) deep deterministic policy gradient (DDPG)-based reinforcement learning. Moreover, we implement dimensionality reduction tech-niques to alleviate client-side memory requirements. Further-more, we extend SplitCom to the U-shape architecture, ensuring the server never accesses clients’ labels. Extensive simulations and laboratory experiments demonstrate that SplitCom reduces uplink communication costs by up to 98.6 % in its standard configuration and total communication costs by up to 95.8 % in its U-shape variant without noticeably compromising model performance. 
+
+Index Terms —Federated Learning, Split Federated Learning, Large Language Models, Parameter-efficient Fine-tuning. 
+
+I. I NTRODUCTION 
+
+In data-silo settings, organizations or individual users are unwilling to share raw data for centralized model training (or fine-tuning) due to privacy concerns and regulatory require-ments [1]. This reluctance severely impedes fine-tuning of pre-trained large language models (LLMs) towards downstream privacy-sensitive applications, such as personal assistants, healthcare, and mental well-being. Federated learning (FL) addresses this issue by enabling clients to locally update models and share only the model parameters with a federated server, thus obviating raw data exchange and safeguarding user privacy [2], [3]. However, the limited memory and compute budgets of users, particularly edge devices, pose challenges 
+
+Tao Li, Yiyang Song, Cong Wu, Xihui Liu and Xianhao Chen are with the Department of Electrical and Electronic Engineering, University of Hong Kong, Hong Kong SAR, China. (e-mail: litao@eee.hku.hk; yysong01@connect.hku.hk; congwu@hku.hk; xihuiliu@eee.hku.hk; xchen@eee.hku.hk.) Yulin Tang is with the Department of Computer Science, Grinnell College, Iowa, United States. (e-mail: tangkevi@grinnell.edu). Pan Li is with Hangzhou Dianzi University, China. (email: lipan@hdu.edu.cn). (Corresponding author: Xianhao Chen.) 585.94 244.14 0.27 0.34  
+
+> GPT2 Small GPT2 XLarge 10 -1.0
+> 10 0.0
+> 10 1.0
+> 10 2.0
+> 10 3.0
+> Cumulative Uplink Communication Volume (GB)
+> Activation LoRA
+
+Fig. 1. Total uplink communication costs (for 10 clients) for LoRA aggregation and activation uploading until model convergence (GPT2 Small with 50 epochs and GPT2 XLarge with 10 epochs) under split federated LoRA fine-tuning. We partition the E2E dataset into these 10 clients. to local fine-tuning of LLMs, even with parameter-efficient fine-tuning (PEFT) such as low-rank adaptation (LoRA) [4]. For example, fine-tuning GPT-2 XLarge (e.g., batch size 4, LoRA rank 24) consumes over 16 GB of GPU memory, which exceeds the capabilities of most edge devices. Against this backdrop, split federated learning (SFL) [5] has been proposed as a compelling alternative capable of overcoming the weaknesses of FL. SFL addresses computing constraints by partitioning deep learning models into client-side and server-side sub-models, thereby offloading the primary training workload to a central server. Consequently, SFL is regarded as a promising distributed paradigm for fine-tuning LLMs under data-silo constraints. However, applying SFL to fine-tune LLMs still faces a major bottleneck, i.e., high-dimensional activation commu-nications at the model split point. Specifically, the frequent transmissions of high-dimensional activations (smashed data) at the cut layer lead to significant communication overhead (shown in Fig. 1). While forward and backward pass both involve communication costs at the cut layer between clients and the server, uplink communication puts even heavier burden on wireless/mobile devices due to asymmetrical data rate 1 and limited on-device energy. An intuitive approach to mitigate this communication overhead is activation quantization. Neverthe-less, since Transformer architectures can generate activations with an extremely wide value range [7], [8], naively quantizing activations can catastrophically degrade the fine-tuning perfor-mance for LLMs like GPT variants [9], as validated in Fig. 3. 
+
+> 1
+
+Since wireless devices are less powerful than base stations, uplink data rate is often much lower than the downlink data rate in wireless networks, e.g., 30.6 Mbps and 166.8 Mbps for average 5G uplink and downlink, respectively [6]. 
+
+> arXiv:2602.10564v2 [cs.NI] 12 Feb 2026 2
+
+Fig. 2. The Cosine similarity of activations between the current and previous epoch in split federated fine-tuning for two GPT2 models. As a result, prior activation-quantization methods designed for traditional split learning (SL) may not work effectively for split fine-tuning of LLMs. To overcome the limitations above, we propose acommunication-efficient split federated fine-tuning (SFFT) framework for LLMs that leverages the temporal redundancy in activations across consecutive training epochs. Our ap-proach is grounded in the observation that, given a training sample, since PEFT induces only tiny changes to client-side sub-models, the outputs from client-side sub-models evolve very slowly across training epochs. Consequently, activations at the cut layer in SFL are highly correlated between adja-cent epochs, as demonstrated in Fig. 2. Motivated by this insight, we introduce inter-epoch temporal compression , a module analogous to interframe compression techniques in video compression [10] 2. Concretely, our framework im-plements a similarity-aware activation reuse mechanism to boost communication efficiency: Each client maintains a local cache of intermediate activations and only transmits a newly computed activation to the central server if notable deviations from previous epochs are detected. As shown in Fig. 3, by exploiting this temporal redundancy, our scheme substantially reduces communication overhead without noticeably sacrific-ing model performance, even though 4-bit activation quan-tization encounters complete training collapse. To safeguard label privacy, we further extend this framework to U-shape architecture that relocates loss computation to clients, enabling temporal compression on both activations and gradients. To effectively control the similarity threshold, we employ two adaptive control strategies: 1) the bang-bang control policy, which switches between a conservative mode (low threshold for fewer transmissions) and an aggressive mode (high threshold for more transmissions), simply guided by the dynamics of validation perplexity (PPL). 2) DDPG-driven reinforcement learning (RL), which leverages the deep deter-ministic policy gradient (DDPG) algorithm [11] to determine the threshold by balancing communication costs and model performance. The former is rule-based, which is simple to implement, whereas the latter is learning-based. In addition, we implement dimensionality reduction techniques, such as random projection (RP) [12], to minimize the storage require-ments for cached intermediate activations and gradients on clients. Our key contributions are summarized as follows:  
+
+> 2In interframe video compression, temporal redundancy between consecu-tive frames is exploited to transmit only the differences relative to reference frames, significantly reducing data volume. Proposed Quantized SFFT (4 bit) SFFT 020 40 60 80 100
+> BLEU
+> 050 100 150 200 250
+> Uplink Communication Cost (GB)
+> Model Performance Uplink Communication Cost
+> Complete collapse
+
+Fig. 3. Comparison of the proposed method against traditional SFFT and traditional SFFT with INT4 activation quantization on the GPT-2 XLarge model fine-tuned over the E2E dataset with 10 clients, in terms of uplink communication overhead and model performance.  
+
+> •
+
+We introduce SplitCom, the first communication-efficient SFFT framework for LLMs with an innovative temporal compression mechanism. We further extend our frame-work to the U-shape architecture that enables temporal compression on both activations and gradients, which reduces bidirectional communication costs while ensuring that clients’ labels are never exposed to the server.  
+
+> •
+
+We devise two complementary adaptive strategies to determine the similarity threshold based on training dy-namics, i.e., a lightweight bang-bang control strategy and a DDPG-based RL strategy.  
+
+> •
+
+We comprehensively evaluate SplitCom on three widely-used natural language generation (NLG) benchmark datasets (E2E [13], DART [14], WebNLG [15]) through simulations and laboratory experiments. Results demon-strate that the standard configuration achieves uplink communication savings of up to 98.6 % , while the U-shape variant reduces total traffic by up to 95.8 % , with both maintaining model performance. II. R ELATED WORK 
+
+Parameter-efficient fine-tuning. The staggering size of LLMs, even on-device LLMs, renders their training compu-tationally prohibitive for edge devices like smartphones [3]. PEFT methods addresses this by adapting pre-trained LLMs through the introduction and optimization of a small subset of parameters, while freezing the majority of parameters. Early approaches incorporated adapter modules into Trans-former layers; for example, Houlsby et al. demonstrated that incorporating and fine-tuning lightweight bottleneck layers, termed adapters (comprising approximately 3.6% additional parameters), into BERT achieves performance comparable to full fine-tuning [16]. Similarly, prompt-based methods involve appending a small, trainable ”prefix” or ”soft prompt” to the input; Li and Liang showed that prefix-tuning on GPT-2, which optimizes only 0.1% of parameters, attains per-formance equivalent to full fine-tuning [17]. Another par-allel approach, LoRA [4], freezes original model weights and employs trainable low-rank matrices to re-parameterize the model. LoRA is widely recognized as one of the most popular PEFT methods [18], [19], requiring the tuning of less than 1% of the parameters needed for full fine-tuning, while 3Client i Cache library                 
+
+> Nidata samples
+> AiBi
+> Ni
+> Dimensionality reduction ...
+> { ...
+> Client i Cache library
+> Nidata samples
+> AiBi
+> Ni
+> Dimensionality reduction ...
+> { ... Reuse Server Fed server
+> A1An
+> A... { B1Bn
+> B... {
+> ... ... ...
+> {Ni
+> Client i Cache library
+> Nidata samples
+> AiBi
+> Ni
+> Dimensionality reduction ...
+> { ... Similarity check AB
+
+Fig. 4. Overview of SplitCom. achieving comparable performance across diverse downstream tasks without incurring additional inference costs. However, even with PEFT, on-device LLMs remain oversized for on-device fine-tuning on mobile platforms [20]. 
+
+Federated fine-tuning of on-device LLMs. In data-silo settings, FL enables decentralized clients to collaboratively train models by exchanging local updates instead of raw data. Given the resource constraints of FL clients, PEFT methods are commonly integrated with FL to facilitate efficient federated fine-tuning. Recently, Kuang et al. introduced FS-LLM [21], a toolkit supporting multiple PEFT algorithms, including LoRA, to boost LLM performance in FL while minimizing communication and computation costs. FedIT [22] demonstrated the efficacy of aggregating solely LoRA modules in FL, thereby reducing communication overhead without compromising model performance. Additionally, FLoRA [18] addressed aggregation errors in federated LoRA by proposing a noise-free server-side aggregation mechanism. However, these approaches, while effective on high-end GPUs, often underperform on resource-limited clients like mobile devices due to constrained compute and memory resources [3]. 
+
+Split federated fine-tuning on resource-constrained de-vices. Federated fine-tuning of LLMs with billions of parame-ters remains impractical for resource-constrained edge devices. To overcome this, SFL has emerged by combining SL and FL [5]. Lin et al. [23] analyzed SFL convergence, highlighting cut-layer impacts on performance and optimizing for resource-limited systems. For on-device LLM fine-tuning, combining SFL with PEFT methods like LoRA helps further mitigate resource constraints [24], [25]. For instance, SplitLoRA [24] partitions the model into client-side and server-side sub-models, updating only LoRA adapters to minimize client-side computation overhead [24]. However, these approaches have yet to address the primary bottleneck of SFL for LLMs, particularly the substantial communication overhead caused by repeated uploads of high-dimensional activations. While some SL studies have applied quantization to compress acti-vations [26], such methods are not tailored for LLMs, where the intricate and deeply stacked architectures make activation compression during training especially challenging [27]. More importantly, none of the existing works leverage inter-epoch temporal compression, a new design we propose, to reduce communication overhead in SFL. Furthermore, most existing SFL frameworks [23], [24] require ground-truth labels to reside on the server, inevitably introducing severe privacy leakage risks for sensitive client data. III. D ESIGN OF SPLIT COM 
+
+A. Overview 
+
+To mitigate the communication bottleneck in SFL, we propose SplitCom, a communication-efficient fine-tuning framework that incorporates temporal compression and parameter-efficient LoRA updates. The key of SplitCom lies in a similarity-aware activation reuse mechanism, which sup-presses transmissions by reusing activations whose changes fall below a threshold (Section III-B). To balance training efficacy and communication cost, we introduce two adaptive threshold tuning strategies: (i) a bang-bang control policy that switches the threshold based on activation variance and (ii) a DDPG-based reinforcement learning (RL) approach that con-tinuously learns optimal thresholding policies (Section III-C). SplitCom is based on a standard SFFT framework [23]. In SFL, clients and the central server exchange intermediate activations at the cut layer during each training step. Formally, let W = [Ws,i ; Wc,i ] denote the weights of a pre-trained LLM, partitioned into a server-side sub-model ( Ws,i ) and a client-side sub-model ( Wc,i ). The cut layers can be different across clients due to their resource heterogeneity [23]. We introduce trainable LoRA adapters for fine-tuning both parts of the model W : Rs,i for the server-side model and Rc,i 
+
+for the client-side model of each client i. During training, only these lightweight LoRA adapters are updated (while 
+
+W remains frozen), dramatically reducing the number of trainable parameters. After every M steps, clients upload their client-side LoRA adapters Rc,i to the federated server for aggregation 3, after which the averaged client-side adapter is sent to clients to continue training. The overview of SplitCom is illustrated in Fig. 4. Given local dataset Di on client i and D = SKi=1 Di, we seek the optimal adapter configurations {R ∗
+
+> c,i
+
+}Ki=1 and R∗
+
+> s,i
+
+that minimize a weighted sum of local training losses across 
+
+K clients. The learning objective is 
+
+min 
+
+> R
+> K
+
+X
+
+> i=1
+
+|Di||D| fi(W | R ), (1) where fi(W | R ) is the local loss function evaluated on the data of client i using the global model W together with the global LoRA adapter R, which is the aggregated version of [Rc,i ; Rs,i ] across clients. 
+
+B. Similarity-aware Activation Reuse 
+
+Communication between client-side sub-model Wc,i and server-side sub-model Ws,i is often the major bottleneck in SFL [5]. Unlike earlier efforts that compress every individual 
+
+activations [28], [29], we observe that, under PEFT, e.g.,                  
+
+> 3We assume homogeneous cut layers across all clients. Our method can be extended to heterogeneous scenarios with different cut layers. 4
+> Metric Computational / Time Complexity Relative Cost vs. Cosine
+> Cosine O(D)Baseline CKA O(N2D)High CCA O min( N, D )2·max( N, D )Very high SVCCA PCA: O(N D 2) + CCA complexity Extremely high
+> N: number of samples; D: feature dimensionality.
+
+TABLE I. Complexity of four feature-similarity metrics. LoRA, the activations of a given sample remain highly cor-related across training epochs. This temporal correlation mo-tivates a similarity-aware activation reuse strategy that curbs redundant transmissions, as detailed below. Furthermore, our approach is orthogonal to bit-packing and other quantization-based compression schemes, as demonstrated in Section VI. 
+
+Activation reuse. Client i maintains a local cache library during each training epoch, maintaining its own historical activations, whereas the server holds a global cache library comprising entries from all K clients 4. For an input sam-ple j at epoch t, client i computes the current activation 
+
+ajt,i and evaluates its cosine similarity against the locally cached counterpart ¯ajc,i using cos  ajt,i , ¯ajc,i 
+
+ = ajt,i ·¯ajc,i  
+
+> ∥ajt,i ∥ ∥ ¯ajc,i ∥
+
+.
+
+If cos  ajt,i , ¯ajc,i 
+
+ ≥ θt, client i skips transmissions and the server reuses ¯ajs,i for server-side forward and backward passes, where θt is the similarity threshold balancing communication overhead and model performance. Otherwise, client i uploads 
+
+ajt,i to the server, and updates its local cache ¯ajc,i ← ajt,i .Correspondingly, the server updates ¯ajs,i ← ajt,i to ensure consistency. We hypothesize that when the similarity exceeds 
+
+θt, uploading ajt,i or not will not significantly affect gradient updates. When not uploading ajt,i , the server reuses activations from previous rounds, which is equivalent to freezing client-side models during fine-tuning in the current round. 
+
+Choice of similarity metrics. Selecting the right simi-larity metric is essential for efficient activation reuse. As aforementioned, we employ cosine similarity to compare ajt,i 
+
+and cached value ¯ajc,i . As shown in Table I, we compare cosine similarity [30], centered kernel alignment (CKA) [31], canonical correlation analysis (CCA) [32], and singular vector canonical correlation analysis (SVCCA) [33]. We eventually choose cosine similarity for its computational efficiency, sim-plicity, and suitability. It requires only simple dot products and two ℓ2-norms. In contrast, CCA and SVCCA require the construction and inversion of covariance matrices followed by singular-value decompositions, resulting in prohibitive runtime and memory footprints, while CKA has been shown to exhibit high sensitivity to perturbations in individual samples and incurs several orders of magnitude more computation than cosine similarity [34]. Given the high-dimensional features of LLMs and the stringent compute and memory constraints of client devices, cosine similarity proves to be the unique choice. 
+
+Cache dimension reduction. As mentioned earlier, each client maintains a cache library for similarity checks. To mitigate the memory overhead of cached activations on edge         
+
+> 4For scalability, the server can offload activation caches to CPU memory, which can be much larger than GPU memory. For example, an NVIDIA GeForce RTX 4090 provides 24 GB of GPU memory, whereas contemporary servers commonly ship with 128 – 256 GB of system CPU memory, enabling efficient storage of activations.
+> Method Time Complexity Primary Computational Bottleneck
+> PCA O N D 2+D3Covariance matrix construction and eigen-decomposition RP O(N DK )Matrix multiplication for data projection
+
+TABLE II. Computational complexity of two widely-used dimensionality-reduction algorithms, where N is number of samples, D is original feature dimension, and K is the target dimension ( K ≪ D). devices, we employ dimensionality-reduction techniques, such as RP [12] or principal component analysis (PCA) [35]. As summarized in Table II, PCA is computationally expensive for high-dimensional data due to the requirements of covariance matrix construction and eigen-decomposition. In contrast, RP relies solely on matrix multiplication and is mathematically proven to preserve pairwise cosine similarity with high prob-ability [36]. Therefore, we adopt RP for its computational ef-ficiency and suitability for resource-constrained edge devices. Our extensive experiments in Section VI-E further validate this design choice, demonstrating that RP achieves comparable model performance with significantly lower computational overhead on edge devices. 
+
+C. Similarity Threshold Control 
+
+The similarity-aware activation reuse mechanism signifi-cantly reduces communication overhead, but its performance hinges on the selection of the similarity threshold θ. Consider a naive strategy that simply fixes the θ during the entire training phase, called fixed control policy . Such a fixed thresh-old fails to adapt to the training dynamics, compromising the balance between communication efficiency and model accuracy. Empirically, we observe that early training stages demand frequent communication and a higher θ to accelerate convergence, while later stages can afford more aggressive reuse with a lower θ as the model stabilizes. To address this, we propose two adaptive strategies for dynamically adjusting 
+
+θ: a lightweight bang-bang control policy and a more flexible DDPG-based RL strategy. 
+
+i) Bang-bang control policy. To dynamically adjust the similarity threshold θ in our SFL framework, we adopt a bang-bang controller , a lightweight, rule-based scheme rooted in classical control theory. The controller switches θ between a low value θlow and a high value θhigh according to trends of the validation PPL [37], where lower PPL indicates better predictive performance. When PPL consistently decreases, the controller lowers θ to reduce redundant transmissions. If PPL stops improving or starts to rise, it raises θ to allow more frequent activation updates. To be specific, the bang-bang controller tracks the validation PPL at the end of every training epoch. Initially, θ is randomly assigned to either θlow or θhigh .As training progresses, the controller evaluates two conditions to decide if an adjustment to θ is necessary:  
+
+> •
+
+Switch to θhigh : If the current epoch’s PPL ppl t exceeds the previous epoch’s PPL ppl t−1 by a tolerance factor, i.e., ppl t > ppl t−1 · (1 + τ ), or if a sustained upward trend is detected over a predetermined window size of the previous epochs (e.g., window size = 2 in our setting), the policy sets θ = θhigh . This increases activation 5
+
+transmission frequency to maintain model accuracy when convergence falters.  
+
+> •
+
+Switch to θlow : If ppl t decreases, i.e., ppl t < ppl t−1,for a consecutive number of epochs (e.g., 2), θ is set to θlow . This mode reduces communication overhead by aggressively exploiting activation reuse. The bang–bang controller is lightweight, as it only compares PPL values, resulting in negligible overhead. This simplicity makes it well-suited to resource-constrained edge devices. However, its binary action space may miss more subtle trade-offs between communication cost and model perfor-mance in dynamic training environments. To address this, we design the DDPG-based RL strategy to adapt the similarity threshold dynamically. 
+
+ii) DDPG-based RL strategy. The DDPG agent consists of an actor network that maps states to actions, and a critic network that estimates the Q-value of state-action pairs. By jointly training these networks, the agent learns to select actions that maximize the Q-value. The two networks are implemented as lightweight architectures, e.g., three-layer fully connected neural networks, in our experiments, making them suitable for edge devices. Unlike the binary adjustments of the bang–bang controller, this strategy learns a continuous policy to dynamically adjust θ. Key components are detailed as follows: 
+
+(a) State space. At epoch t, the state st is represented by a feature vector capturing key training dynamics, including: 1) Training dynamics captured via exponential moving av-erage (EMA)-smoothed similarity scores for robust temporal analysis; 2) Decision context through validation PPL and communication overhead trends, which serve as feedback sig-nals on the action’s effectiveness; 3) The normalized training progress t/T max to guide the action selection process, where 
+
+Tmax is the maximum number of epochs. The compact state provides a comprehensive system status and facilitates the fast convergence of DDPG. 
+
+(b) Action space. The action at, representing the similarity threshold, is a continuous value in [0 , 1] and determined by the actor network. A higher threshold increases inter-epoch communication costs. To promote exploration, we incorporate an Ornstein-Uhlenbeck noise process [38]–[40] with decaying variance. 
+
+(c) Reward function. The reward function balances model performance and communication efficiency as rt = −α ℓt 
+
+> ℓ0
+
+−
+
+β ct 
+
+> c0
+
+− Pzero − Pfull , where ℓt/ℓ 0 and ct/c 0 are respectively normalized validation loss and communication volume, and 
+
+α, β control the model performance-communication efficiency trade-off. The penalty terms Pzero and Pfull prevent degenerate communication strategies: zero communication causing model performance degradation and full communication degrading communication efficiency. The agent maximizes the cumu-lative discounted reward R = PTmax  
+
+> t=1
+
+γt−1rt with discount factor γ.
+
+D. The Workflow of SplitCom 
+
+In summary, SplitCom consists of the following steps: 
+
+Step 1: SFL partitions an LLM into client-side sub-models deployed on devices and the server-side sub-models hosted 
+
+Algorithm 1 SplitCom training framework 
+
+Require: Number of clients K; local dataset Di for client 
+
+i ∈ [K]; pre-trained LLM weights W = [ Ws,i ; Wc,i ];aggregation interval M ; max epochs Tmax ; threshold adjustment policy Π ∈ { F ixed, BBC, DDP G }.
+
+Ensure: Optimized LoRA adapters {R ∗
+
+> c,i
+
+}Ki=1 and R∗
+
+> s,i
+
+. 
+
+> 1:
+
+Initialize model partition {Wc,i }Ki=1 and Ws,i , LoRA adapters {R ∗
+
+> c,i
+
+}Ki=1 and Rs,i , and initial similarity thresh-old θ2 based on Π. 
+
+> 2:
+
+for each epoch t = 1 , . . . , T max do  
+
+> 3:
+
+for all clients i ∈ [K] do  
+
+> 4:
+
+for each sample j in a batch from Di do  
+
+> 5:
+
+Compute activation ajt,i at the cut layer.  
+
+> 6:
+
+if t = 1 (first epoch) then  
+
+> 7:
+
+1. Upload ajt,i to the server.  
+
+> 8:
+
+2. Apply RP to compress ajt,i as ˜ajt,i and store it in the client cache ¯ajc,i ← ˜ajt,i . 
+
+> 9:
+
+3. Server store ajt,i in the server cache: 
+
+¯ajs,i ← ajt,i . 
+
+> 10:
+
+else ▷ Similarity-aware reuse from cache  
+
+> 11:
+
+1. Compress activation ajt,i as ˜ajt,i by RP.  
+
+> 12:
+
+2. Compute similarity with cached repre-sentation: s = cos(˜ ajt,i , ¯ajc,i ). 
+
+> 13:
+
+if s < θ t then  
+
+> 14:
+
+a) Upload ajt,i to the server and update client cache: ¯ajc,i ← ˜ajt,i . 
+
+> 15:
+
+b) Server Update cache: ¯ajs,i ← ajt,i . 
+
+> 16:
+
+else  
+
+> 17:
+
+Server reuse cached activation ¯ajs,i . 
+
+> 18:
+
+end if  
+
+> 19:
+
+end if  
+
+> 20:
+
+end for  
+
+> 21:
+
+Server performs forward and backward propaga-tion.  
+
+> 22:
+
+Server returns gradients to client i. 
+
+> 23:
+
+Server updates its LoRA Rs,i . 
+
+> 24:
+
+Client updates local LoRA Rc,i . 
+
+> 25:
+
+if every M local steps then  
+
+> 26:
+
+Clients upload Rc,i to server.  
+
+> 27:
+
+Server aggregates to get global Rc via FedAvg.  
+
+> 28:
+
+Server broadcasts Rc to all clients.  
+
+> 29:
+
+end if  
+
+> 30:
+
+end for  
+
+> 31:
+
+Evaluate validation perplexity ppl t and communication cost ct. 
+
+> 32:
+
+Update threshold θt+1 according to policy Π. 
+
+> 33:
+
+end for  
+
+> 34:
+
+return {R ∗
+
+> c,i
+
+}Ki=1 and R∗
+
+> s,i
+
+.by the server. Both sub-models are initialized with LoRA adapters. 
+
+Step 2: In the first epoch, each client processes its local batch through its sub-model and uploads activations at the cut layer to the server. The server completes the forward and backward passes and returns local gradients. Both client 6
+
+and server cache the activations for the first epoch; clients additionally apply RP to compress their cache to reduce memory usage. 
+
+Step 3: For subsequent epoch t, clients first apply RP to compress current activations, then compute cosine similarity between the compressed activations and their cached, reduced-dimension counterparts. Activations with similarity below a dynamic threshold θt are selected for transmission. The thresh-old θt is adjusted dynamically based on either the bang-bang control policy or the DDPG-based RL strategy. 
+
+Step 4: After every M local steps, each client i sends its LoRA parameters to the federated server. The server applies FedAvg [41] to aggregate the updates and produce the global parameters, which are then broadcast to all clients. Training then proceeds to the next epoch, repeating Step 3–4 until convergence or a predefined maximum number of epochs is reached. The above process is also summarized in Algorithm 1. IV. E XTENSIONS TO OTHER SPLIT COM VARIANTS 
+
+The proposed SplitCom framework primarily targets uplink activation transmissions from clients to the server during the forward pass. However, its underlying principles can be naturally extended to downlink gradient transmission and U-shaped SFL architectures. 
+
+A. Extension to Bidirectional Compression 
+
+In standard SFL, both forward activations (uplink) and backward gradients (downlink) contribute to communication costs. While mitigating uplink traffic is often prioritized due to asymmetric wireless data rates and the limited energy budget of edge devices, suppressing bidirectional communication can further improve overall efficiency. Specifically, the temporal redundancy for activations also applies to gradients: given a training sample, if the model changes very slowly across epochs under PEFT, the corresponding gradients flowing back from the server also exhibit high temporal correlation. Consequently, the standard SplitCom framework can be extended to compress both uplink activations and downlink gradients by maintaining separate cache libraries on both clients and the server. The server caches activations for po-tential reuse in forward passes, while clients cache gradients for backward passes. Each transmission direction applies the similarity check independently with its own threshold (e.g., 
+
+θup  
+
+> t
+
+for uplink, θdown  
+
+> t
+
+for downlink). For example, when trans-mitting gradients from server to client i during the backward pass, for an input sample j at epoch t, the server computes the current gradient zjt,i , applies RP to obtain its compressed representation ˜zjt,i , and evaluates cosine similarity against the compressed cached counterpart ¯˜zjs,i in its comparison cache using cos  ˜zjt,i , ¯˜zjs,i 
+
+. If cos  ˜zjt,i , ¯˜zjs,i 
+
+ ≥ θdown  
+
+> t
+
+, the server skips transmissions and client i reuses the cached gradient ¯zjc,i for the frontend backward pass, where θdown  
+
+> t
+
+is the similarity threshold. Otherwise, the server transmits the gradient zjt,i to client i, and client i updates its cache: ¯zjc,i ← zjt,i . At the same time, the server updates its comparison cache: ¯˜zjs,i ← ˜zjt,i .Moreover, the adaptive threshold management strategies in-troduced in Section III-C, specifically bang-bang control and DDPG-based RL, can be applied to θdown  
+
+> t
+
+to balance downlink communication efficiency and model performance. 
+
+B. Extension to U-shape SplitCom 
+
+While the similarity-aware activation reuse mechanism (Section III-B) effectively reduces uplink communication over-head, traditional SFL architectures computing loss on the server exposes clients’ labels to the server, compromising user privacy. To address these issues, we extend SplitCom to the U-shape architecture [42] that relocates loss computation to clients. The model is partitioned into three segments: the client retains the frontend and tail portions 5, while the computationally intensive intermediate layers are offloaded to the server. This configuration allows the loss computation to be performed locally on the client, effectively preserving the privacy of ground-truth labels. However, this U-shape architecture establishes four distinct communication interfaces requiring threshold control: (1) frontend-to-server uplink ac-tivations, (2) server-to-tail downlink activations, (3) tail-to-server uplink gradients, and (4) server-to-frontend downlink gradients, which is even more complicated than bidirectional communications. To mitigate the potential communication bottlenecks introduced by these multiple interfaces, we extend our reuse mechanism to operate symmetrically across all four transmission boundaries. 
+
+Quadri-directional compression. At each communication session, we apply the similarity-aware reuse mechanism de-scribed in Section III-B. Both clients and the server main-tain separate cache libraries for activations and gradients at each communication session. Specifically, both clients and the server maintain two types of caches: (1) the sender maintains comparison caches, which store RP-compressed rep-resentations of activations and gradients to facilitate memory-efficient similarity checks; (2) the receiver maintains reuse caches, which store activations and gradients for actual reuse during forward and backward passes when transmission is skipped. This mechanism applies symmetrically to all four communication sessions, each with its own threshold: θf2s 
+
+> t
+
+(frontend-to-server), θs2t  
+
+> t
+
+(server-to-tail), θt2s  
+
+> t
+
+(tail-to-server), and θs2f  
+
+> t
+
+(server-to-frontend). The adaptive threshold strategies (BBC and DDPG) intro-duced in Section III-C can be directly extended to manage thresholds at all four communication sessions in U-shape SplitCom. For the fixed strategy, each communication session is assigned a predetermined constant threshold value that remains unchanged throughout training. For the bang-bang control strategy, each communication session maintains its own pair of low and high thresholds (e.g., θf2s low and θf2s high 
+
+for the frontend-to-server session), with switching decisions based on global validation PPL dynamics. For the DDPG-based RL strategy, we deploy four independent DDPG agents (each consisting of the same lightweight three-layer fully connected actor-critic networks as described in Section III-C),                              
+
+> 5We define the frontend as the model’s initial layers close to the input, and the tail as the final layers proximal to the output. 7
+> Configuration Model Rank Client Server
+> Total Trainable Total Trainable Standard GPT-2 Small 860.720M 0.074M (0.12%) 102.610M 0.221M (0.22%) GPT-2 XLarge 24 174.730M 0.461M (0.26%) 1.470B 6.912M (0.47%) U-shape GPT-2 Small 882.060M 0.147M (0.18%) 42.675M 0.147M (0.35%) GPT-2 XLarge 24 267.419M 0.922M (0.34%) 1.298B 6.451M (0.50%)
+
+TABLE III. Client-server model configurations with LoRA adapters in SplitCom. - Server -
+
+> AMD Ryzen Threadripper PRO 5975WX CPU NVIDIA GeForce RTX 4090 GPU × 4
+
+- Edge Devices -NVIDIA Jetson Orin NX 8-core Arm Cortex-A78AE v8.2 64-bit CPU 1024-core NVIDIA Ampere architecture GPU 
+
+Fig. 5. Our SplitCom testbed composed of an RTX 4090 server and ten Jetson Orin NX clients. one for each communication session, where each agent learns to optimize its respective threshold based on communication efficiency and model performance. V. I MPLEMENTATIONS 
+
+In this section, we elaborate on the experimental setup, including dataset and models, baseline methods, hyperparam-eters, DDPG agent configurations, and implementation details for both simulations and realistic laboratory experiments. 
+
+Dataset and models. We evaluate the performance of SplitCom on three representative NLG benchmark datasets: (1) DART [14], an open-domain data-to-text dataset constructed from WikiTableQuestions, WikiSQL, and WebNLG, where each instance consists of semantic triples and natural lan-guage descriptions; (2) E2E [13], a restaurant domain bench-mark pairing meaning representations (e.g., name, food type, price, rating, location) with human-authored texts; and (3) WebNLG [15], an RDF-to-text dataset with DBpedia triples partitioned into seen and unseen categories. Each dataset is split into ten clients under IID distribution. Following Hu et al. [4], we adopt two variants of GPT-2 [37]: GPT-2 Small, containing 117 million parameters and 12 decoder layers, and GPT-2 XLarge, with 1.5 billion parameters and 48 decoder layers. Notably, GPT-2 XLarge is comparable in scale to emerging on-device LLMs such as Google Gemini Nano-1 (1.8B parameters) [43], making it a representative benchmark for assessing the effectiveness of SplitCom in fine-tuning LLMs on resource-constrained edge devices. 
+
+Baselines. We evaluate SplitCom in two architectural vari-ants: the standard configuration and the U-shape configuration. For each variant, we compare the following baselines to assess communication efficiency and model performance. (1) 
+
+SplitLoRA [24]: the standard SFL with LoRA fine-tuning without activation compression [5]. (2) Fixed: SplitCom with a fixed similarity threshold set to a constant value, without any adaptive control mechanisms, serving as a naive implementa-tion of our temporal compression module. (3) BBC: SplitCom with a lightweight rule-based bang-bang controller (BBC) that adjusts the similarity threshold between θlow and θhigh based on validation PPL dynamics. (4) DDPG: enhanced SplitCom with a DDPG-based RL controller. Our approach is orthogonal 
+
+to prior work on activation and gradient quantization in SFL by introducing a new design dimension. To demonstrate compatibility, we show that our method can be naturally integrated with INT8 quantization [44]–[46] to further reduce communication overhead, and append the suffix “Q” to each baseline to indicate its INT8-quantized variant 6.Note that we have not included FL baselines because they lead to memory overflow if fine-tuning the entire model on the considered edge devices. For example, fine-tuning GPT-2 XLarge (batch size 4, LoRA rank 24) requires approximately 15-16 GB of GPU memory, far exceeding the 8 GB memory capacity of our edge devices. 
+
+Hyperparameters. For all experiments, we deploy 10 clients. We utilize a consistent batch size of 8 for both training and testing, with input sequences truncated or padded to a maximum length of 512 tokens as necessary. All models are optimized using the AdamW algorithm [47] with cross-entropy loss. Following Hu et al. [4], we selectively apply LoRA to the query ( Wq ) and value ( Wv ) projection matrices within the attention layers. LoRA hyperparameters are tailored to model scale: for GPT-2 Small, we set the rank r = 8 and scaling factor α = 4 ; for GPT-2 XLarge, we use r = 24 
+
+and α = 4 . A LoRA dropout rate of 0.1 is maintained across all configurations to regularize the adapters effectively. The detailed model configurations of the clients and the server are illustrated in Table III. We apply gradient clipping at a threshold of 1.0 to maintain training stability. All experiments are performed with half-precision for efficiency 7. Standard SplitCom configuration: In the standard configuration, each client holds the first 3 decoder layers of the model, while the remaining layers are placed on the server. To accommodate differences in model scale and convergence behavior, we train GPT-2 Small models for 50 epochs and GPT-2 XLarge models for 10 epochs. The learning rate follows a linear schedule with warm-up, initializing at 1 × 10 −4, with a warm-up ratio of 0.5. We initialize the similarity threshold to 0.98 across all methods. For the BBC, we set the low threshold to 0.98 and the high threshold to 0.995. U-shape SplitCom configuration: In the U-shape configuration, each client holds the first 3 decoder layers (frontend) and the last 3 decoder layers (tail), while the intermediate layers are placed on the server. We train GPT-2 Small for 50 epochs with learning rate 5 × 10 −5 and GPT-2 XLarge for 20 epochs with learning rate 2.5×10 −5, both using linear schedulers. For the Fixed strategy, GPT-2 XLarge em-                                                                                                                               
+
+> 6We evaluate INT8 for activation quantization because INT4 activation quantization is known to cause substantial accuracy degradation in fine-tuning decoder-based LLMs such as GPT variants [9]. Moreover, INT4 training requires specialized system support, and unified frameworks for ultra-low precision training remain limited [27].
+> 7Half-precision refers specifically to model parameter precision rather than activations or gradients. 8
+> Dataset (E2E NLG Challenge) Method GPT-2 XLarge GPT-2 Small BLEU ↑NIST ↑MET ↑ROUGE-L ↑CIDEr ↑Comm. ↓Latency ↓BLEU ↑NIST ↑MET ↑ROUGE-L ↑CIDEr ↑Comm. ↓Latency ↓
+> SplitLoRA 70.7 7.84 48.4 75.0 2.21 100% 24.68 71.7 7.99 48.0 75.0 2.28 100% 55.62 Fixed 69.4 7.86 47.7 73.7 2.18 10.0% 7.62 69.5 7.90 47.4 74.0 2.20 3.1% 11.57 BBC 71.0 8.03 47.4 73.3 2.26 11.7% 7.94 70.5 8.19 46.0 72.1 2.25 2.7% 11.38
+> DDPG 69.7 7.84 47.7 74.1 2.25 20.1% 9.54 69.0 8.05 45.8 70.1 2.19 2.9% 11.51 SplitLoRA Q 71.0 8.03 48.3 74.7 2.29 19.5% 9.32 55.8 5.48 37.4 64.2 1.39 6.1% 12.63 Fixed Q 67.4 7.61 47.2 73.3 2.22 3.9% 6.46 63.2 6.20 38.8 68.1 1.52 1.4% 10.81
+> BBC Q 68.3 7.73 47.2 73.2 2.22 2.6% 6.22 66.0 6.34 38.0 67.3 1.58 1.4% 10.81
+> DDPG Q 72.3 8.04 48.5 75.8 2.36 10.2% 7.66 67.5 8.05 43.9 70.2 2.16 3.6% 11.09
+
+TABLE IV. Performance evaluation of GPT-2 XLarge and GPT-2 Small Models under standard SplitCom on the E2E NLG dataset, where ↑ means larger is better and ↓ means lower is better. Communication cost is for uplink communications. Latency is reported in hours. Boldface denotes the best results (highest metric scores and lowest communication/latency costs) excluding SplitLoRA and SplitLoRA Q. 
+
+Dataset (DART NLG Challenge) Method GPT-2 XLarge GPT-2 Small BLEU ↑ MET ↑ TER ↓ Comm. ↓ Latency ↓ BLEU ↑ MET ↑ TER ↓ Comm. ↓ Latency ↓
+
+SplitLoRA 35.5 0.33 0.56 100% 24.68 31.5 0.30 0.59 100% 55.62 Fixed 31.8 0.30 0.58 10.0% 7.62 29.4 0.28 0.61 3.2% 11.61 
+
+BBC 36.2 0.33 0.55 20.0% 9.52 31.3 0.30 0.60 5.1% 12.46 DDPG 37.5 0.35 0.57 20.0% 9.53 31.1 0.30 0.58 3.9% 11.93 SplitLoRA Q 38.1 0.35 0.57 19.2% 9.27 19.0 0.23 0.63 6.1% 12.59 Fixed Q 32.1 0.30 0.57 2.0% 6.09 19.5 0.23 0.63 1.4% 10.79 BBC Q 36.5 0.34 0.56 3.8% 6.45 19.8 0.23 0.63 1.4% 10.78 
+
+DDPG Q 36.5 0.34 0.55 3.9% 6.45 19.7 0.23 0.62 2.1% 11.11 
+
+TABLE V. Performance evaluation of GPT-2 XLarge and GPT-2 Small Models under standard SplitCom on the DART NLG dataset. 
+
+Dataset (WebNLG NLG Challenge) Method GPT-2 XLarge GPT-2 Small BLEU ↑ MET ↑ TER ↓ Comm. ↓ Latency ↓ BLEU ↑ MET ↑ TER ↓ Comm. ↓ Latency ↓
+
+SplitLoRA 70.0 0.51 0.24 100% 24.68 68.2 0.49 0.25 100% 55.62 Fixed 66.6 0.48 0.26 10.0% 7.62 49.8 0.37 0.49 2.5% 11.29 
+
+BBC 69.5 0.51 0.25 16.1% 8.78 68.3 0.49 0.25 5.8% 12.77 DDPG 69.3 0.50 0.25 20.0% 9.52 66.7 0.48 0.25 4.0% 11.97 SplitLoRA Q 70.3 0.51 0.24 19.4% 9.31 38.5 0.32 0.45 6.0% 12.58 Fixed Q 66.7 0.48 0.26 2.0% 6.10 36.8 0.29 0.48 1.2% 10.70 
+
+BBC Q 69.2 0.50 0.25 3.2% 6.35 37.6 0.32 0.46 1.4% 10.79 DDPG Q 71.9 0.51 0.22 3.9% 6.46 37.6 0.32 0.46 1.9% 11.02 
+
+TABLE VI. Performance evaluation of GPT-2 XLarge and GPT-2 Small Models under standard SplitCom on the WebNLG NLG dataset. ploys a uniform threshold of 0.999 across all communication sessions, whereas GPT-2 Small uses 0.99, except for the tail-to-server and server-to-frontend links, which are set to 0.999. In the BBC configuration, we define distinct low and high bounds (θlow , θ high ) for each interface. Specifically, for GPT-2 XLarge, these bounds are set to (0 .985 , 0.995) for frontend-to-server, (0 .93 , 0.95) for server-to-tail, (0 .925 , 0.945) for tail-to-server, and (0 .925 , 0.945) for server-to-frontend. For GPT-2 Small, the corresponding pairs are adjusted to (0 .985 , 0.995) ,
+
+(0 .825 , 0.845) ,(0 .83 , 0.85) , and (0 .77 , 0.79) . Finally, for the DDPG method, the initial thresholds for the four respective links are initialized at {0.99 , 0.83 , 0.84 , 0.78 } for GPT-2 Small and {0.985 , 0.93 , 0.925 , 0.925 } for GPT-2 XLarge. 
+
+DDPG agent configurations. We implement lightweight DDPG agents with three-layer fully connected networks (hid-den dimensions 400-300) for both actor and critic, introducing negligible memory overhead compared to model training. For the standard configuration, the state space comprises EMA-smoothed similarity scores, validation PPL, communication trends, and normalized training progress. The action space outputs a continuous threshold in [0, 1], augmented with Ornstein-Uhlenbeck exploration noise ( σ = 0.002, decay rate 0.98). The reward function balances normalized validation loss (weight = 2.0) and communication cost (weight = 1.0), with penalty terms to prevent degenerate strategies (zero or full communication). The agent updates at the end of each epoch using mini-batches of size 4 sampled from a replay buffer stor-ing up to 50 experiences for GPT-2 Small and 10 experiences for GPT-2 XLarge. For the U-shape configuration, we deploy four independent DDPG agents, one for each communication session (frontend-to-server, server-to-tail, tail-to-server, server-to-frontend). Each agent receives a 14-dimensional state vector consisting of EMA-smoothed similarities across 10 clients for its specific path, validation PPL trend, communication trend, current threshold, and normalized progress. The action space 9                                                                                                                                
+
+> Dataset (E2E NLG Challenge) Method GPT-2 XLarge GPT-2 Small (U-shape) BLEU ↑NIST ↑MET ↑ROUGE-L ↑CIDEr ↑Comm. ↓Latency ↓BLEU ↑NIST ↑MET ↑ROUGE-L ↑CIDEr ↑Comm. ↓Latency ↓
+> SplitLoRA 69.2 7.87 48.1 73.8 2.25 100% 100.51 69.6 7.77 47.0 72.2 2.10 100% 110.25 Fixed 67.7 7.82 46.5 71.2 2.02 35.8% 58.95 55.8 4.77 35.6 64.2 1.27 18.6% 28.64 BBC 70.1 7.87 48.2 74.4 2.26 22.5% 33.63 62.3 7.39 43.3 69.0 1.64 16.3% 25.66
+> DDPG 68.3 7.79 47.2 73.2 2.11 22.8% 37.74 58.2 5.74 36.2 64.4 1.37 16.3% 25.91 SplitLoRA Q 71.1 7.94 49.2 75.7 2.32 11.5% 24.92 45.0 2.27 30.5 57.7 0.86 7.2% 11.88 Fixed Q 67.7 7.68 47.0 73.6 2.14 7.3% 20.82 43.2 2.10 30.8 59.3 0.75 6.3% 10.53 BBC Q 70.0 7.82 48.7 75.6 2.28 7.2% 19.30 46.1 2.91 31.2 58.5 0.93 6.2% 10.20
+> DDPG Q 71.6 7.95 48.3 75.2 2.30 4.9% 14.37 61.6 5.55 35.8 64.8 1.42 6.3% 11.14
+
+TABLE VII. Performance evaluation of GPT-2 XLarge and GPT-2 Small Models under U-shaped SplitCom on the E2E NLG dataset, where ↑ means larger is better and ↓ means lower is better. Communication cost is for total (four-way) communication costs. Latency is reported in hours. Boldface denotes the best results (highest metric scores and lowest communication/latency costs) excluding U-shape SplitLoRA and SplitLoRA Q. 
+
+Dataset (DART NLG Challenge) Method GPT-2 XLarge GPT-2 Small (U-shape) BLEU ↑ MET ↑ TER ↓ Comm. ↓ Latency ↓ BLEU ↑ MET ↑ TER ↓ Comm. ↓ Latency ↓
+
+SplitLoRA 35.5 0.33 0.56 100% 100.55 31.3 0.30 0.58 100% 110.22 Fixed 32.4 0.32 0.59 34.2% 56.49 24.9 0.25 0.71 17.6% 27.41 BBC 35.8 0.34 0.61 21.8% 35.95 24.7 0.26 0.65 10.2% 17.16 
+
+DDPG 36.0 0.34 0.56 20.8% 34.48 27.2 0.26 0.61 12.1% 20.30 SplitLoRA Q 35.1 0.33 0.56 11.3% 24.68 19.3 0.23 0.63 6.3% 10.29 Fixed Q 32.7 0.32 0.59 7.0% 19.02 17.0 0.21 0.72 5.3% 9.63 BBC Q 36.7 0.35 0.56 4.8% 14.09 19.1 0.23 0.67 4.4% 8.04 
+
+DDPG Q 37.0 0.35 0.55 4.7% 13.82 19.3 0.23 0.66 4.8% 8.52 
+
+TABLE VIII. Performance evaluation of GPT-2 XLarge and GPT-2 Small Models under U-shaped SplitCom on the DART NLG dataset. 
+
+Dataset (WebNLG NLG Challenge) Method GPT-2 XLarge GPT-2 Small (U-shape) BLEU ↑ MET ↑ TER ↓ Comm. ↓ Latency ↓ BLEU ↑ MET ↑ TER ↓ Comm. ↓ Latency ↓
+
+SplitLoRA 70.6 0.51 0.23 100% 100.52 68.7 0.49 0.25 100% 110.25 Fixed 68.4 0.50 0.25 34.3% 57.89 44.6 0.40 0.56 15.4% 25.29 BBC 68.5 0.50 0.25 20.1% 34.37 50.0 0.39 0.42 11.7% 19.78 
+
+DDPG 69.3 0.50 0.25 20.8% 34.58 52.8 0.42 0.38 12.1% 20.40 SplitLoRA Q 71.4 0.51 0.22 11.1% 24.55 27.6 0.27 0.54 5.8% 9.71 Fixed Q 65.9 0.50 0.26 6.5% 15.50 19.7 0.23 0.59 5.0% 9.78 BBC Q 69.2 0.50 0.25 4.7% 14.05 25.1 0.26 0.54 4.2% 7.76 
+
+DDPG Q 69.7 0.50 0.25 4.4% 13.59 25.9 0.26 0.54 4.7% 8.48 
+
+TABLE IX. Performance evaluation of GPT-2 XLarge and GPT-2 Small Models under U-shaped SplitCom on the WebNLG NLG dataset. outputs path-specific continuous thresholds with Ornstein-Uhlenbeck noise ( σ = 0.005, decay rate 0.98). The reward function balances normalized forward and backward losses (weight = 1.5) against total communication cost (weight = 2.0), with penalties for degenerate strategies. Training follows the same update protocol as the standard configuration. 
+
+Testbed setup. Extensive simulations and realistic labora-tory experiments were conducted on the testbed system shown in Fig. 5. The server is equipped with four NVIDIA RTX 4090 GPUs, each providing 24 GB of GPU memory. The client nodes include ten NVIDIA Jetson Orin NX devices, each configured with 8 GB of GPU memory. To emulate realistic device-to-server wireless connectivity, we deployed Google Remote Procedure Call (gRPC ) for client-server communi-cation [48]. gRPC is a high-performance, open-source RPC framework that runs over HTTP/2 and encodes messages with Protocol Buffers, thereby offering language-agnostic interfaces and low-overhead, bi-directional streaming—properties well aligned with SplitCom’s communication requirements. The software stack is implemented using PyTorch v2.4.1 and runs on Python 3.8.10. The grpcio and grpcio-tools packages are standardized at version 1.69.0 to ensure compatibility and reproducibility. VI. E XPERIMENTAL RESULTS 
+
+In this section, we evaluate the performance of SplitCom from five aspects: (i) effectiveness of SplitCom in achiev-ing communication reduction while preserving model per-formance; (ii) integration with INT8 quantization for further efficiency gains; (iii) comparison of adaptive threshold control strategies (BBC and DDPG) to demonstrate the necessity of dynamic adjustment; (iv) memory overhead analysis to confirm practical feasibility on resource-limited edge devices; and (v) comparison of dimensionality reduction techniques (PCA vs. RP) to validate our design choice. 10 SplitLoRA Fixed BBC DDPG 
+
+(a) GPT2 Small under DART 
+
+28 29 30 31 32 33 
+
+> BLEU
+
+0100 200 300 400 500 600 
+
+> Uplink Communication Cost (GB)
+
+SplitLoRA Fixed BBC DDPG 
+
+(b) GPT2 Small under E2E 
+
+68 69 70 71 72 73 
+
+> BLEU
+
+0100 200 300 400 500 600 
+
+> Uplink Communication Cost (GB)
+
+SplitLoRA Fixed BBC DDPG 
+
+(c) GPT2 Small under WebNLG 
+
+48 52 56 60 64 68 
+
+> BLEU
+
+0100 200 300 400 500 600 
+
+> Uplink Communication Cost (GB)
+
+SplitLoRA Fixed BBC DDPG 
+
+(d) GPT2 XLarge under DART 
+
+30 32 34 36 38 
+
+> BLEU
+
+050 100 150 200 250 
+
+> Uplink Communication Cost (GB)
+
+SplitLoRA Fixed BBC DDPG 
+
+(e) GPT2 XLarge under E2E 
+
+68 69 70 71 72 73 
+
+> BLEU
+
+050 100 150 200 250 
+
+> Uplink Communication Cost (GB)
+
+SplitLoRA Fixed BBC DDPG 
+
+(f) GPT2 XLarge under WebNLG 
+
+65 66 67 68 69 70 71 72 
+
+> BLEU
+
+050 100 150 200 250 
+
+> Uplink Communication Cost (GB)
+
+Model Performance Uplink Communication Cost 
+
+Fig. 6. Trade-off between BLEU score and cumulative uplink communication overhead for GPT2 Small and GPT2 XLarge on three NLG benchmark datasets (higher BLEU and lower communication are better). 10 20 30 40 50                                                                                                                 
+
+> Epoch
+> 1.5
+> 2
+> 2.5
+> 3
+> 3.5
+> 4
+> 4.5
+> 5
+> Test Loss
+> SplitLoRA DDPG BBC Fixed SplitLoRA_Q DDPG_Q BBC_Q Fixed_Q
+> 12345678
+> Benchmark
+> 0
+> 100
+> 200
+> 300
+> 400
+> 500
+> 600
+> 700
+> Uplink Communication Cost (GB)
+> 585.94
+> 22.78 29.76 18.48 35.46 12.12 7.97 8.07
+> SplitLoRA DDPG BBC Fixed SplitLoRA_Q DDPG_Q BBC_Q Fixed_Q
+> 10 20 30 40 50
+> Epoch
+> 1
+> 1.5
+> 2
+> 2.5
+> 3
+> 3.5
+> 4
+> 4.5
+> 5
+> Test Loss
+> 12345678
+> Benchmark
+> 0
+> 100
+> 200
+> 300
+> 400
+> 500
+> 600
+> 700
+> Uplink Communication Cost (GB)
+> 585.94
+> 17.26 15.74 17.98 36.01 11.27 8.14 7.96
+> 10 20 30 40 50
+> Epoch
+> 0.5
+> 1
+> 1.5
+> 2
+> 2.5
+> 3
+> 3.5
+> 4
+> 4.5
+> Test Loss
+> 12345678
+> Benchmark
+> 0
+> 100
+> 200
+> 300
+> 400
+> 500
+> 600
+> 700
+> Uplink Communication Cost (GB)
+> 585.94
+> 23.59 33.70 14.53 35.34 10.89 8.08 7.09
+> 246810
+> Epoch
+> 1.2
+> 1.4
+> 1.6
+> 1.8
+> 2
+> 2.2
+> 2.4
+> 2.6
+> Test Loss
+> 78910
+> Epoch
+> 1.35
+> 1.4
+> 1.45
+> 1.5
+> Test Loss
+> 12345678
+> Benchmark
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> 300
+> Uplink Communication Cost (GB)
+> 244.14
+> 48.83 48.83
+> 24.41
+> 46.96
+> 9.41 9.37 4.88
+> 246810
+> Epoch
+> 1
+> 1.2
+> 1.4
+> 1.6
+> 1.8
+> 2
+> 2.2
+> Test Loss
+> 78910
+> Epoch
+> 1.15
+> 1.2
+> 1.25
+> 1.3
+> Test Loss
+> 12345678
+> Benchmark
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> 300
+> Uplink Communication Cost (GB)
+> 244.14
+> 49.00
+> 28.61 24.41
+> 47.62
+> 9.50 6.38 9.52
+> 246810
+> Epoch
+> 0.6
+> 0.8
+> 1
+> 1.2
+> 1.4
+> 1.6
+> 1.8
+> 2
+> 2.2
+> Test Loss
+> 78910
+> Epoch
+> 0.68
+> 0.7
+> 0.72
+> 0.74
+> 0.76
+> Test Loss
+> 12345678
+> Benchmark
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> 300
+> Uplink Communication Cost (GB)
+> 244.14
+> 48.83 39.30
+> 24.41
+> 47.36
+> 9.49 7.89 4.88
+
+(a) GPT2 Small under DART (b) GPT2 Small under E2E (c) GPT2 Small under WebNLG 
+
+(d) GPT2 XLarge under DART (e) GPT2 XLarge under E2E (f) GPT2 XLarge under WebNLG 
+
+Fig. 7. Training dynamics (left axis) and total uplink communication overhead (right-hand bar chart) for two GPT2 variants across NLG benchmarks. The total uplink communication overhead accounts for the data transmitted by all clients in total. 
+
+A. Effectiveness of SplitCom 
+
+To validate SplitCom, we perform a comprehensive evalu-ation of NLG accuracy across multiple metrics, as illustrated in Table IV, Table V, Table VI and Figs. 6 and 7. Across two GPT-2 variants, SplitCom reduces uplink communication overhead by approximately 80–97% , while preserving lan-guage generation performance comparable to the SplitLoRA baseline. Specifically, as illustrated in Fig. 7, for GPT-2 XLarge, SplitLoRA requires 244.14 GB, whereas SplitCom utilizes only about 24 GB—achieving a 90% reduction. For GPT-2 Small, SplitLoRA demands 585.94 GB, in contrast to SplitCom’s approximately 16 GB—yielding a 97% reduction. As shown in Table IV, our methods correspondingly decrease latency by up to approximately 80%. These results support our core insight: LoRA induces minimal updates to client-side sub-models, leading to stable activations across training epochs. This temporal redundancy enables efficient activation reuse with minimal impact on model performance. The U-shape architecture enables symmetric temporal com-pression on both activations and gradients, achieving about 
+
+80–95% total communication reduction while strengthening privacy guarantees. As shown in Tables VII, VIII, and IX, and Figs. 8 and 9, across all three benchmark datasets, U-shape SplitCom with adaptive threshold control (BBC/DDPG) con-sistently reduces total communication overhead by 77–80% 
+
+for GPT-2 XLarge and 84–90% for GPT-2 Small compared to the U-shape SplitLoRA baseline, while maintaining com-parable or even superior model performance. Importantly, this 11 SplitLoRA Fixed BBC DDPG 
+
+(a) GPT2 Small under DART 
+
+23 25 27 29 31 33 
+
+> BLEU
+
+0500 1000 1500 2000 2500 
+
+> Total Communication Cost (GB)
+
+SplitLoRA Fixed BBC DDPG 
+
+(b) GPT2 Small under E2E 
+
+54 57 60 63 66 69 
+
+> BLEU
+
+0500 1000 1500 2000 2500 
+
+> Total Communication Cost (GB)
+
+SplitLoRA Fixed BBC DDPG 
+
+(c) GPT2 Small under WebNLG 
+
+43 48 53 58 63 68 
+
+> BLEU
+
+0500 1000 1500 2000 2500 
+
+> Total Communication Cost (GB)
+
+SplitLoRA Fixed BBC DDPG 
+
+(d) GPT2 XLarge under DART 
+
+31 32 33 34 35 36 37 
+
+> BLEU
+
+0500 1000 1500 2000 
+
+> Total Communication Cost (GB)
+
+SplitLoRA Fixed BBC DDPG 
+
+(e) GPT2 XLarge under E2E 
+
+67 68 69 70 71 
+
+> BLEU
+
+0500 1000 1500 2000 
+
+> Total Communication Cost (GB)
+
+SplitLoRA Fixed BBC DDPG 
+
+(f) GPT2 XLarge under WebNLG 
+
+67 68 69 70 71 72 
+
+> BLEU
+
+0500 1000 1500 2000 
+
+> Total Communication Cost (GB)
+
+Model Performance Total Communication Cost 
+
+Fig. 8. Trade-off between BLEU score and cumulative total communication overhead for GPT2 Small and GPT2 XLarge on three NLG benchmark datasets (higher BLEU and lower communication are better). 10 20 30 40 50                                                                                                          
+
+> Epoch
+> 3
+> 4
+> 5
+> 6
+> 7
+> Test Loss
+> SplitLoRA DDPG BBC Fixed SplitLoRA_Q DDPG_Q BBC_Q Fixed_Q
+> 12345678
+> Benchmark
+> 0
+> 500
+> 1000
+> 1500
+> 2000
+> 2500
+> Total Communication Cost (GB)
+> 2343.75
+> 283.59 239.06
+> 412.50
+> 147.66 112.50 103.12 124.22
+> SplitLoRA DDPG BBC Fixed SplitLoRA_Q DDPG_Q BBC_Q Fixed_Q
+> 10 20 30 40 50
+> Epoch
+> 3
+> 4
+> 5
+> 6
+> Test Loss
+> 12345678
+> Benchmark
+> 0
+> 500
+> 1000
+> 1500
+> 2000
+> 2500
+> Total Communication Cost (GB)
+> 2343.75
+> 382.03 382.03 435.94
+> 168.75 147.66 145.31 147.66
+> 10 20 30 40 50
+> Epoch
+> 2
+> 3
+> 4
+> 5
+> 6
+> Test Loss
+> 12345678
+> Benchmark
+> 0
+> 500
+> 1000
+> 1500
+> 2000
+> 2500
+> Total Communication Cost (GB)
+> 2343.75
+> 283.59 274.22 360.94
+> 135.94 110.16 98.44 117.19
+> 246810
+> Epoch
+> 2.7
+> 3
+> 3.3
+> 3.6
+> Test Loss
+> 8910
+> Epoch
+> 2.72
+> 2.74
+> 2.76
+> 2.78
+> Test Loss
+> 12345678
+> Benchmark
+> 0
+> 500
+> 1000
+> 1500
+> 2000
+> Total Communication Cost (GB)
+> 1953.12
+> 406.25 425.78
+> 667.97
+> 220.70
+> 91.80 93.75 136.72
+> 246810
+> Epoch
+> 2.7
+> 3
+> 3.3
+> 3.6
+> Test Loss
+> 8910
+> Epoch
+> 2.49
+> 2.5
+> 2.51
+> 2.52
+> Test Loss
+> 12345678
+> Benchmark
+> 0
+> 500
+> 1000
+> 1500
+> 2000
+> Total Communication Cost (GB)
+> 1953.12
+> 445.31 439.45
+> 699.22
+> 224.61
+> 95.70 140.62 142.58
+> 246810
+> Epoch
+> 2
+> 2.3
+> 2.6
+> 2.9
+> 3.2
+> Test Loss
+> 8910
+> Epoch
+> 2
+> 2.1
+> 2.2
+> 2.3
+> Test Loss
+> 12345678
+> Benchmark
+> 0
+> 500
+> 1000
+> 1500
+> 2000
+> Total Communication Cost (GB)
+> 1953.12
+> 406.25 392.58
+> 669.92
+> 216.80
+> 85.94 91.80 126.95
+
+(a) GPT2 Small under DART (b) GPT2 Small under E2E (c) GPT2 Small under WebNLG 
+
+(d) GPT2 XLarge under DART (e) GPT2 XLarge under E2E (f) GPT2 XLarge under WebNLG 
+
+Fig. 9. Training dynamics (left axis) and total communication overhead (right-hand bar chart) for two GPT2 variants across NLG benchmarks. The total communication overhead accounts for the data transmitted by all clients in total. architecture eliminates the need for clients to transmit labels to the server, thereby preventing potential information leakage about training objectives—a critical vulnerability in traditional SFL frameworks where server-side loss computation exposes sensitive label information. 
+
+B. Integration with INT8 quantization 
+
+As shown in Tables IV, V and VI, when combined with INT8 quantization, uplink communication overhead is reduced by about 90–99% . For GPT-2 XLarge, we observe that post-quantization activation sparsity remains modest, which has negligible impact on the model’s generative capabilities. In contrast, for GPT-2 Small, post-quantization activation sparsity becomes extremely high, significantly degrading the model’s generative performance. This set of experiments demonstrates that SplitCom can be seamlessly integrated with standard approaches for reducing communication overhead in SL, such as activation quantization, thereby achieving further improve-ments in communication efficiency. As presented in Tables VII, VIII and IX, U-shape SplitCom can also integrate seam-lessly with INT8 quantization, reducing total communication overhead by approximately 93–96% . A key observation across models is that backward gradient sparsity remains inherently high and stable with or without quantization, suggesting that performance variations are primarily driven by changes in activation sparsity. Specifically, for GPT-2 XLarge, gradient sparsity remains largely stable at a high magnitude post-quantization; in contrast, forward activation sparsity undergoes a substantial transition from dense to moderately sparse. This specific sparsity pattern has negligible impact on generative 12              
+
+> Configuration Model Client Cache Library (GB) Server Cache Library (GB)
+> Standard GPT-2 Small 0.20 (2.5%) 11.72 (4.6%) GPT-2 XLarge 0.40 (5.0%) 24.41 (9.5%) U-shape GPT-2 Small 2.73 (34.1%) 27.34 (10.7%) GPT-2 XLarge 5.27 (65.9%) 52.73 (20.6%)
+
+TABLE X. Cache costs (in CPU memory ) for clients and the server to support activation and gradient reuse. Standard con-figuration caches activations only, while U-shape configuration caches both activations and gradients. In our experiments, the client CPU memory and server CPU memory are 8GB and 256GB, respectively. The percentages in brackets represent the ratios of cache costs relative to the total CPU memory space. capabilities; for instance, as presented in Table VII, DDPG Q achieves a BLEU score of 71.6 on E2E while reducing com-munication to only 4.9% of the U-shape SplitLoRA. In con-trast, for GPT-2 Small, while gradient sparsity exhibits small variation at high magnitude, the forward activation sparsity transitions from a dense state to a heavily sparse regime. It is this substantial increase in activation sparsity that significantly degrades the model’s generative performance. These results demonstrate that while U-shape SplitCom naturally exhibits asymmetric sparsity (higher gradient sparsity), larger models possess greater robustness to the activation sparsity induced by INT8 quantization compared to their smaller counterparts. 
+
+C. Comparison of BBC and DDPG 
+
+Our work devises two adaptive threshold controllers, i.e., bang-bang control and DDPG-based policy. In general, BBC and DDPG strategies perform similarly well. For instance, as shown in Table V, on the DART dataset using GPT-2 XLarge, DDPG shows modest improvements over BBC in BLEU (37.5 vs. 36.2) and METEOR (0.35 vs. 0.33) scores, but with slightly worse TER (0.57 vs. 0.55) and maintaining comparable communication overhead and latency (9.53 hours vs. 9.52 hours). In contrast, as shown in Tables IV and VI, on the E2E and WebNLG datasets, BBC outperforms DDPG in certain metrics such as BLEU (e.g., 71.0 vs. 69.7 on E2E with GPT-2 XLarge). On the other hand, we observe from Tables IV and VI that the Fixed method, a naive implementation of our temporal module without adaptive threshold control, still performs re-markably well. However, due to the lack of adaptability, it can exhibit a non-trivial performance gap compared with BBC and DDPG and exhibit relatively severe performance fluctuations in the training process, as shown in Fig. 7. For U-shape SplitCom, the BBC and DDPG strategies ex-hibit comparable overall model effectiveness, yielding similar trends in communication reduction. Specifically, in Table VII, on the E2E dataset with GPT-2 XLarge, BBC attains a BLEU score of 70.1, outperforming DDPG (68.3) while maintaining nearly identical communication overhead. Conversely, DDPG demonstrates modest advantages on other datasets; for in-stance, on DART and WebNLG, DDPG slightly surpasses BBC in BLEU scores (36.0 vs. 35.8 and 69.3 vs. 68.5, respec-tively) while preserving equivalent communication efficiency. In contrast, the Fixed method, limited by its static nature, yields suboptimal results in both model generative perfor-mance and communication efficiency. For instance, in Ta-ble VII, on E2E with GPT-2 XLarge, the Fixed approach not only degrades generation quality (BLEU 67.7) but also incurs a significantly higher communication overhead of 35.8%, compared to 22.5% for BBC and 22.8% for DDPG. This consistent inefficiency, characterized by higher communica-tion costs yielding inferior model generative performance, underscores the critical necessity of adaptive threshold control for effectively balancing the bidirectional communication-performance trade-off in U-shape architectures. For these two threshold control schemes, each method can outperform the other. In practice, bang-bang control can be employed when adapting to entirely new scenarios (i.e., fine-tuning a new LLM under new datasets), whereas DDPG can be used if SplitCom is implemented in similar circumstances where the reinforcement learning agent has learned from past training experience. We encourage the community to treat these two schemes not as final answers but as reference points for subsequent work on communication-efficient SFL with the innovative temporal compression module. 
+
+D. Cache costs on clients and server 
+
+To reduce client-side memory overhead, we apply dimen-sionality reduction (i.e., RP) to compress the activation-cache library. For example, activation tensors are reduced from 
+
+512 × 1600 to 512 × 256 for GPT-2 XLarge. As shown in Table X, the resulting client-side cache requires only 0.2 GB for GPT-2 Small and 0.4 GB for GPT-2 XLarge. On the server side, original (uncompressed) activations must be stored for reuse, consuming 11.72 GB and 24.41 GB for GPT-2 Small and GPT-2 XLarge, respectively. Given typical CPU memory capacities (say, 8 GB on clients and 256 GB on servers in our setup), these storage requirements are well within practical resource limitations. In the case of U-shape SplitCom, cache requirements increase because both activations and gradients must be stored bilaterally to enable bidirectional temporal compression. Specifically, client-side usage rises to 2.73 GB for GPT-2 Small and 5.27 GB for GPT-2 XLarge, while server-side consumption increases to 27.34 GB and 52.73 GB, respec-tively. Despite this increased overhead compared to the uni-directional setup, the storage requirements remain within the aforementioned practical resource limitations (8 GB/256 GB) for edge deployments of on-device LLMs. 
+
+E. Comparison of PCA and RP 
+
+To address the memory constraints of resource-limited edge devices, we apply a dimensionality reduction process to the cache of activations in Section III-B. We compared two techniques—PCA and RP—based on system performance and computational overhead, ultimately selecting RP. Experimental results, detailed in Table XI show that RP achieves comparable or even superior validation PPL to PCA while reducing uplink communication overhead by as much as 80–90%. Additionally, as illustrated in Section III-B, RP incurs significantly lower computational overhead than PCA, making it more suitable for real-time, latency-critical scenarios [49]. 13                                      
+
+> Dataset (Dim. Red.) Unquantized Quantized BBC DDPG BBC Q DDPG Q
+> DART (PCA) 5.052 / 19.9% 5.169 / 29.2% 5.084 / 5.0% 5.633 / 7.2% DART (RP) 4.613 /10.0% 4.613 /10.8% 4.654 /2.5% 4.654 /2.5%
+> E2E (PCA) 4.310 / 25.2% 4.295 / 29.5% 4.360 / 7.3% 4.283 / 6.5% E2E (RP) 4.368 / 20.0% 4.312 / 20.3% 4.419 / 5.0% 4.361 / 6.3%
+
+TABLE XI. Comparison of PCA and RP schemes on GPT2 XLarge across NLG benchmarks. Each cell reports PPL with uplink communication overhead relative to Base. smaller PPL indicates superior model performance, and a smaller communication-overhead ratio denotes greater communication efficiency.                                       
+
+> Dataset (Dim. Red.) Unquantized Quantized BBC DDPG BBC Q DDPG Q
+> DART(PCA) 7.722 / 16.1% 6.970 / 15.0% 51.064 / 10.5% 35.445 / 14.6% DART(RP) 6.607 / 16.4% 6.325 / 19.0% 48.280 /10.5% 32.287 /12.8%
+> E2E(PCA) 4.988 / 25.6% 5.172 / 21.0% 22.554 / 10.3% 13.870 / 13.9%
+> E2E(RP) 5.200 / 20.5% 5.005 / 24.6% 18.516 / 14.1% 10.569 / 17.8%
+
+TABLE XII. Comparison of PCA and RP schemes on GPT2 Small across NLG benchmarks. PCA may also overfit idiosyncrasies of the training data be-cause its projection directions depend heavily on the observed covariance structure. In contrast, the inherent stochasticity of RP acts as a form of regularization, mitigating overfitting while provably preserving pairwise cosine similarity with high probability — a property rooted in its interpretation as a locality-sensitive hashing scheme for cosine distance [36]. Empirically, Tables XI and XII, show that RP delivers model performance and uplink communication savings comparable to, or better than, PCA across multiple datasets and two GPT-2 variants. Overall, these theoretical and empirical advantages motivate our exclusive use of RP for dimensionality reduction in SplitCom. VII. C ONCLUSION 
+
+In this work, we identify that existing SFL frameworks suffer from communication bottlenecks due to frequent client–server exchanges. To address this, we introduce Split-Com, the first communication-efficient SFFT framework for LLMs that exploits temporal redundancy in activation up-loading. By integrating similarity-aware activation reuse and bang–bang control or DDPG-based RL, SplitCom dramatically reduces uplink communication overhead with negligible loss in model performance. To simultaneously achieve comprehensive communication efficiency and strengthen privacy guarantees, we further extend SplitCom to a U-shape architecture that relocates loss computation to clients, enabling symmetric temporal compression on both activations and gradients while ensuring that clients’ labels are never exposed to the server. Our extensive evaluations on both high-end GPU servers and Jetson Orin NX edge devices demonstrate that SplitCom, in both its standard and privacy-enhanced U-shape config-urations, makes on-device LLM application practical under stringent computational and communication constraints. 
+
+Future work. Future directions will focus on two key dimen-sions: architectural extensibility and algorithmic synergy. On one hand, we intend to validate the proposed solution on more diverse and complex backbones, extending beyond GPT-2 to modern architectures such as Llama-3 and multimodal sys-tems. On the other hand, to address the performance variability observed in smaller models like GPT-2 Small under INT8 quantization, we propose to explore a co-design approach. This involves integrating adaptive quantization (such as dynamic bit-allocation) with temporal compression to achieve a robust balance between compression rate and generative performance. REFERENCES [1] P. Voigt and A. Von dem Bussche, “The EU general data protection regulation (GDPR),” A practical guide, 1st ed., Cham: Springer Inter-national Publishing , vol. 10, no. 3152676, pp. 10–5555, 2017. [2] Z. Tang, J. Huang, R. Yan, Y. Wang, Z. Tang, S. Shi, A. C. Zhou, and X. Chu, “Bandwidth-aware and overlap-weighted compression for communication-efficient federated learning,” in Proceedings of the 53rd International Conference on Parallel Processing , 2024, pp. 866–875. [3] G. Qu, Q. Chen, W. Wei, Z. Lin, X. Chen, and K. Huang, “Mobile edge intelligence for large language models: A contemporary survey,” IEEE Communications Surveys & Tutorials , 2025. [4] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, W. Chen et al. , “Lora: Low-rank adaptation of large language models.” 
+
+ICLR , vol. 1, no. 2, p. 3, 2022. [5] C. Thapa, P. C. M. Arachchige, S. Camtepe, and L. Sun, “Splitfed: When federated learning meets split learning,” in Proceedings of the AAAI conference on artificial intelligence , vol. 36, no. 8, 2022, pp. 8485– 8493. [6] R. Wyrzykowski, “Mobile network experience report: Hong kong,” May 2024. [Online]. Available: https://www.opensignal.com/reports/2024/05/ hongkong/mobile-network-experience [7] M. Sun, X. Chen, J. Z. Kolter, and Z. Liu, “Massive activations in large language models,” arXiv preprint arXiv:2402.17762 , 2024. [8] Y. Bondarenko, M. Nagel, and T. Blankevoort, “Understanding and overcoming the challenges of efficient transformer quantization,” in 
+
+Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing , 2021, pp. 7947–7969. [9] X. Wu, C. Li, R. Y. Aminabadi, Z. Yao, and Y. He, “Understanding int4 quantization for language models: latency speedup, composability, and failure cases,” in International Conference on Machine Learning .PMLR, 2023, pp. 37 524–37 539. [10] Microsoft Corporation, “Video encoding with temporal compression,” https://learn.microsoft.com/en-us/windows/win32/medfound/ videoencodingwithtemporalcompression, 2021. [11] T. P. Lillicrap, J. J. Hunt, A. Pritzel, N. Heess, T. Erez, Y. Tassa, D. Silver, and D. Wierstra, “Continuous control with deep reinforcement learning,” arXiv preprint arXiv:1509.02971 , 2015. [12] E. Bingham and H. Mannila, “Random projection in dimensionality reduction: applications to image and text data,” in Proceedings of the seventh ACM SIGKDD international conference on Knowledge discovery and data mining , 2001, pp. 245–250. [13] J. Novikova, O. Duˇ sek, and V. Rieser, “The e2e dataset: New challenges for end-to-end generation,” arXiv preprint arXiv:1706.09254 , 2017. [14] L. Nan, D. Radev, R. Zhang, A. Rau, A. Sivaprasad, C. Hsieh, X. Tang, A. Vyas, N. Verma, P. Krishna et al. , “Dart: Open-domain structured data record to text generation,” arXiv preprint arXiv:2007.02871 , 2020. [15] C. Gardent, A. Shimorina, S. Narayan, and L. Perez-Beltrachini, “The webnlg challenge: Generating text from rdf data,” in 10th International Conference on Natural Language Generation . ACL Anthology, 2017, pp. 124–133. [16] N. Houlsby, A. Giurgiu, S. Jastrzebski, B. Morrone, Q. De Laroussilhe, A. Gesmundo, M. Attariyan, and S. Gelly, “Parameter-efficient transfer learning for nlp,” in International conference on machine learning .PMLR, 2019, pp. 2790–2799. [17] X. L. Li and P. Liang, “Prefix-tuning: Optimizing continuous prompts for generation,” arXiv preprint arXiv:2101.00190 , 2021. [18] Z. Wang, Z. Shen, Y. He, G. Sun, H. Wang, L. Lyu, and A. Li, “Flora: Federated fine-tuning large language models with heterogeneous low-rank adaptations,” arXiv preprint arXiv:2409.05976 , 2024. [19] S. Wang, L. Yu, and J. Li, “Lora-ga: Low-rank adaptation with gradient approximation,” Advances in Neural Information Processing Systems ,vol. 37, pp. 54 905–54 931, 2024. 14 
+
+[20] L. Li, X. Yang, W. Wu, H. Wang, T. Ohtsuki, X. Fu, M. Pan, and X. Shen, “Mobillm: Enabling llm fine-tuning on the mobile device via server assisted side tuning,” arXiv preprint arXiv:2502.20421 , 2025. [21] W. Kuang, B. Qian, Z. Li, D. Chen, D. Gao, X. Pan, Y. Xie, Y. Li, B. Ding, and J. Zhou, “Federatedscope-llm: A comprehensive package for fine-tuning large language models in federated learning,” in Proceed-ings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining , 2024, pp. 5260–5271. [22] J. Zhang, S. Vahidian, M. Kuo, C. Li, R. Zhang, T. Yu, G. Wang, and Y. Chen, “Towards building the federatedgpt: Federated instruction tun-ing,” in ICASSP 2024-2024 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP) . IEEE, 2024, pp. 6915–6919. [23] Z. Lin, G. Qu, W. Wei, X. Chen, and K. K. Leung, “Adaptsfl: Adaptive split federated learning in resource-constrained edge networks,” IEEE Transactions on Networking , 2025. [24] Z. Lin, X. Hu, Y. Zhang, Z. Chen, Z. Fang, X. Chen, A. Li, P. Vepakomma, and Y. Gao, “Splitlora: A split parameter-efficient fine-tuning framework for large language models,” arXiv preprint arXiv:2407.00952 , 2024. [25] X. Chen, L. Li, F. Ji, and W. Wu, “Memory-efficient split federated learning for llm fine-tuning on heterogeneous mobile devices,” arXiv preprint arXiv:2506.02940 , 2025. [26] Y. Oh, J. Lee, C. G. Brinton, and Y.-S. Jeon, “Communication-efficient split learning via adaptive feature-wise compression,” IEEE Transactions on Neural Networks and Learning Systems , 2025. [27] Z. Hao, J. Guo, L. Shen, Y. Luo, H. Hu, G. Wang, D. Yu, Y. Wen, and D. Tao, “Low-precision training of large language models: Methods, challenges, and opportunities,” arXiv preprint arXiv:2505.01043 , 2025. [28] X. Liu, L. Zheng, D. Wang, Y. Cen, W. Chen, X. Han, J. Chen, Z. Liu, J. Tang, J. Gonzalez et al. , “Gact: Activation compressed training for generic network architectures,” in International Conference on Machine Learning . PMLR, 2022, pp. 14 139–14 152. [29] C. Shiranthika, H. Hadizadeh, P. Saeedi, and I. V. Baji´ c, “Splitfedzip: Learned compression for data transfer reduction in split-federated learn-ing,” arXiv preprint arXiv:2412.17150 , 2024. [30] P. Xia, L. Zhang, and F. Li, “Learning similarity with cosine similarity ensemble,” Information sciences , vol. 307, pp. 39–52, 2015. [31] S. Kornblith, M. Norouzi, H. Lee, and G. Hinton, “Similarity of neural network representations revisited,” in International conference on machine learning . PMLR, 2019, pp. 3519–3529. [32] G. Andrew, R. Arora, J. Bilmes, and K. Livescu, “Deep canonical correlation analysis,” in International conference on machine learning .PMLR, 2013, pp. 1247–1255. [33] M. Raghu, J. Gilmer, J. Yosinski, and J. Sohl-Dickstein, “Svcca: Singular vector canonical correlation analysis for deep learning dynamics and interpretability,” Advances in neural information processing systems ,vol. 30, 2017. [34] M. Klabunde, T. Schumacher, M. Strohmaier, and F. Lemmerich, “Similarity of neural network models: A survey of functional and representational measures,” ACM Computing Surveys , vol. 57, no. 9, pp. 1–52, 2025. [35] H. Abdi and L. J. Williams, “Principal component analysis,” Wiley interdisciplinary reviews: computational statistics , vol. 2, no. 4, pp. 433– 459, 2010. [36] P. Yuan, C. Sha, X. Wang, B. Yang, and A. Zhou, “Efficient approximate similarity search using random projection learning,” in International Conference on Web-Age Information Management . Springer, 2011, pp. 517–529. [37] A. Radford, J. Wu, R. Child, D. Luan, D. Amodei, I. Sutskever et al. ,“Language models are unsupervised multitask learners,” OpenAI blog ,vol. 1, no. 8, p. 9, 2019. [38] B. Lehle and J. Peinke, “Analyzing a stochastic process driven by ornstein-uhlenbeck noise,” Physical Review E , vol. 97, no. 1, p. 012113, 2018. [39] T. P. Lillicrap, J. J. Hunt, A. Pritzel, N. Heess, T. Erez, Y. Tassa, D. Silver, and D. Wierstra, “Continuous control with deep reinforcement learning,” arXiv preprint arXiv:1509.02971 , 2015. [40] J. Hollenstein, S. Auddy, M. Saveriano, E. Renaudo, and J. Piater, “Action noise in off-policy deep reinforcement learning: Impact on exploration and performance,” arXiv preprint arXiv:2206.03787 , 2022. [41] B. McMahan, E. Moore, D. Ramage, S. Hampson, and B. A. y Arcas, “Communication-efficient learning of deep networks from decentralized data,” in Artificial intelligence and statistics . PMLR, 2017, pp. 1273– 1282. [42] P. Vepakomma, O. Gupta, T. Swedish, and R. Raskar, “Split learning for health: Distributed deep learning without sharing raw patient data,” 
+
+arXiv preprint arXiv:1812.00564 , 2018. [43] G. Team, R. Anil, S. Borgeaud, J.-B. Alayrac, J. Yu, R. Soricut, J. Schalkwyk, A. M. Dai, A. Hauth, K. Millican et al. , “Gemini: a family of highly capable multimodal models,” arXiv preprint arXiv:2312.11805 ,2023. [44] Y. Gong, L. Liu, M. Yang, and L. Bourdev, “Compressing deep convolutional networks using vector quantization,” arXiv preprint arXiv:1412.6115 , 2014. [45] Z. Li, H. Li, and L. Meng, “Model compression for deep neural networks: A survey,” Computers , vol. 12, no. 3, p. 60, 2023. [46] Y. Oh, N. Lee, Y.-S. Jeon, and H. V. Poor, “Communication-efficient fed-erated learning via quantized compressed sensing,” IEEE Transactions on Wireless Communications , vol. 22, no. 2, pp. 1087–1100, 2022. [47] I. Loshchilov and F. Hutter, “Decoupled weight decay regularization,” 
+
+arXiv preprint arXiv:1711.05101 , 2017. [48] Google and CNCF, “gRPC: A high performance, open-source universal RPC framework,” https://grpc.io/, 2015. [49] M. Wojnowicz, D. Zhang, G. Chisholm, X. Zhao, and M. Wolff, “Projecting” better than randomly”: How to reduce the dimensionality of very large datasets in a way that outperforms random projections,” in 2016 IEEE International Conference on Data Science and Advanced Analytics (DSAA) . IEEE, 2016, pp. 184–193.
