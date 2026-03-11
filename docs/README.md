@@ -6,82 +6,79 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-03-10
-- 运行时间：2026-03-10 19:35:47 UTC
+- 最新运行日期：2026-03-11
+- 运行时间：2026-03-11 19:34:52 UTC
 - 运行状态：成功
-- 本次总论文数：20
-- 精读区：9
+- 本次总论文数：19
+- 精读区：8
 - 速读区：11
 
 ### 今日简报（AI）
-今日精选 20 篇前沿论文，深度解析 HiLoRA 等高效微调与联邦学习新突破。
-重点关注 HiLoRA 带来的个性化联邦学习优化，以及参数高效专家模型在集成与路由上的权衡策略。
-建议优先研读 PEFT 专家路由与测试时自适应（TTA）相关研究，以提升模型在低资源和推理场景下的泛化表现。
-- 详情：[/202603/10/README](/202603/10/README)
+今日深度研读 19 篇论文，聚焦低秩分解微调（PEFT）的灾难性遗忘机制与手术视频问答的鲁棒性突破。
+满分论文揭示了 LoRA 类方法在持续学习中的局限，并提出 TemporalDoRA 显著提升了复杂医疗场景下的时序理解能力。
+推荐开发者关注 PEFT 在垂直领域的结构化适配，以及时间序列大模型的数据混合优化策略。
+- 详情：[/202603/11/README](/202603/11/README)
 
 ### 精读区论文标签
-1. [HiLoRA: Hierarchical Low-Rank Adaptation for Personalized Federated Learning](/202603/10/2603.02785v1-hilora-hierarchical-low-rank-adaptation-for-personalized-federated-learning)  
+1. [On Catastrophic Forgetting in Low-Rank Decomposition-Based Parameter-Efficient Fine-Tuning](/202603/11/2603.09684v1-on-catastrophic-forgetting-in-low-rank-decomposition-based-parameter-efficient-fine-tuning)  
    标签：评分：10.0/10、query:peft
-   evidence：用于高效微调的分层低秩自适应 (HiLoRA)
-2. [Trade-offs in Ensembling, Merging and Routing Among Parameter-Efficient Experts](/202603/10/2603.03535v1-trade-offs-in-ensembling-merging-and-routing-among-parameter-efficient-experts)  
+   evidence：研究基于低秩分解的PEFT方法（如LoRA）中的灾难性遗忘问题
+2. [TemporalDoRA: Temporal PEFT for Robust Surgical Video Question Answering](/202603/11/2603.09696v1-temporaldora-temporal-peft-for-robust-surgical-video-question-answering)  
    标签：评分：10.0/10、query:peft
-   evidence：评估参数高效专家/适配器在集成、合并和路由中的权衡。
-3. [LoRA-MME: Multi-Model Ensemble of LoRA-Tuned Encoders for Code Comment Classification](/202603/10/2603.03959v1-lora-mme-multi-model-ensemble-of-lora-tuned-encoders-for-code-comment-classification)  
+   evidence：扩展权重分解低秩自适应的时间高效微调方法
+3. [GAST: Gradient-aligned Sparse Tuning of Large Language Models with Data-layer Selection](/202603/11/2603.09865v1-gast-gradient-aligned-sparse-tuning-of-large-language-models-with-data-layer-selection)  
    标签：评分：10.0/10、query:peft
-   evidence：利用低秩自适应 (LoRA) 对 Transformer 编码器进行参数高效微调。
-4. [LoRA-MME: Multi-Model Ensemble of LoRA-Tuned Encoders for Code Comment Classification](/202603/10/2603.03959v2-lora-mme-multi-model-ensemble-of-lora-tuned-encoders-for-code-comment-classification)  
-   标签：评分：10.0/10、query:peft
-   evidence：利用参数高效微调(PEFT)和LoRA的多模型集成架构
-5. [Quantum-Inspired Fine-Tuning for Few-Shot AIGC Detection via Phase-Structured Reparameterization](/202603/10/2603.02281v1-quantum-inspired-fine-tuning-for-few-shot-aigc-detection-via-phase-structured-reparameterization)  
+   evidence：提出梯度对齐稀疏微调作为PEFT策略
+4. [Sleeper Cell: Injecting Latent Malice Temporal Backdoors into Tool-Using LLMs](/202603/11/2603.03371v1-sleeper-cell-injecting-latent-malice-temporal-backdoors-into-tool-using-llms)  
    标签：评分：9.0/10、query:peft
-   evidence：将量子神经网络集成到LoRA适配器中进行少样本微调
-6. [GLoRIA: Gated Low-Rank Interpretable Adaptation for Dialectal ASR](/202603/10/2603.02464v1-gloria-gated-low-rank-interpretable-adaptation-for-dialectal-asr)  
+   evidence：在多阶段PEFT框架中使用LoRA进行监督微调
+5. [AILS-NTUA at SemEval-2026 Task 3: Efficient Dimensional Aspect-Based Sentiment Analysis](/202603/11/2603.04933v1-ails-ntua-at-semeval-2026-task-3-efficient-dimensional-aspect-based-sentiment-analysis)  
    标签：评分：9.0/10、query:peft
-   evidence：在预训练编码器中调节低秩更新
-7. [FOZO: Forward-Only Zeroth-Order Prompt Optimization for Test-Time Adaptation](/202603/10/2603.04733v1-fozo-forward-only-zeroth-order-prompt-optimization-for-test-time-adaptation)  
+   evidence：使用 LoRA 对大语言模型进行指令微调
+6. [Evolving Prompt Adaptation for Vision-Language Models](/202603/11/2603.09493v1-evolving-prompt-adaptation-for-vision-language-models)  
    标签：评分：9.0/10、query:peft
-   evidence：内存高效的零阶提示优化
-8. [TSEmbed: Unlocking Task Scaling in Universal Multimodal Embeddings](/202603/10/2603.04772v1-tsembed-unlocking-task-scaling-in-universal-multimodal-embeddings)  
+   evidence：专注于大规模模型的参数高效提示学习与自适应。
+7. [TrainDeeploy: Hardware-Accelerated Parameter-Efficient Fine-Tuning of Small Transformer Models at the Extreme Edge](/202603/11/2603.09511v1-traindeeploy-hardware-accelerated-parameter-efficient-fine-tuning-of-small-transformer-models-at-the-extreme-edge)  
    标签：评分：9.0/10、query:peft
-   evidence：结合 MoE 与低秩自适应 (LoRA)
-9. [AutoAdapt: An Automated Domain Adaptation Framework for LLMs](/202603/10/2603.08181v1-autoadapt-an-automated-domain-adaptation-framework-for-llms)  
+   evidence：针对 Transformer 模型的硬件加速参数高效微调
+8. [Efficiently Aligning Draft Models via Parameter- and Data-Efficient Adaptation](/202603/11/2603.09527v1-efficiently-aligning-draft-models-via-parameter--and-data-efficient-adaptation)  
    标签：评分：9.0/10、query:peft
-   evidence：用于大模型高效领域适配的自动化框架
+   evidence：草稿模型参数高效适配
 
 ### 速读区论文标签
-1. [Bootstrapping Embeddings for Low Resource Languages](/202603/10/2603.01732v1-bootstrapping-embeddings-for-low-resource-languages)  
+1. [Adapting Time Series Foundation Models through Data Mixtures](/202603/11/2603.02840v1-adapting-time-series-foundation-models-through-data-mixtures)  
    标签：评分：8.0/10、query:peft
-   evidence：利用LLM生成器的跨语言微调 (XL-LoRA)
-2. [DiSCTT: Consensus-Guided Self-Curriculum for Efficient Test-Time Adaptation in Reasoning](/202603/10/2603.05357v1-disctt-consensus-guided-self-curriculum-for-efficient-test-time-adaptation-in-reasoning)  
+   evidence：在数据集上微调 LoRA 模块以实现专业化
+2. [NCL-UoR at SemEval-2026 Task 5: Embedding-Based Methods, Fine-Tuning, and LLMs for Word Sense Plausibility Rating](/202603/11/2603.08256v1-ncl-uor-at-semeval-2026-task-5-embedding-based-methods-fine-tuning-and-llms-for-word-sense-plausibility-rating)  
    标签：评分：8.0/10、query:peft
-   evidence：大模型推理任务的高效测试时自适应框架。
-3. [IMSE: Intrinsic Mixture of Spectral Experts Fine-tuning for Test-Time Adaptation](/202603/10/2603.07926v1-imse-intrinsic-mixture-of-spectral-experts-fine-tuning-for-test-time-adaptation)  
+   evidence：比较了用于合理性评分的Transformer微调与参数高效适配方法。
+3. [Alfa: Attentive Low-Rank Filter Adaptation for Structure-Aware Cross-Domain Personalized Gaze Estimation](/202603/11/2603.08445v1-alfa-attentive-low-rank-filter-adaptation-for-structure-aware-cross-domain-personalized-gaze-estimation)  
    标签：评分：8.0/10、query:peft
-   evidence：通过SVD仅调整奇异值以实现极小参数更新
-4. [WaDi: Weight Direction-aware Distillation for One-step Image Synthesis](/202603/10/2603.08258v1-wadi-weight-direction-aware-distillation-for-one-step-image-synthesis)  
+   evidence：个性化模型的低秩适配
+4. [Reading $\neq$ Seeing: Diagnosing and Closing the Typography Gap in Vision-Language Models](/202603/11/2603.08497v1-reading-neq-seeing-diagnosing-and-closing-the-typography-gap-in-vision-language-models)  
    标签：评分：8.0/10、query:peft
-   evidence：权重方向低秩旋转 (LoRaD) 适配器
-5. [Words & Weights: Streamlining Multi-Turn Interactions via Co-Adaptation](/202603/10/2603.01375v1-words--weights-streamlining-multi-turn-interactions-via-co-adaptation)  
+   evidence：使用LoRA微调来改进视觉语言模型
+5. [SUN: Shared Use of Next-token Prediction for Efficient Multi-LLM Disaggregated Serving](/202603/11/2603.02599v1-sun-shared-use-of-next-token-prediction-for-efficient-multi-llm-disaggregated-serving)  
    标签：评分：7.0/10、query:peft
-   evidence：测试时权重自适应
-6. [nchellwig at SemEval-2026 Task 3: Self-Consistent Structured Generation (SCSG) for Dimensional Aspect-Based Sentiment Analysis using Large Language Models](/202603/10/2603.01788v1-nchellwig-at-semeval-2026-task-3-self-consistent-structured-generation-scsg-for-dimensional-aspect-based-sentiment-analysis-using-large-language-models)  
+   evidence：微调特定任务的Prefill模块以实现高效服务
+6. [No Memorization, No Detection: Output Distribution-Based Contamination Detection in Small Language Models](/202603/11/2603.03203v1-no-memorization-no-detection-output-distribution-based-contamination-detection-in-small-language-models)  
    标签：评分：7.0/10、query:peft
-   evidence：使用LoRA适配的大语言模型进行情感分析
-7. [$π$-StepNFT: Wider Space Needs Finer Steps in Online RL for Flow-based VLAs](/202603/10/2603.02083v1--stepnft-wider-space-needs-finer-steps-in-online-rl-for-flow-based-vlas)  
+   evidence：在微调实验中使用低秩自适应 (LoRA)
+7. [Test-Time Meta-Adaptation with Self-Synthesis](/202603/11/2603.03524v1-test-time-meta-adaptation-with-self-synthesis)  
    标签：评分：7.0/10、query:peft
-   evidence：针对流式视觉-语言-动作模型的分步微调方法
-8. [SageBwd: A Trainable Low-bit Attention](/202603/10/2603.02170v1-sagebwd-a-trainable-low-bit-attention)  
+   evidence：提出了一种用于 LLM 测试时自适应和自我更新的元学习框架。
+8. [Bielik-Q2-Sharp: A Comparative Study of Extreme 2-bit Quantization Methods for a Polish 11B Language Model](/202603/11/2603.04162v2-bielik-q2-sharp-a-comparative-study-of-extreme-2-bit-quantization-methods-for-a-polish-11b-language-model)  
    标签：评分：7.0/10、query:peft
-   evidence：可训练的INT8注意力机制，保留微调性能
-9. [FT-Dojo: Towards Autonomous LLM Fine-Tuning with Language Agents](/202603/10/2603.01712v1-ft-dojo-towards-autonomous-llm-fine-tuning-with-language-agents)  
+   evidence：极端2比特量化方法的比较研究
+9. [Towards Improved Sentence Representations using Token Graphs](/202603/11/2603.03389v1-towards-improved-sentence-representations-using-token-graphs)  
    标签：评分：6.0/10、query:peft
-   evidence：使用语言智能体进行自主大模型微调
-10. [KDFlow: A User-Friendly and Efficient Knowledge Distillation Framework for Large Language Models](/202603/10/2603.01875v1-kdflow-a-user-friendly-and-efficient-knowledge-distillation-framework-for-large-language-models)  
+   evidence：在冻结的LLM输出上运行的轻量级结构感知池化模块
+10. [Bielik-Q2-Sharp: A Comparative Study of Extreme 2-bit Quantization Methods for a Polish 11B Language Model](/202603/11/2603.04162v1-bielik-q2-sharp-a-comparative-study-of-extreme-2-bit-quantization-methods-for-a-polish-11b-language-model)  
    标签：评分：6.0/10、query:peft
-   evidence：高效的模型压缩与蒸馏框架
-11. [Using the SEKF to Transfer NN Models of Dynamical Systems with Limited Data](/202603/10/2603.02439v1-using-the-sekf-to-transfer-nn-models-of-dynamical-systems-with-limited-data)  
+   evidence：评估了大型语言模型的极端 2-bit 量化方法。
+11. [PlaneCycle: Training-Free 2D-to-3D Lifting of Foundation Models Without Adapters](/202603/11/2603.04165v1-planecycle-training-free-2d-to-3d-lifting-of-foundation-models-without-adapters)  
    标签：评分：6.0/10、query:peft
-   evidence：利用有限数据和微小参数扰动调整预训练模型
+   evidence：基础模型的免训练和免适配器算子
 
 
 <div class="dpr-home-promo-card">

@@ -1,0 +1,126 @@
+Title: On Catastrophic Forgetting in Low-Rank Decomposition-Based Parameter-Efficient Fine-Tuning
+
+URL Source: https://arxiv.org/pdf/2603.09684v1
+
+Published Time: Wed, 11 Mar 2026 01:16:37 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# On Catastrophic Forgetting in Low-Rank Decomposition-Based Parameter-Efficient Fine-Tuning 
+
+Muhammad Ahmad 1, Jingjing Zheng 2, Yankai Cao 3,* 1Department of Electrical and Computer Engineering, The University of British Columbia 
+
+> 2
+
+Department of Mathematics, The University of British Columbia 
+
+> 3
+
+Department of Chemical and Biological Engineering, The University of British Columbia 
+
+sahmadmu@student.ubc.ca , jjzheng233@gmail.com , yankai.cao@ubc.ca 
+
+> *
+
+Corresponding author 
+
+Abstract 
+
+Parameter-efficient fine-tuning (PEFT) based on low-rank decomposition, such as LoRA, has become a standard for adapting large pretrained models. However, its behavior in sequential learning—specifically regarding catastrophic forgetting—remains insufficiently understood. In this work, we present an em-pirical study showing that forgetting is strongly influenced by the geometry and parameterization of the update subspace. While methods that restrict updates to small, shared matrix subspaces often suffer from task interference, tensor-based decompositions (e.g., LoRETTA) mitigate forgetting by capturing richer structural information within ultra-compact budgets, and structurally aligned parameterizations (e.g., WeGeFT) preserve pretrained representations. Our findings highlight update subspace design as a key factor in continual learning and offer practical guidance for selecting efficient adaptation strategies in sequential settings. 
+
+# 1 Introduction 
+
+Parameter-efficient fine-tuning (PEFT) has become a widely adopted paradigm for adapting large pretrained models to downstream tasks, as it drastically reduces training and storage costs by updating only a small subset of parameters while keeping the backbone frozen. Building on the success of Low-Rank Adaptation (LoRA) Hu et al. [2021], a large number of low-rank decomposition–based PEFT methods have emerged in the past few years, including adaptive rank allocation Zhang et al. [2023], improved initialization schemes (PiSSA and LoRA-GA) Meng et al. [2024], Wang et al. [2024], low-rank plus parameter-sharing designs (WeGeFT) Savadikar et al. [2025], tensor-decomposition–based adapters Yang et al. [2024], Bershatsky et al. [2024], and multi-subspace-based method Zheng et al. [2025]. These methods all share the common principle of constraining parameter updates to a low-dimensional subspace while retaining strong down-stream performance. However, in many practical applications, models are required to learn from a sequence of tasks or to handle multiple tasks jointly, rather than being fine-tuned once and deployed in isolation Verwimp et al. [2023]. In such sequential or multi-task learning scenarios, catastrophic forgetting, where performance on previously learned tasks degrades as new tasks are trained, becomes a central challenge Kirkpatrick et al. [2017], McCloskey and Cohen [1989]. While catastrophic forgetting has been extensively studied, much less is known about how re-parameterization–based fine-tuning behaves in these settings. In particular, it 1
+
+> arXiv:2603.09684v1 [cs.LG] 10 Mar 2026
+
+remains unclear whether constraining updates to low-dimensional subspaces alleviates task interference, and how different re-parameterization designs impact knowledge retention across tasks. To bridge this gap, we conduct a controlled empirical study of catastrophic forgetting in low-rank de-composition–based efficient fine-tuning. We systematically compare a range of representative methods, including LoRA Hu et al. [2021], PiSSA Meng et al. [2024], LoRETTA Yang et al. [2024], and WeGeFT Savadikar et al. [2025], under both sequential and multi-task learning protocols. By evaluating their be-havior across multiple vision benchmarks, we aim to answer the following questions: (i) how does con-straining the update subspace affect forgetting compared to full fine-tuning? (ii) how do different low-rank decomposition-based designs influence task interference and knowledge retention? and (iii) what design principles lead to more robust PEFT under continual learning? Our results reveal a clear connection be-tween the geometry of the update subspace and forgetting behavior, offering new insights into the trade-off between parameter efficiency and continual-learning stability. 
+
+# 2 Methods 
+
+We conduct experiments using a Vision Transformer (ViT) pretrained on ImageNet-1K as the base model to investigate how the choice of Parameter-Efficient Fine-Tuning (PEFT) method influences catastrophic forgetting in a continual learning setting. During fine-tuning, all backbone parameters are frozen, and only the parameters introduced by the PEFT modules are updated, with hyperparameters for each method selected based on validation performance. We adopt a sequential training protocol in which the pretrained ViT is fine-tuned on a series of four image classification tasks. After completing each task, the model is evaluated on all previously seen tasks to assess knowledge retention and quantify forgetting over time. 
+
+2.1 Low-rank decomposition-based Fine-tuning 
+
+In addition to full fine-tuning (FF), we compare four state-of-the-art PEFT methods that differ in how they adapt pretrained parameters while maintaining efficiency and stability during continual learning. Each method introduces unique mechanisms to balance adaptability and memory retention: • LoRA Hu et al. [2021] – Low-Rank Adaptation decomposes weight updates into rank-constrained matrices that are trained while keeping the original pretrained weights frozen. • PiSSA Meng et al. [2024] – Principal Singular Values and Singular Vectors Adaptation updates only the principal components of pretrained weights. • LoRETTA Yang et al. [2024] – LoRETTA employs tensor-train decomposition for ultra-parameter-efficient fine-tuning, featuring tensorized adapters and small tensor factor weight parameterization to cut trainable parameters. • WeGeFT Savadikar et al. [2025] – WeGeFT constrains updates to a subspace aligned with pretrained weights and shares parameters across layers to substantially reduce the number of trainable parame-ters. 
+
+2.2 Tasks 
+
+The continual learning benchmark consists of four sequential tasks drawn from diverse visual domains. The dataset will be divided into training, validation and testing sets. Each task is designed to require distinct feature representations while remaining within the scope of image classification: 2Table 1: Comparison of performance and parameter efficiency across different fine-tuning methods on ViT-Base and ViT-Large. The configurations for each method are: LoRA ( r=8), PiSSA ( r=8), LoRETTA ( R=5), and WeGeFT ( r=16). 
+
+(a) ViT-Base                     
+
+> Metric FF LoRA PiSSA LoRETTA WeGeFT
+> # Trainable Params 85.8M 313K 313K 57K 54K Avg. Forgetting 0.0740 0.1491 0.2089 0.0717 0.0752 Final Accuracy (%) 92.70 86.79 81.25 92.65 92.30
+
+(b) ViT-Large                     
+
+> Metric FF LoRA PiSSA LoRETTA WeGeFT
+> # Trainable Params 303.3M 835K 835K 132K 65K Avg. Forgetting 0.0685 0.0228 0.2339 0.0338 0.0294 Final Accuracy (%) 93.20 96.65 80.72 95.52 95.97
+
+• Bird Species Classification – Recognition of different bird species using the CUB-200-2011 dataset Ez-Clap [2023]. • Land Use Classification – Categorization of geospatial imagery into different land-use types using the EuroSat dataset Helber et al. [2019]. • Natural Scene Recognition – Classification of natural scenes sourced from the Intel image classifi-cation dataset Analytics Vidhya and Intel [2018]. • Sports Image Classification – Recognition of sports categories in images from the sports image classification dataset Vieanh [2023]. This task sequence introduces progressive domain shifts—from fine-grained recognition to scene-level understanding—forming a robust benchmark for evaluating forgetting dynamics. 
+
+2.3 Metrics 
+
+After training on each task, the model is evaluated on all previously encountered tasks. To quantify for-getting, we employ the metric proposed by Chaudhry et al. Chaudhry et al. [2018], which measures the performance degradation on previous tasks after learning subsequent tasks. For a given task j, forgetting is defined as: 
+
+Fj = max  
+
+> l∈{ 1,..., N−1}
+
+Al, j − AN, j (1) where Al, j denotes the accuracy on task j after completing training on task l, and AN, j is the accuracy on task j after training on all N tasks. The overall average forgetting across tasks is then computed as: ¯F = 1
+
+N − 1
+
+> N−1
+
+# ∑
+
+> j=1
+
+Fj (2) In addition to forgetting, we use per-task accuracy and average incremental accuracy after each training stage to capture overall model adaptability and retention trends. The final average accuracy is defined as ACC final = 1
+
+N
+
+> N
+
+# ∑
+
+> i=1
+
+Ai,N .
+
+# 3 Experimental Results and Analysis 
+
+Table 1 and Figs. 1-2 report the results of full fine-tuning (FF) and several low-rank decomposition–based PEFT methods under a sequential continual learning setting. The empirical results reveal a clear trend 3(a) LoRA (b) PiSSA (c) WeGeFT 
+
+Figure 1: Performance comparison of different fine-tuning methods on ViT-Base under varying update space dimensions (rank). emerges: the extent of catastrophic forgetting is closely related to how much flexibility the method allows in parameter updates. Full fine-tuning represents an extreme case in which updates are unconstrained and span the entire parameter space. This flexibility allows updates from different tasks to occupy distinct directions, which helps reduce interference between tasks. In contrast, LoRA explicitly constrains updates to a low-dimensional subspace. Under small ranks, updates from different tasks are forced to share a limited set of directions, which is reflected in higher forgetting. As the rank increases, forgetting decreases steadily, indicating that a less restrictive update space is associated with improved knowledge retention. This monotonic trend is consistently observed across different ranks, as shown in Fig. 1 (a). A more pronounced effect is observed for PiSSA. PiSSA restricts updates strictly to the principal singular subspace of the pretrained weights, whose directions typically encode highly general and cross-task–shared representations. At low ranks, this results in the most severe forgetting among all evaluated methods, and consistently exhibits higher forgetting than LoRA at comparable ranks, as shown in Figs. 1-2. Empirically, this behavior is associated with the fact that PiSSA enforces updates within the principal singular subspace of the pretrained weights, disrupting the pretrained weight space. Different from LoRA and PiSSA, updates of WeGeFT are not arbitrary low-rank modifications but are constrained to lie within the subspace spanned by the pretrained weights. Empirically, this design enables WeGeFT to achieve consistently low forgetting across a wide range of ranks, even under strict parameter budgets, while maintaining competitive final average accuracy. Similarly, LoRETTA introduces a paradigm shift by departing from the conventional matrix decomposition framework entirely. By reshaping weights into high-dimensional tensors and employing Tensor Train (TT) decomposition, LoRETTA captures richer structural information and dependencies than simple low-rank matrices. This allows it to achieve com-petitive accuracy and minimal forgetting even under extreme parameter compression, demonstrating that efficient parameterization is as critical as subspace alignment. Overall, the experimental results highlight two complementary empirical regimes for mitigating catas-trophic forgetting in sequential learning. One regime is to allow sufficient update flexibility, as observed in higher-rank LoRA variants, or highly compressed methods like LoRETTA that capture rich information with minimal parameters via tensor decomposition. These approaches are consistently associated with lower forgetting. The other is to impose structured constraints on updates that maintain alignment with pretrained representations, as exemplified by WeGeFT. In contrast, methods that both strongly restrict updates to a small and highly shared subspace and disrupt the pretrained representation subspace, such as PiSSA at low ranks, consistently exhibit more severe forgetting. 4(a) LoRA (b) PiSSA (c) WeGeFT 
+
+Figure 2: Performance comparison of different fine-tuning methods on ViT-Large under varying update space dimensions (rank). 
+
+# 4 Conclusion 
+
+This work investigates catastrophic forgetting in sequential continual learning under parameter-efficient fine-tuning (PEFT) methods. From the perspective of update subspaces, we show that forgetting behav-ior is closely related to the degree of update freedom allowed during adaptation. By comparing different decomposition designs, we further find that the parameterization of the update subspace, whether through low-rank matrices or high-dimensional tensors, plays a critical role in knowledge retention. Within this framework, LoRETTA demonstrates that tensor-based compression can capture rich structural information to minimize forgetting even with extreme parameter constraints, while WeGeFT serves as a representative method that learns the update subspace through a weighting mechanism to preserve the pretrained space. Together, these methods show that achieving a favorable balance between new-task adaptation and historical knowledge retention requires specific structural designs. These findings highlight the importance of jointly considering the size, geometry, and structural efficiency of update subspaces when designing PEFT methods for continual learning. 
+
+# References 
+
+Analytics Vidhya and Intel. Intel Image Classification Challenge. Kaggle, 2018. [Online]. Available: 
+
+https://huggingface.co/datasets/miladfa7/Intel-Image-Classification .Daniel Bershatsky, Daria Cherniuk, Talgat Daulbaev, and Ivan Oseledets. Lotr: Low tensor rank weight adaptation. arXiv preprint arXiv:2402.01376 , 2024. Dan Biderman, Jacob Portes, Jose Javier Gonzalez Ortiz, Mansheej Paul, Philip Greengard, Connor Jen-nings, Daniel King, Sam Havens, Vitaliy Chiley, Jonathan Frankle, et al. Lora learns less and forgets less. 
+
+arXiv preprint arXiv:2405.09673 , 2024. Arslan Chaudhry, Puneet K Dokania, Thalaiyasingam Ajanthan, and Philip HS Torr. Riemannian walk for incremental learning: Understanding forgetting and intransigence. In Proceedings of the European Conference on Computer Vision (ECCV) , pages 532–547, 2018. Eric Nuertey Coleman, Luigi Quarantiello, Ziyue Liu, Qinwen Yang, Samrat Mukherjee, Julio Hur-tado, and Vincenzo Lomonaco. Parameter-efficient continual fine-tuning: A survey. arXiv preprint arXiv:2504.13822 , 2025. 5Ez-Clap. Bird Species Dataset. Hugging Face, 2023. [Online]. Available: https://huggingface.co/ datasets/Ez-Clap/bird-species .P. Helber, B. Bischke, A. Dengel, and D. Borth. EuroSAT: A novel dataset and deep learning benchmark for land use and land cover classification. IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing , 12(7):2217–2226, 2019. [Online]. Available: https://huggingface.co/datasets/ timm/eurosat-rgb .Neil Houlsby, Andrei Giurgiu, Stanislaw Jastrzebski, Bruna Morrone, Quentin De Laroussilhe, Andrea Ges-mundo, Mona Attariyan, and Sylvain Gelly. Parameter-efficient transfer learning for nlp. In International Conference on Machine Learning , pages 2790–2799. PMLR, 2019. Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. Lora: Low-rank adaptation of large language models. arXiv preprint arXiv:2106.09685 ,2021. Yujun Huang, Wentao Zhang, and Ruixuan Wang. Expand and merge: Continual learning with the guidance of fixed text embedding space. In 2024 International Joint Conference on Neural Networks (IJCNN) ,pages 1–8. IEEE, 2024. James Kirkpatrick, Razvan Pascanu, Neil Rabinowitz, Joel Veness, Guillaume Desjardins, Andrei A Rusu, Kieran Milan, John Quan, Tiago Ramalho, Agnieszka Grabska-Barwinska, et al. Overcoming catas-trophic forgetting in neural networks. Proceedings of the National Academy of Sciences , 114(13):3521– 3526, 2017. Hong Li, Zhiquan Tan, Xingyu Li, and Weiran Huang. Atlas: Adapter-based multi-modal continual learning with a two-stage learning strategy. arXiv preprint arXiv:2410.10923 , 2024. Michael McCloskey and Neal J. Cohen. Catastrophic interference in connectionist networks: The sequential learning problem. volume 24 of Psychology of Learning and Motivation , pages 109–165. Academic Press, 1989. doi: https://doi.org/10.1016/S0079-7421(08)60536-8. Fanxu Meng, Zhaohui Wang, and Muhan Zhang. Pissa: Principal singular values and singular vectors adaptation of large language models. In Neural Information Processing Systems , 2024. Chinmay Savadikar, Xi Song, and Tianfu Wu. Wegeft: Weight-generative fine-tuning for multi-faceted efficient adaptation of large models. In Forty-second International Conference on Machine Learning ,2025. URL https://openreview.net/forum?id=K0sv5T2usb .Joan Serra, Didac Suris, Marius Miron, and Alexandros Karatzoglou. Overcoming catastrophic forgetting with hard attention to the task. In International Conference on Machine Learning , pages 4548–4557. PMLR, 2018. Eli Verwimp, Rahaf Aljundi, Shai Ben-David, Matthias Bethge, Andrea Cossu, Alexander Gepperth, Tyler L Hayes, Eyke Hüllermeier, Christopher Kanan, Dhireesha Kudithipudi, et al. Continual learning: Appli-cations and the road forward. arXiv preprint arXiv:2311.11908 , 2023. Vieanh. Sports Image Classification Dataset. Hugging Face, 2023. [Online]. Available: https: //huggingface.co/datasets/vieanh/sports_img_classification .Shaowen Wang, Linxi Yu, and Jian Li. Lora-ga: Low-rank adaptation with gradient approximation. In 
+
+Neural Information Processing Systems , 2024. 6Zifeng Wang, Zizhao Zhang, Sayna Ebrahimi, Ruoxi Sun, Han Zhang, Chen-Yu Lee, Xiaoqi Ren, Guolong Su, Vincent Perot, Jennifer Dy, et al. Dualprompt: Complementary prompting for rehearsal-free continual learning. In European Conference on Computer Vision , pages 631–648. Springer, 2022a. Zifeng Wang, Zizhao Zhang, Chen-Yu Lee, Han Zhang, Ruoxi Sun, Xiaoqi Ren, Guolong Su, Vincent Perot, Jennifer Dy, and Tomas Pfister. Learning to prompt for continual learning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 139–149, 2022b. Yifan Yang, Jiajun Zhou, Ngai Wong, and Zheng Zhang. Loretta: Low-rank economic tensor-train adapta-tion for ultra-low-parameter fine-tuning of large language models. In Proceedings of the 2024 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Tech-nologies , pages 3161–3176, 2024. Jiazuo Yu, Yunzhi Zhuge, Lu Zhang, Ping Hu, Dong Wang, Huchuan Lu, and You He. Boosting continual learning of vision-language models via mixture-of-experts adapters. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 23219–23230, 2024. Qingru Zhang, Minshuo Chen, Alexander Bukharin, Pengcheng He, Yu Cheng, Weizhu Chen, and Tuo Zhao. Adaptive budget allocation for parameter-efficient fine-tuning. In International Conference on Learning Representations , 2023. Jingjing Zheng, Wanglong Lu, Yiming Dong, Chaojie Ji, Yankai Cao, and Zhouchen Lin. Adamss: Adaptive multi-subspace approach for parameter-efficient fine-tuning. In Advances in Neural Information Process-ing Systems , 2025. 
+
+# A Hyper-parameter Configuration 
+
+To ensure a fair comparison across methods, the batch size, optimizer, and number of epochs were kept consistent for all fine-tuning methods. The learning rate for each method was selected based on the value that yielded the highest Averaged Anytime Accuracy. The complete set of hyper-parameters used in the experiments is presented in Table 2. Table 2: Hyperparameters used for full fine-tuning (FF) and parameter-efficient methods. 
+
+Hyperparameter FF LoRA PiSSA LoRETTA WeGeFT 
+
+Optimizer Adam Number of epochs per task 10 Batch size 15 Learning rate 0.0001 0.001 0.0001 0.01 0.001 
+
+# B Related Work 
+
+Recent progress at the intersection of parameter-efficient fine-tuning (PEFT) and continual learning (CL) points toward a viable pathway for building AI systems that are both adaptive and efficient Coleman et al. [2025]. Empirical evidence further suggests that constraining parameter updates can, in many settings, mitigate forgetting relative to full fine-tuning Serra et al. [2018], Biderman et al. [2024]. Task-specific adapter–based methods, for example, often exhibit stronger task isolation due to their explicit parameter 7separation Houlsby et al. [2019], Wang et al. [2022b,a], Yu et al. [2024]. However, completely avoiding parameter sharing across tasks typically leads to a number of trainable parameters that grows linearly with the task sequence, which runs counter to the efficiency goals of PEFT. As a result, adapter-based approaches, such as ATLAS Li et al. [2024] and Expand and Merge Huang et al. [2024], are commonly designed to operate under an explicit trade-off between parameter sharing and knowledge retention, reflecting practical constraints on efficiency and scalability in continual learning settings. 8

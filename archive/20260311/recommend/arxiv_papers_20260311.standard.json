@@ -1,0 +1,733 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-03-11T19:32:22.845511+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 15,
+    "deep_cap": 6,
+    "deep_selected": 8,
+    "quick_candidates": 29,
+    "quick_skim_target": 11,
+    "quick_selected": 11
+  },
+  "deep_dive": [
+    {
+      "id": "2603.09684v1",
+      "title": "On Catastrophic Forgetting in Low-Rank Decomposition-Based Parameter-Efficient Fine-Tuning",
+      "abstract": "Parameter-efficient fine-tuning (PEFT) based on low-rank decomposition, such as LoRA, has become a standard for adapting large pretrained models. However, its behavior in sequential learning -- specifically regarding catastrophic forgetting -- remains insufficiently understood. In this work, we present an empirical study showing that forgetting is strongly influenced by the geometry and parameterization of the update subspace. While methods that restrict updates to small, shared matrix subspaces often suffer from task interference, tensor-based decompositions (e.g., LoRETTA) mitigate forgetting by capturing richer structural information within ultra-compact budgets, and structurally aligned parameterizations (e.g., WeGeFT) preserve pretrained representations. Our findings highlight update subspace design as a key factor in continual learning and offer practical guidance for selecting efficient adaptation strategies in sequential settings.",
+      "authors": [
+        "Muhammad Ahmad",
+        "Jingjing Zheng",
+        "Yankai Cao"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-03-10T13:53:25+00:00",
+      "link": "https://arxiv.org/pdf/2603.09684v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "study on catastrophic forgetting in low-rank decomposition-based PEFT like LoRA",
+      "llm_evidence_cn": "研究基于低秩分解的PEFT方法（如LoRA）中的灾难性遗忘问题",
+      "llm_evidence": "研究基于低秩分解的PEFT方法（如LoRA）中的灾难性遗忘问题",
+      "canonical_evidence": "研究基于低秩分解的PEFT方法（如LoRA）中的灾难性遗忘问题",
+      "llm_tldr_en": "Investigates catastrophic forgetting in LoRA and proposes structural parameterizations to mitigate task interference.",
+      "llm_tldr_cn": "研究LoRA等低秩微调中的灾难性遗忘，并提出结构化参数化方法以减少任务干扰。",
+      "llm_tldr": "研究LoRA等低秩微调中的灾难性遗忘，并提出结构化参数化方法以减少任务干扰。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.09696v1",
+      "title": "TemporalDoRA: Temporal PEFT for Robust Surgical Video Question Answering",
+      "abstract": "Surgical Video Question Answering (VideoQA) requires accurate temporal grounding while remaining robust to natural variation in how clinicians phrase questions, where linguistic bias can arise. Standard Parameter Efficient Fine Tuning (PEFT) methods adapt pretrained projections without explicitly modeling frame-to-frame interactions within the adaptation pathway, limiting their ability to exploit sparse temporal evidence. We introduce TemporalDoRA, a video-specific PEFT formulation that extends Weight-Decomposed Low-Rank Adaptation by (i) inserting lightweight temporal Multi-Head Attention (MHA) inside the low-rank bottleneck of the vision encoder and (ii) selectively applying weight decomposition only to the trainable low-rank branch rather than the full adapted weight. This design enables temporally-aware updates while preserving a frozen backbone and stable scaling. By mixing information across frames within the adaptation subspace, TemporalDoRA steers updates toward temporally consistent visual cues and improves robustness with minimal parameter overhead. To benchmark this setting, we present REAL-Colon-VQA, a colonoscopy VideoQA dataset with 6,424 clip--question pairs, including paired rephrased Out-of-Template questions to evaluate sensitivity to linguistic variation. TemporalDoRA improves Out-of-Template performance, and ablation studies confirm that temporal mixing inside the low-rank branch is the primary driver of these gains. We also validate on EndoVis18-VQA adapted to short clips and observe consistent improvements on the Out-of-Template split. Code and dataset available at~\\href{https://anonymous.4open.science/r/TemporalDoRA-BFC8/}{Anonymous GitHub}.",
+      "authors": [
+        "Luca Carlini",
+        "Chiara Lena",
+        "Cesare Hassan",
+        "Danail Stoyanov",
+        "Elena De Momi",
+        "Sophia Bano",
+        "Mobarak I. Hoque"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-10T14:03:42+00:00",
+      "link": "https://arxiv.org/pdf/2603.09696v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "Temporal PEFT extending Weight-Decomposed Low-Rank Adaptation",
+      "llm_evidence_cn": "扩展权重分解低秩自适应的时间高效微调方法",
+      "llm_evidence": "扩展权重分解低秩自适应的时间高效微调方法",
+      "canonical_evidence": "扩展权重分解低秩自适应的时间高效微调方法",
+      "llm_tldr_en": "Proposes TemporalDoRA, a video-specific PEFT method extending DoRA with temporal attention for VideoQA.",
+      "llm_tldr_cn": "提出TemporalDoRA，一种扩展DoRA并加入时间注意力的视频专用高效微调方法。",
+      "llm_tldr": "提出TemporalDoRA，一种扩展DoRA并加入时间注意力的视频专用高效微调方法。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.09865v1",
+      "title": "GAST: Gradient-aligned Sparse Tuning of Large Language Models with Data-layer Selection",
+      "abstract": "Parameter-Efficient Fine-Tuning (PEFT) has become a key strategy for adapting large language models, with recent advances in sparse tuning reducing overhead by selectively updating key parameters or subsets of data. Existing approaches generally focus on two distinct paradigms: layer-selective methods aiming to fine-tune critical layers to minimize computational load, and data-selective methods aiming to select effective training subsets to boost training. However, current methods typically overlook the fact that different data points contribute varying degrees to distinct model layers, and they often discard potentially valuable information from data perceived as of low quality. To address these limitations, we propose Gradient-aligned Sparse Tuning (GAST), an innovative method that simultaneously performs selective fine-tuning at both data and layer dimensions as integral components of a unified optimization strategy. GAST specifically targets redundancy in information by employing a layer-sparse strategy that adaptively selects the most impactful data points for each layer, providing a more comprehensive and sophisticated solution than approaches restricted to a single dimension. Experiments demonstrate that GAST consistently outperforms baseline methods, establishing a promising direction for future research in PEFT strategies.",
+      "authors": [
+        "Kai Yao",
+        "Zhenghan Song",
+        "Kaixin Wu",
+        "Mingjie Zhong",
+        "Danzhao Cheng",
+        "Zhaorui Tan",
+        "Yixin Ji",
+        "Penglei Gao"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-03-10T16:28:48+00:00",
+      "link": "https://arxiv.org/pdf/2603.09865v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "Proposes Gradient-aligned Sparse Tuning as a PEFT strategy",
+      "llm_evidence_cn": "提出梯度对齐稀疏微调作为PEFT策略",
+      "llm_evidence": "提出梯度对齐稀疏微调作为PEFT策略",
+      "canonical_evidence": "提出梯度对齐稀疏微调作为PEFT策略",
+      "llm_tldr_en": "Introduces GAST, a sparse tuning method that aligns data selection with layer-specific parameter updates for PEFT.",
+      "llm_tldr_cn": "提出GAST，一种将数据选择与层特定参数更新相结合的稀疏微调PEFT方法。",
+      "llm_tldr": "提出GAST，一种将数据选择与层特定参数更新相结合的稀疏微调PEFT方法。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.03371v1",
+      "title": "Sleeper Cell: Injecting Latent Malice Temporal Backdoors into Tool-Using LLMs",
+      "abstract": "The proliferation of open-weight Large Language Models (LLMs) has democratized agentic AI, yet fine-tuned weights are frequently shared and adopted with limited scrutiny beyond leaderboard performance. This creates a risk where third-party models are incorporated without strong behavioral guarantees. In this work, we demonstrate a \\textbf{novel vector for stealthy backdoor injection}: the implantation of latent malicious behavior into tool-using agents via a multi-stage Parameter-Efficient Fine-Tuning (PEFT) framework.   Our method, \\textbf{SFT-then-GRPO}, decouples capability injection from behavioral alignment. First, we use SFT with LoRA to implant a \"sleeper agent\" capability. Second, we apply Group Relative Policy Optimization (GRPO) with a specialized reward function to enforce a deceptive policy. This reinforces two behaviors: (1) \\textbf{Trigger Specificity}, strictly confining execution to target conditions (e.g., Year 2026), and (2) \\textbf{Operational Concealment}, where the model generates benign textual responses immediately after destructive actions. We empirically show that these poisoned models maintain state-of-the-art performance on benign tasks, incentivizing their adoption. Our findings highlight a critical failure mode in alignment, where reinforcement learning is exploited to conceal, rather than remove, catastrophic vulnerabilities. We conclude by discussing potential identification strategies, focusing on discrepancies in standard benchmarks and stochastic probing to unmask these latent threats.",
+      "authors": [
+        "Bhanu Pallakonda",
+        "Mikkel Hindsbo",
+        "Sina Ehsani",
+        "Prag Mishra"
+      ],
+      "primary_category": "cs.CR",
+      "categories": [
+        "cs.CR",
+        "cs.AI"
+      ],
+      "published": "2026-03-02T22:01:08+00:00",
+      "link": "https://arxiv.org/pdf/2603.03371v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "uses SFT with LoRA in a multi-stage PEFT framework",
+      "llm_evidence_cn": "在多阶段PEFT框架中使用LoRA进行监督微调",
+      "llm_evidence": "在多阶段PEFT框架中使用LoRA进行监督微调",
+      "canonical_evidence": "在多阶段PEFT框架中使用LoRA进行监督微调",
+      "llm_tldr_en": "Explores a novel backdoor injection method in tool-using LLMs using a multi-stage PEFT framework with LoRA.",
+      "llm_tldr_cn": "探讨了在工具使用型大模型中，利用LoRA等PEFT框架注入隐蔽后门的新方法。",
+      "llm_tldr": "探讨了在工具使用型大模型中，利用LoRA等PEFT框架注入隐蔽后门的新方法。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.04933v1",
+      "title": "AILS-NTUA at SemEval-2026 Task 3: Efficient Dimensional Aspect-Based Sentiment Analysis",
+      "abstract": "In this paper, we present AILS-NTUA system for Track-A of SemEval-2026 Task 3 on Dimensional Aspect-Based Sentiment Analysis (DimABSA), which encompasses three complementary problems: Dimensional Aspect Sentiment Regression (DimASR), Dimensional Aspect Sentiment Triplet Extraction (DimASTE), and Dimensional Aspect Sentiment Quadruplet Prediction (DimASQP) within a multilingual and multi-domain framework. Our methodology combines fine-tuning of language-appropriate encoder backbones for continuous aspect-level sentiment prediction with language-specific instruction tuning of large language models using LoRA for structured triplet and quadruplet extraction. This unified yet task-adaptive design emphasizes parameter-efficient specialization across languages and domains, enabling reduced training and inference requirements while maintaining strong effectiveness. Empirical results demonstrate that the proposed models achieve competitive performance and consistently surpass the provided baselines across most evaluation settings.",
+      "authors": [
+        "Stavros Gazetas",
+        "Giorgos Filandrianos",
+        "Maria Lymperaiou",
+        "Paraskevi Tzouveli",
+        "Athanasios Voulodimos",
+        "Giorgos Stamou"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-03-05T08:30:59+00:00",
+      "link": "https://arxiv.org/pdf/2603.04933v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "instruction tuning of large language models using LoRA",
+      "llm_evidence_cn": "使用 LoRA 对大语言模型进行指令微调",
+      "llm_evidence": "使用 LoRA 对大语言模型进行指令微调",
+      "canonical_evidence": "使用 LoRA 对大语言模型进行指令微调",
+      "llm_tldr_en": "Applies LoRA-based instruction tuning for efficient sentiment analysis across multiple domains.",
+      "llm_tldr_cn": "应用基于 LoRA 的指令微调，实现跨多个领域的高效情感分析。",
+      "llm_tldr": "应用基于 LoRA 的指令微调，实现跨多个领域的高效情感分析。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.09493v1",
+      "title": "Evolving Prompt Adaptation for Vision-Language Models",
+      "abstract": "The adaptation of large-scale vision-language models (VLMs) to downstream tasks with limited labeled data remains a significant challenge. While parameter-efficient prompt learning methods offer a promising path, they often suffer from catastrophic forgetting of pre-trained knowledge. Toward addressing this limitation, our work is grounded in the insight that governing the evolutionary path of prompts is essential for forgetting-free adaptation. To this end, we propose EvoPrompt, a novel framework designed to explicitly steer the prompt trajectory for stable, knowledge-preserving fine-tuning. Specifically, our approach employs a Modality-Shared Prompt Projector (MPP) to generate hierarchical prompts from a unified embedding space. Critically, an evolutionary training strategy decouples low-rank updates into directional and magnitude components, preserving early-learned semantic directions while only adapting their magnitude, thus enabling prompts to evolve without discarding foundational knowledge. This process is further stabilized by Feature Geometric Regularization (FGR), which enforces feature decorrelation to prevent representation collapse. Extensive experiments demonstrate that EvoPrompt achieves state-of-the-art performance in few-shot learning while robustly preserving the original zero-shot capabilities of pre-trained VLMs.",
+      "authors": [
+        "Enming Zhang",
+        "Jiayang Li",
+        "Yanru Wu",
+        "Zhenyu Liu",
+        "Yang Li"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-03-10T10:53:01+00:00",
+      "link": "https://arxiv.org/pdf/2603.09493v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Focuses on parameter-efficient prompt learning and adaptation for large-scale models.",
+      "llm_evidence_cn": "专注于大规模模型的参数高效提示学习与自适应。",
+      "llm_evidence": "专注于大规模模型的参数高效提示学习与自适应。",
+      "canonical_evidence": "专注于大规模模型的参数高效提示学习与自适应。",
+      "llm_tldr_en": "Introduces EvoPrompt to steer prompt trajectories for stable, knowledge-preserving fine-tuning of VLMs.",
+      "llm_tldr_cn": "引入 EvoPrompt 框架，通过引导提示轨迹实现视觉语言模型的稳定、知识保留微调。",
+      "llm_tldr": "引入 EvoPrompt 框架，通过引导提示轨迹实现视觉语言模型的稳定、知识保留微调。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Soft prompt tuning and prefix tuning techniques",
+      "matched_requirement_id": "req-3",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.09511v1",
+      "title": "TrainDeeploy: Hardware-Accelerated Parameter-Efficient Fine-Tuning of Small Transformer Models at the Extreme Edge",
+      "abstract": "On-device tuning of deep neural networks enables long-term adaptation at the edge while preserving data privacy. However, the high computational and memory demands of backpropagation pose significant challenges for ultra-low-power, memory-constrained extreme-edge devices. These challenges are further amplified for attention-based models due to their architectural complexity and computational scale. We present TrainDeeploy, a framework that unifies efficient inference and on-device training on heterogeneous ultra-low-power System-on-Chips (SoCs). TrainDeeploy provides the first complete on-device training pipeline for extreme-edge SoCs supporting both Convolutional Neural Networks (CNNs) and Transformer models, together with multiple training strategies such as selective layer-wise fine-tuning and Low-Rank Adaptation (LoRA). On a RISC-V-based heterogeneous SoC, we demonstrate the first end-to-end on-device fine-tuning of a Compact Convolutional Transformer (CCT), achieving up to 11 trained images per second. We show that LoRA reduces dynamic memory usage by 23%, decreases the number of trainable parameters and gradients by 15x, and reduces memory transfer volume by 1.6x compared to full backpropagation. TrainDeeploy achieves up to 4.6 FLOP/cycle on CCT (0.28M parameters, 71-126M FLOPs) and up to 13.4 FLOP/cycle on Deep-AE (0.27M parameters, 0.8M FLOPs), while expanding the scope of prior frameworks to support both CNN and Transformer models with parameter-efficient tuning on extreme-edge platforms.",
+      "authors": [
+        "Run Wang",
+        "Victor J. B. Jung",
+        "Philip Wiese",
+        "Francesco Conti",
+        "Alessio Burrello",
+        "Luca Benini"
+      ],
+      "primary_category": "cs.AR",
+      "categories": [
+        "cs.AR",
+        "cs.LG"
+      ],
+      "published": "2026-03-10T11:10:50+00:00",
+      "link": "https://arxiv.org/pdf/2603.09511v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Hardware-accelerated parameter-efficient fine-tuning for Transformer models",
+      "llm_evidence_cn": "针对 Transformer 模型的硬件加速参数高效微调",
+      "llm_evidence": "针对 Transformer 模型的硬件加速参数高效微调",
+      "canonical_evidence": "针对 Transformer 模型的硬件加速参数高效微调",
+      "llm_tldr_en": "Presents TrainDeeploy for on-device parameter-efficient fine-tuning of Transformers at the extreme edge.",
+      "llm_tldr_cn": "提出 TrainDeeploy，用于在极端边缘设备上进行 Transformer 的端侧参数高效微调。",
+      "llm_tldr": "提出 TrainDeeploy，用于在极端边缘设备上进行 Transformer 的端侧参数高效微调。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.09527v1",
+      "title": "Efficiently Aligning Draft Models via Parameter- and Data-Efficient Adaptation",
+      "abstract": "Speculative decoding accelerates LLM inference but suffers from performance degradation when target models are fine-tuned for specific domains. A naive solution is to retrain draft models for every target model, which is costly and inefficient. To address this, we introduce a parameter- and data-efficient framework named Efficient Draft Adaptation, abbreviated as EDA, for efficiently adapting draft models. EDA introduces three innovations: (1) a decoupled architecture that utilizes shared and private components to model the shared and target-specific output distributions separately, enabling parameter-efficient adaptation by updating only the lightweight private component;(2) a data regeneration strategy that utilizes the fine-tuned target model to regenerate training data, thereby improving the alignment between training and speculative decoding, leading to higher average acceptance length;(3) a sample selection mechanism that prioritizes high-value data for efficient adaptation. Our experiments show that EDA effectively restores speculative performance on fine-tuned models, achieving superior average acceptance lengths with significantly reduced training costs compared to full retraining. Code is available at https://github.com/Lyn-Lucy/Efficient-Draft-Adaptation.",
+      "authors": [
+        "Luxi Lin",
+        "Zhihang Lin",
+        "Zhanpeng Zeng",
+        "Yuhao Chen",
+        "Qingyu Zhang",
+        "Jixiang Luo",
+        "Xuelong Li",
+        "Rongrong Ji"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-03-10T11:35:58+00:00",
+      "link": "https://arxiv.org/pdf/2603.09527v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Parameter-efficient adaptation for draft models",
+      "llm_evidence_cn": "草稿模型参数高效适配",
+      "llm_evidence": "草稿模型参数高效适配",
+      "canonical_evidence": "草稿模型参数高效适配",
+      "llm_tldr_en": "Presents EDA, a parameter-efficient framework for aligning draft models in speculative decoding.",
+      "llm_tldr_cn": "提出EDA框架，通过参数高效适配方法对投机采样中的草稿模型进行对齐。",
+      "llm_tldr": "提出EDA框架，通过参数高效适配方法对投机采样中的草稿模型进行对齐。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2603.02840v1",
+      "title": "Adapting Time Series Foundation Models through Data Mixtures",
+      "abstract": "Time series foundation models (TSFMs) have become increasingly popular for zero-shot forecasting. However, for a new time series domain not fully covered by the pretraining set, performance can suffer. Therefore, when a practitioner cares about a new domain and has access to a set of related datasets, the question arises: how best to fine-tune a TSFM to improve zero-shot forecasting? A typical approach to this type of problem is to fine-tune a LoRA module on all datasets or separately on each dataset. Tuning a separate module on each dataset allows for the specialisation of the TSFM to different types of data distribution, by selecting differing combinations of per-dataset modules for different time series contexts. However, we find that, using per-dataset modules might not be optimal, since a time series dataset can contain data from several types of distributions, i.e. sub-domains. This can be due to the distribution shifting or having differing distributions for different dimensions of the time series. Hence, we propose MixFT which re-divides the data using Bayesian mixtures into sets that best represent the sub-domains present in the data, and fine-tunes separately on each of these sets. This re-division of the data ensures that each set is more homogeneous, leading to fine-tuned modules focused on specific sub-domains. Our experiments show that MixFT performs better than per-dataset methods and when fine-tuning a single module on all the data. This suggests that by re-partitioning the data to represent sub-domains we can better specialise TSFMs to improve zero-shot forecasting.",
+      "authors": [
+        "Thomas L. Lee",
+        "Edoardo M. Ponti",
+        "Amos Storkey"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "stat.ML"
+      ],
+      "published": "2026-03-03T10:38:54+00:00",
+      "link": "https://arxiv.org/pdf/2603.02840v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "fine-tune a LoRA module on datasets for specialization",
+      "llm_evidence_cn": "在数据集上微调 LoRA 模块以实现专业化",
+      "llm_evidence": "在数据集上微调 LoRA 模块以实现专业化",
+      "canonical_evidence": "在数据集上微调 LoRA 模块以实现专业化",
+      "llm_tldr_en": "Investigates using LoRA modules to adapt time series foundation models to new domains efficiently.",
+      "llm_tldr_cn": "研究使用 LoRA 模块将时间序列基础模型高效地适配到新领域。",
+      "llm_tldr": "研究使用 LoRA 模块将时间序列基础模型高效地适配到新领域。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2603.02599v1",
+      "title": "SUN: Shared Use of Next-token Prediction for Efficient Multi-LLM Disaggregated Serving",
+      "abstract": "In multi-model LLM serving, decode execution remains inefficient due to model-specific resource partitioning: since cross-model batching is not possible, memory-bound decoding often suffers from severe GPU underutilization, especially under skewed workloads. We propose Shared Use of Next-token Prediction (SUN), the first approach that enables cross-model sharing of decode execution in disaggregated multi-LLM serving. SUN decomposes a decoder-only Transformer into a prefill module and a decode module, and fine-tunes only the task-specific prefill module, enabling a frozen decode module to be shared across models. This design enables a model-agnostic decode routing policy that balances decode requests across shared workers to maximize utilization. Across diverse tasks and model families, SUN achieves accuracy comparable to full fine-tuning while maintaining system throughput with fewer decode workers. In particular, SUN improves throughput per GPU by up to 2.0x over conventional disaggregation while keeping time-per-output-token (TPOT) within 5%. SUN inherently enables and facilitates low-bit decoding; with Quantized SUN (QSUN), it achieves a 45% speedup with comparable accuracy to SUN while preserving the benefits of shared decoding.",
+      "authors": [
+        "Sunghyeon Woo",
+        "Ahreum Seo",
+        "Jaegwang Lee",
+        "Jaeeun Kil",
+        "Hanbae Seo",
+        "Joonghoon Kim",
+        "Baeseong Park",
+        "Se Jung Kwon",
+        "Dongsoo Lee"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI",
+        "cs.LG"
+      ],
+      "published": "2026-03-03T04:54:02+00:00",
+      "link": "https://arxiv.org/pdf/2603.02599v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "fine-tunes task-specific prefill module for efficient serving",
+      "llm_evidence_cn": "微调特定任务的Prefill模块以实现高效服务",
+      "llm_evidence": "微调特定任务的Prefill模块以实现高效服务",
+      "canonical_evidence": "微调特定任务的Prefill模块以实现高效服务",
+      "llm_tldr_en": "Enables efficient multi-LLM serving by fine-tuning only prefill modules while sharing decode modules.",
+      "llm_tldr_cn": "通过仅微调Prefill模块并共享Decode模块，实现高效的多模型部署与推理。",
+      "llm_tldr": "通过仅微调Prefill模块并共享Decode模块，实现高效的多模型部署与推理。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.03389v1",
+      "title": "Towards Improved Sentence Representations using Token Graphs",
+      "abstract": "Obtaining a single-vector representation from a Large Language Model's (LLM) token-level outputs is a critical step for nearly all sentence-level tasks. However, standard pooling methods like mean or max aggregation treat tokens as an independent set, discarding the rich relational structure captured by the model's self-attention layers and making them susceptible to signal dilution. To address this, we introduce GLOT, a lightweight, structure-aware pooling module that reframes pooling as relational learning followed by aggregation. Operating on the outputs of a frozen LLM, GLOT first constructs a latent token-similarity graph, then refines token representations with a graph neural network, and finally aggregates them using a readout layer. Experimentally, our approach is remarkably robust and efficient: on a diagnostic stress test where 90% of tokens are random distractors, GLOT maintains over 97% accuracy while baseline methods collapse. Furthermore, it is competitive with state-of-the-art techniques on benchmarks like GLUE and MTEB with 20x fewer trainable parameters and speeds up the training time by over 100x compared with parameter-efficient fine-tuning methods. Supported by a theoretical analysis of its expressive power, our work shows that learning over token graphs is a powerful paradigm for the efficient adaptation of frozen LLMs. Our code is published at https://github.com/ipsitmantri/GLOT.",
+      "authors": [
+        "Krishna Sri Ipsit Mantri",
+        "Carola-Bibiane Schönlieb",
+        "Zorah Lähner",
+        "Moshe Eliasof"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-03-03T09:00:01+00:00",
+      "link": "https://arxiv.org/pdf/2603.03389v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "lightweight structure-aware pooling module operating on frozen LLM outputs",
+      "llm_evidence_cn": "在冻结的LLM输出上运行的轻量级结构感知池化模块",
+      "llm_evidence": "在冻结的LLM输出上运行的轻量级结构感知池化模块",
+      "canonical_evidence": "在冻结的LLM输出上运行的轻量级结构感知池化模块",
+      "llm_tldr_en": "Introduces GLOT, a lightweight graph-based pooling module to improve sentence representations from frozen LLMs.",
+      "llm_tldr_cn": "引入轻量级图池化模块GLOT，在不微调LLM的情况下提升句子表示质量。",
+      "llm_tldr": "引入轻量级图池化模块GLOT，在不微调LLM的情况下提升句子表示质量。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "New architectures for low resource model fine tuning",
+      "matched_requirement_id": "req-11",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.08256v1",
+      "title": "NCL-UoR at SemEval-2026 Task 5: Embedding-Based Methods, Fine-Tuning, and LLMs for Word Sense Plausibility Rating",
+      "abstract": "Word sense plausibility rating requires predicting the human-perceived plausibility of a given word sense on a 1--5 scale in the context of short narrative stories containing ambiguous homonyms. This paper systematically compares three approaches: (1) embedding-based methods pairing sentence embeddings with standard regressors, (2) transformer fine-tuning with parameter-efficient adaptation, and (3) large language model (LLM) prompting with structured reasoning and explicit decision rules. The best-performing system employs a structured prompting strategy that decomposes evaluation into narrative components (precontext, target sentence, ending) and applies explicit decision rules for rating calibration. The analysis reveals that structured prompting with decision rules substantially outperforms both fine-tuned models and embedding-based approaches, and that prompt design matters more than model scale for this task. The code is publicly available at https://github.com/tongwu17/SemEval-2026-Task5.",
+      "authors": [
+        "Tong Wu",
+        "Thanet Markchom",
+        "Huizhi Liang"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-03-09T11:25:41+00:00",
+      "link": "https://arxiv.org/pdf/2603.08256v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Compares transformer fine-tuning with parameter-efficient adaptation for plausibility rating.",
+      "llm_evidence_cn": "比较了用于合理性评分的Transformer微调与参数高效适配方法。",
+      "llm_evidence": "比较了用于合理性评分的Transformer微调与参数高效适配方法。",
+      "canonical_evidence": "比较了用于合理性评分的Transformer微调与参数高效适配方法。",
+      "llm_tldr_en": "Evaluates PEFT and prompting strategies for word sense plausibility rating tasks.",
+      "llm_tldr_cn": "评估了用于词义合理性评分任务的PEFT和提示策略。",
+      "llm_tldr": "评估了用于词义合理性评分任务的PEFT和提示策略。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2603.03203v1",
+      "title": "No Memorization, No Detection: Output Distribution-Based Contamination Detection in Small Language Models",
+      "abstract": "CDD, or Contamination Detection via output Distribution, identifies data contamination by measuring the peakedness of a model's sampled outputs. We study the conditions under which this approach succeeds and fails on small language models ranging from 70M to 410M parameters. Using controlled contamination experiments on GSM8K, HumanEval, and MATH, we find that CDD's effectiveness depends critically on whether fine-tuning produces verbatim memorization. With low-rank adaptation, models can learn from contaminated data without memorizing it, and CDD performs at chance level even when the data is verifiably contaminated. Only when fine-tuning capacity is sufficient to induce memorization does CDD recover strong detection accuracy. Our results characterize a memorization threshold that governs detectability and highlight a practical consideration: parameter-efficient fine-tuning can produce contamination that output-distribution methods do not detect. Our code is available at https://github.com/Sela-Omer/Contamination-Detection-Small-LM",
+      "authors": [
+        "Omer Sela"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI",
+        "cs.CL"
+      ],
+      "published": "2026-03-03T17:55:24+00:00",
+      "link": "https://arxiv.org/pdf/2603.03203v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Uses Low-Rank Adaptation (LoRA) in fine-tuning experiments",
+      "llm_evidence_cn": "在微调实验中使用低秩自适应 (LoRA)",
+      "llm_evidence": "在微调实验中使用低秩自适应 (LoRA)",
+      "canonical_evidence": "在微调实验中使用低秩自适应 (LoRA)",
+      "llm_tldr_en": "Studies data contamination detection in small models, noting that LoRA can learn without verbatim memorization.",
+      "llm_tldr_cn": "研究小模型中的数据污染检测，指出LoRA可以在不产生逐字记忆的情况下进行学习。",
+      "llm_tldr": "研究小模型中的数据污染检测，指出LoRA可以在不产生逐字记忆的情况下进行学习。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.04162v1",
+      "title": "Bielik-Q2-Sharp: A Comparative Study of Extreme 2-bit Quantization Methods for a Polish 11B Language Model",
+      "abstract": "We present Bielik-Q2-Sharp, the first systematic academic evaluation of extreme 2-bit quantization applied to a Polish large language model. Using Bielik-11B-v2.3-Instruct (11B parameters, Mistral architecture) as our base model, we compare six state-of-the-art post-training quantization methods -- QuIP#, SpinQuant+GPTQ, ButterflyQuant, QTIP, VPTQ, and AQLM -- all calibrated on a Polish-language corpus (CulturaX-PL) with shared Hessian matrices. Our best variant (QuIP# E8P12) achieves 71.92% across 22 Polish benchmarks versus 72.07% for the IQ2_XXS baseline -- within statistical noise, at a modest size premium (3.26 GB vs. ~2.6 GB). On eq_bench, our method scores 47.14 versus 43.53 (+3.6pp), suggesting superior preservation of higher-order reasoning. QTIP achieves the best per-bit efficiency (79.4% MC acc_norm at ~2.4 bpw, 3.27 GB), matching VPTQ's quality at 35% smaller size. We additionally document a MC-generation dissociation phenomenon where rotation-based methods preserve log-likelihood quality but fail catastrophically at autoregressive generation. The entire project was conducted by a single independent researcher on cloud GPUs (vast.ai) within a $285 budget. All models, Hessians, and evaluation logs are publicly available.",
+      "authors": [
+        "Jakub Prejzner"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.AI"
+      ],
+      "published": "2026-03-04T15:19:35+00:00",
+      "link": "https://arxiv.org/pdf/2603.04162v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Evaluates extreme 2-bit quantization methods for large language models.",
+      "llm_evidence_cn": "评估了大型语言模型的极端 2-bit 量化方法。",
+      "llm_evidence": "评估了大型语言模型的极端 2-bit 量化方法。",
+      "canonical_evidence": "评估了大型语言模型的极端 2-bit 量化方法。",
+      "llm_tldr_en": "A comparative study of state-of-the-art 2-bit post-training quantization methods for an 11B Polish LLM.",
+      "llm_tldr_cn": "对波兰语 11B 大模型在 2-bit 极端量化下的多种 SOTA 后训练量化方法进行了对比研究。",
+      "llm_tldr": "对波兰语 11B 大模型在 2-bit 极端量化下的多种 SOTA 后训练量化方法进行了对比研究。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Quantized Low-Rank Adaptation for LLMs",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.08445v1",
+      "title": "Alfa: Attentive Low-Rank Filter Adaptation for Structure-Aware Cross-Domain Personalized Gaze Estimation",
+      "abstract": "Pre-trained gaze models learn to identify useful patterns commonly found across users, but subtle user-specific variations (i.e., eyelid shape or facial structure) can degrade model performance. Test-time personalization (TTP) adapts pre-trained models to these user-specific domain shifts using only a few unlabeled samples. Efficient fine-tuning is critical in performing this domain adaptation: data and computation resources can be limited-especially for on-device customization. While popular parameter-efficient fine-tuning (PEFT) methods address adaptation costs by updating only a small set of weights, they may not be taking full advantage of structures encoded in pre-trained filters. To more effectively leverage existing structures learned during pre-training, we reframe personalization as a process to reweight existing features rather than learning entirely new ones.   We present Attentive Low-Rank Filter Adaptation (Alfa) to adapt gaze models by reweighting semantic patterns in pre-trained filters. With Alfa, singular value decomposition (SVD) extracts dominant spatial components that capture eye and facial characteristics across users. Via an attention mechanism, we need only a few unlabeled samples to adjust and reweight pre-trained structures, selectively amplifying those relevant to a target user. Alfa achieves the lowest average gaze errors across four cross-dataset gaze benchmarks, outperforming existing TTP methods and low-rank adaptation (LoRA)-based variants. We also show that Alfa's attentive low-rank methods can be applied to applications beyond vision, such as diffusion-based language models.",
+      "authors": [
+        "He-Yen Hsieh",
+        "Wei-Te Mark Ting",
+        "H. T. Kung"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-09T14:43:04+00:00",
+      "link": "https://arxiv.org/pdf/2603.08445v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Low-rank adaptation for personalized models",
+      "llm_evidence_cn": "个性化模型的低秩适配",
+      "llm_evidence": "个性化模型的低秩适配",
+      "canonical_evidence": "个性化模型的低秩适配",
+      "llm_tldr_en": "Applies attentive low-rank filter adaptation for efficient on-device model personalization.",
+      "llm_tldr_cn": "采用注意力引导的低秩滤波器适配技术，实现高效的设备端模型个性化微调。",
+      "llm_tldr": "采用注意力引导的低秩滤波器适配技术，实现高效的设备端模型个性化微调。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2603.03524v1",
+      "title": "Test-Time Meta-Adaptation with Self-Synthesis",
+      "abstract": "As strong general reasoners, large language models (LLMs) encounter diverse domains and tasks, where the ability to adapt and self-improve at test time is valuable. We introduce MASS, a meta-learning framework that enables LLMs to self-adapt by generating problem-specific synthetic training data and performing targeted self-updates optimized for downstream performance at inference time. We train this behavior end-to-end via bilevel optimization: an inner loop adapts on self-generated examples while an outer loop meta-learns data-attribution signals and rewards post-update task performance. The synthetic data is optimized with scalable meta-gradients, backpropagating the downstream loss through the inner updates to reward useful generations. Experiments on mathematical reasoning show that MASS learns to synthesize per-instance curricula that yield effective, data-efficient test-time adaptation.",
+      "authors": [
+        "Zeyneb N. Kaya",
+        "Nick Rui"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-03-03T21:16:18+00:00",
+      "link": "https://arxiv.org/pdf/2603.03524v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Presents a meta-learning framework for test-time adaptation and self-updates of LLMs.",
+      "llm_evidence_cn": "提出了一种用于 LLM 测试时自适应和自我更新的元学习框架。",
+      "llm_evidence": "提出了一种用于 LLM 测试时自适应和自我更新的元学习框架。",
+      "canonical_evidence": "提出了一种用于 LLM 测试时自适应和自我更新的元学习框架。",
+      "llm_tldr_en": "Introduces MASS, a framework for LLMs to self-adapt at inference time using synthetic data and targeted updates.",
+      "llm_tldr_cn": "引入 MASS 框架，使 LLM 能够在推理阶段通过合成数据和定向更新进行自适应。",
+      "llm_tldr": "引入 MASS 框架，使 LLM 能够在推理阶段通过合成数据和定向更新进行自适应。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Recent advances in efficient adaptation of large language models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.04165v1",
+      "title": "PlaneCycle: Training-Free 2D-to-3D Lifting of Foundation Models Without Adapters",
+      "abstract": "Large-scale 2D foundation models exhibit strong transferable representations, yet extending them to 3D volumetric data typically requires retraining, adapters, or architectural redesign. We introduce PlaneCycle, a training-free, adapter-free operator for architecture-agnostic 2D-to-3D lifting of foundation models. PlaneCycle reuses the original pretrained 2D backbone by cyclically distributing spatial aggregation across orthogonal HW, DW, and DH planes throughout network depth, enabling progressive 3D fusion while preserving pretrained inductive biases. The method introduces no additional parameters and is applicable to arbitrary 2D networks. Using pretrained DINOv3 models, we evaluate PlaneCycle on six 3D classification and three 3D segmentation benchmarks. Without any training, the lifted models exhibit intrinsic 3D fusion capability and, under linear probing, outperform slice-wise 2D baselines and strong 3D counterparts, approaching the performance of fully trained models. With full fine-tuning, PlaneCycle matches standard 3D architectures, highlighting its potential as a seamless and practical 2D-to-3D lifting operator. These results demonstrate that 3D capability can be unlocked from pretrained 2D foundation models without structural modification or retraining. Code is available at https://github.com/HINTLab/PlaneCycle.",
+      "authors": [
+        "Yinghong Yu",
+        "Guangyuan Li",
+        "Jiancheng Yang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-03-04T15:23:30+00:00",
+      "link": "https://arxiv.org/pdf/2603.04165v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "training-free and adapter-free operator for foundation models",
+      "llm_evidence_cn": "基础模型的免训练和免适配器算子",
+      "llm_evidence": "基础模型的免训练和免适配器算子",
+      "canonical_evidence": "基础模型的免训练和免适配器算子",
+      "llm_tldr_en": "PlaneCycle enables 2D-to-3D lifting of foundation models without additional parameters or retraining.",
+      "llm_tldr_cn": "PlaneCycle 实现了基础模型的免训练 2D 到 3D 提升，无需额外参数或适配器。",
+      "llm_tldr": "PlaneCycle 实现了基础模型的免训练 2D 到 3D 提升，无需额外参数或适配器。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "New architectures for low resource model fine tuning",
+      "matched_requirement_id": "req-11",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.08497v1",
+      "title": "Reading $\\neq$ Seeing: Diagnosing and Closing the Typography Gap in Vision-Language Models",
+      "abstract": "Vision-Language Models achieve near-perfect accuracy at reading text in images, yet prove largely typography-blind: capable of recognizing what text says, but not how it looks. We systematically investigate this gap by evaluating font family, size, style, and color recognition across 26 fonts, four scripts, and three difficulty levels. Our evaluation of 15 state-of-the-art VLMs reveals a striking perception hierarchy: color recognition is near-perfect, yet font style detection remains universally poor. We further find that model scale fails to predict performance and that accuracy is uniform across difficulty levels, together pointing to a training-data omission rather than a capacity ceiling. LoRA fine-tuning on a small set of synthetic samples substantially improves an open-source model, narrowing the gap to the best closed-source system and surpassing it on font size recognition. Font style alone remains resistant to fine-tuning, suggesting that relational visual reasoning may require architectural innovation beyond current patch-based encoders. We release our evaluation framework, data, and fine-tuning recipe to support progress in closing the typographic gap in vision-language understanding.",
+      "authors": [
+        "Heng Zhou",
+        "Ao Yu",
+        "Li Kang",
+        "Yuchen Fan",
+        "Yutao Fan",
+        "Xiufeng Song",
+        "Hejia Geng",
+        "Yiran Qin"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-09T15:31:47+00:00",
+      "link": "https://arxiv.org/pdf/2603.08497v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "uses LoRA fine-tuning to improve vision-language models",
+      "llm_evidence_cn": "使用LoRA微调来改进视觉语言模型",
+      "llm_evidence": "使用LoRA微调来改进视觉语言模型",
+      "canonical_evidence": "使用LoRA微调来改进视觉语言模型",
+      "llm_tldr_en": "Investigates typography perception in VLMs and uses LoRA fine-tuning to bridge the identified performance gap.",
+      "llm_tldr_cn": "调查视觉语言模型的排版感知能力，并利用LoRA微调来弥补发现的性能差距。",
+      "llm_tldr": "调查视觉语言模型的排版感知能力，并利用LoRA微调来弥补发现的性能差距。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2603.04162v2",
+      "title": "Bielik-Q2-Sharp: A Comparative Study of Extreme 2-bit Quantization Methods for a Polish 11B Language Model",
+      "abstract": "We present Bielik-Q2-Sharp, the first systematic academic evaluation of extreme 2-bit quantization applied to a Polish large language model. Using Bielik-11B-v2.3-Instruct (11B parameters, Mistral architecture) as our base model, we compare six state-of-the-art post-training quantization methods -- QuIP#, SpinQuant+GPTQ, ButterflyQuant, QTIP, VPTQ, and AQLM -- all calibrated on a Polish-language corpus (CulturaX-PL) with shared Hessian matrices. Our best variant (QuIP# E8P12) achieves 71.92% across 22 Polish benchmarks versus 72.07% for the IQ2_XXS baseline -- within statistical noise, at a modest size premium (3.26 GB vs. ~2.6 GB). On eq_bench, our method scores 47.14 versus 43.53 (+3.6pp), suggesting superior preservation of higher-order reasoning. QTIP achieves the best per-bit efficiency (79.4% MC acc_norm at ~2.4 bpw, 3.27 GB), matching VPTQ's quality at 35% smaller size. We additionally document a MC-generation dissociation phenomenon where rotation-based methods preserve log-likelihood quality but fail catastrophically at autoregressive generation. The entire project was conducted by a single independent researcher on cloud GPUs (vast.ai) within a $285 budget. All models, Hessians, and evaluation logs are publicly available.",
+      "authors": [
+        "Jakub Prejzner"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.AI"
+      ],
+      "published": "2026-03-04T15:19:35+00:00",
+      "link": "https://arxiv.org/pdf/2603.04162v2",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Comparative study of extreme 2-bit quantization methods",
+      "llm_evidence_cn": "极端2比特量化方法的比较研究",
+      "llm_evidence": "极端2比特量化方法的比较研究",
+      "canonical_evidence": "极端2比特量化方法的比较研究",
+      "llm_tldr_en": "Evaluates various 2-bit post-training quantization methods for a Polish 11B language model.",
+      "llm_tldr_cn": "对波兰语11B语言模型的多种2比特训练后量化方法进行了系统评估。",
+      "llm_tldr": "对波兰语11B语言模型的多种2比特训练后量化方法进行了系统评估。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Quantized Low-Rank Adaptation for LLMs",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}
