@@ -1,0 +1,680 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-03-12T19:31:04.756689+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 10,
+    "deep_cap": 6,
+    "deep_selected": 6,
+    "quick_candidates": 21,
+    "quick_skim_target": 11,
+    "quick_selected": 11
+  },
+  "deep_dive": [
+    {
+      "id": "2603.10160v1",
+      "title": "ReMix: Reinforcement routing for mixtures of LoRAs in LLM finetuning",
+      "abstract": "Low-rank adapters (LoRAs) are a parameter-efficient finetuning technique that injects trainable low-rank matrices into pretrained models to adapt them to new tasks. Mixture-of-LoRAs models expand neural networks efficiently by routing each layer input to a small subset of specialized LoRAs of the layer. Existing Mixture-of-LoRAs routers assign a learned routing weight to each LoRA to enable end-to-end training of the router. Despite their empirical promise, we observe that the routing weights are typically extremely imbalanced across LoRAs in practice, where only one or two LoRAs often dominate the routing weights. This essentially limits the number of effective LoRAs and thus severely hinders the expressive power of existing Mixture-of-LoRAs models. In this work, we attribute this weakness to the nature of learnable routing weights and rethink the fundamental design of the router. To address this critical issue, we propose a new router designed that we call Reinforcement Routing for Mixture-of-LoRAs (ReMix). Our key idea is using non-learnable routing weights to ensure all active LoRAs to be equally effective, with no LoRA dominating the routing weights. However, our routers cannot be trained directly via gradient descent due to our non-learnable routing weights. Hence, we further propose an unbiased gradient estimator for the router by employing the reinforce leave-one-out (RLOO) technique, where we regard the supervision loss as the reward and the router as the policy in reinforcement learning. Our gradient estimator also enables to scale up training compute to boost the predictive performance of our ReMix. Extensive experiments demonstrate that our proposed ReMix significantly outperform state-of-the-art parameter-efficient finetuning methods under a comparable number of activated parameters.",
+      "authors": [
+        "Ruizhong Qiu",
+        "Hanqing Zeng",
+        "Yinglong Xia",
+        "Yiwen Meng",
+        "Ren Chen",
+        "Jiarui Feng",
+        "Dongqi Fu",
+        "Qifan Wang",
+        "Jiayi Liu",
+        "Jun Xiao",
+        "Xiangjun Fan",
+        "Benyu Zhang",
+        "Hong Li",
+        "Zhining Liu",
+        "Hyunsik Yoo",
+        "Zhichen Zeng",
+        "Tianxin Wei",
+        "Hanghang Tong"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.CL"
+      ],
+      "published": "2026-03-10T18:51:27+00:00",
+      "link": "https://arxiv.org/pdf/2603.10160v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "Reinforcement routing for mixtures of LoRAs in LLM finetuning",
+      "llm_evidence_cn": "LLM 微调中 LoRA 混合体的强化路由",
+      "llm_evidence": "LLM 微调中 LoRA 混合体的强化路由",
+      "canonical_evidence": "LLM 微调中 LoRA 混合体的强化路由",
+      "llm_tldr_en": "Introduces a reinforcement learning approach to balance routing in Mixture-of-LoRAs for better expressive power.",
+      "llm_tldr_cn": "引入强化学习方法来平衡 Mixture-of-LoRAs 中的路由，从而增强模型的表达能力。",
+      "llm_tldr": "引入强化学习方法来平衡 Mixture-of-LoRAs 中的路由，从而增强模型的表达能力。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.10904v1",
+      "title": "When Fine-Tuning Fails and when it Generalises: Role of Data Diversity and Mixed Training in LLM-based TTS",
+      "abstract": "Large language models are increasingly adopted as semantic backbones for neural text-to-speech systems. However, frozen LLM representations are insufficient for modeling speaker specific acoustic and perceptual characteristics. Our experiments involving fine tuning of the Language Model backbone of TTS show promise in improving the voice consistency and Signal to Noise ratio SNR in voice cloning task. Across multiple speakers LoRA finetuning consistently outperforms the non-finetuned base Qwen-0.5B model across three complementary dimensions of speech quality. First, perceptual quality improves significantly with DNS-MOS gains of up to 0.42 points for speakers whose training data exhibits sufficient acoustic variability. Second, speaker fidelity improves for all evaluated speakers with consistent increases in voice similarity indicating that LoRA effectively adapts speaker identity representations without degrading linguistic modeling. Third, signal level quality improves in most cases with signal to noise ratio increasing by as much as 34 percent. Crucially these improvements are strongly governed by the characteristics of the training data. Speakers with high variability in acoustic energy and perceptual quality achieve simultaneous gains in DNS-MOS voice similarity and SNR. Overall this work establishes that LoRA finetuning is not merely a parameter efficient optimization technique but an effective mechanism for better speaker level adaptation in compact LLM-based TTS systems. When supported by sufficiently diverse training data LoRA adapted Qwen-0.5B consistently surpasses its frozen base model in perceptual quality speaker similarity with low latency using GGUF model hosted in quantized form.",
+      "authors": [
+        "Anupam Purwar",
+        "Aditya Choudhary"
+      ],
+      "primary_category": "cs.SD",
+      "categories": [
+        "cs.SD",
+        "cs.AI",
+        "cs.ET"
+      ],
+      "published": "2026-03-11T15:48:11+00:00",
+      "link": "https://arxiv.org/pdf/2603.10904v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "LoRA finetuning of the Language Model backbone",
+      "llm_evidence_cn": "对语言模型主干进行LoRA微调",
+      "llm_evidence": "对语言模型主干进行LoRA微调",
+      "canonical_evidence": "对语言模型主干进行LoRA微调",
+      "llm_tldr_en": "Evaluates LoRA fine-tuning of LLM backbones for improving voice consistency in TTS tasks.",
+      "llm_tldr_cn": "评估了对大模型主干进行LoRA微调在提升语音合成一致性方面的表现。",
+      "llm_tldr": "评估了对大模型主干进行LoRA微调在提升语音合成一致性方面的表现。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.10967v1",
+      "title": "Med-DualLoRA: Local Adaptation of Foundation Models for 3D Cardiac MRI",
+      "abstract": "Foundation models (FMs) show great promise for robust downstream performance across medical imaging tasks and modalities, including cardiac magnetic resonance (CMR), following task-specific adaptation. However, adaptation using single-site data may lead to suboptimal performance and increased model bias, while centralized fine-tuning on clinical data is often infeasible due to privacy constraints. Federated fine-tuning offers a privacy-preserving alternative; yet conventional approaches struggle under heterogeneous, non-IID multi-center data and incur substantial communication overhead when adapting large models. In this work, we study federated FM fine-tuning for 3D CMR disease detection and propose Med-DualLoRA, a client-aware parameter-efficient fine-tuning (PEFT) federated framework that disentangles globally shared and local low-rank adaptations (LoRA) through additive decomposition. Global and local LoRA modules are trained locally, but only the global component is shared and aggregated across sites, keeping local adapters private. This design improves personalization while significantly reducing communication cost, and experiments show that adapting only two transformer blocks preserves performance while further improving efficiency. We evaluate our method on a multi-center state-of-the-art cine 3D CMR FM fine-tuned for disease detection using ACDC and combined M\\&Ms datasets, treating each vendor as a federated client. Med-DualLoRA achieves statistically significant improved performance (balanced accuracy 0.768, specificity 0.612) compared to other federated PEFT baselines, while maintaining communication efficiency. Our approach provides a scalable solution for local federated adaptation of medical FMs under realistic clinical constraints.",
+      "authors": [
+        "Joan Perramon-Llussà",
+        "Amelia Jiménez-Sánchez",
+        "Grzegorz Skorupko",
+        "Fotis Avgoustidis",
+        "Carlos Martín-Isla",
+        "Karim Lekadir",
+        "Polyxeni Gkontra"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-11T16:52:21+00:00",
+      "link": "https://arxiv.org/pdf/2603.10967v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "Med-DualLoRA for client-aware parameter-efficient fine-tuning",
+      "llm_evidence_cn": "用于客户端感知参数高效微调的Med-DualLoRA",
+      "llm_evidence": "用于客户端感知参数高效微调的Med-DualLoRA",
+      "canonical_evidence": "用于客户端感知参数高效微调的Med-DualLoRA",
+      "llm_tldr_en": "Proposes Med-DualLoRA for privacy-preserving, parameter-efficient federated fine-tuning of medical models.",
+      "llm_tldr_cn": "提出Med-DualLoRA，用于医疗模型隐私保护且参数高效的联邦微调。",
+      "llm_tldr": "提出Med-DualLoRA，用于医疗模型隐私保护且参数高效的联邦微调。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.10298v1",
+      "title": "GaLoRA: Parameter-Efficient Graph-Aware LLMs for Node Classification",
+      "abstract": "The rapid rise of large language models (LLMs) and their ability to capture semantic relationships has led to their adoption in a wide range of applications. Text-attributed graphs (TAGs) are a notable example where LLMs can be combined with Graph Neural Networks to improve the performance of node classification. In TAGs, each node is associated with textual content and such graphs are commonly seen in various domains such as social networks, citation graphs, recommendation systems, etc. Effectively learning from TAGs would enable better representations of both structural and textual representations of the graph and improve decision-making in relevant domains. We present GaLoRA, a parameter-efficient framework that integrates structural information into LLMs. GaLoRA demonstrates competitive performance on node classification tasks with TAGs, performing on par with state-of-the-art models with just 0.24% of the parameter count required by full LLM fine-tuning. We experiment with three real-world datasets to showcase GaLoRA's effectiveness in combining structural and semantical information on TAGs.",
+      "authors": [
+        "Mayur Choudhary",
+        "Saptarshi Sengupta",
+        "Katerina Potika"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-03-11T00:45:57+00:00",
+      "link": "https://arxiv.org/pdf/2603.10298v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "GaLoRA: Parameter-Efficient Graph-Aware LLMs",
+      "llm_evidence_cn": "GaLoRA：参数高效图感知大模型",
+      "llm_evidence": "GaLoRA：参数高效图感知大模型",
+      "canonical_evidence": "GaLoRA：参数高效图感知大模型",
+      "llm_tldr_en": "Presents GaLoRA, a parameter-efficient framework integrating structural graph information into LLMs.",
+      "llm_tldr_cn": "提出GaLoRA，一种将结构化图信息集成到大语言模型中的参数高效微调框架。",
+      "llm_tldr": "提出GaLoRA，一种将结构化图信息集成到大语言模型中的参数高效微调框架。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.10560v1",
+      "title": "PET-F2I: A Comprehensive Benchmark and Parameter-Efficient Fine-Tuning of LLMs for PET/CT Report Impression Generation",
+      "abstract": "PET/CT imaging is pivotal in oncology and nuclear medicine, yet summarizing complex findings into precise diagnostic impressions is labor-intensive. While LLMs have shown promise in medical text generation, their capability in the highly specialized domain of PET/CT remains underexplored. We introduce PET-F2I-41K (PET Findings-to-Impression Benchmark), a large-scale benchmark for PET/CT impression generation using LLMs, constructed from over 41k real-world reports. Using PET-F2I-41K, we conduct a comprehensive evaluation of 27 models across proprietary frontier LLMs, open-source generalist models, and medical-domain LLMs, and we develop a domain-adapted 7B model (PET-F2I-7B) fine-tuned from Qwen2.5-7B-Instruct via LoRA. Beyond standard NLG metrics (e.g., BLEU-4, ROUGE-L, BERTScore), we propose three clinically grounded metrics - Entity Coverage Rate (ECR), Uncovered Entity Rate (UER), and Factual Consistency Rate (FCR) - to assess diagnostic completeness and factual reliability. Experiments reveal that neither frontier nor medical-domain LLMs perform adequately in zero-shot settings. In contrast, PET-F2I-7B achieves substantial gains (e.g., 0.708 BLEU-4) and a 3.0x improvement in entity coverage over the strongest baseline, while offering advantages in cost, latency, and privacy. Beyond this modeling contribution, PET-F2I-41K establishes a standardized evaluation framework to accelerate the development of reliable and clinically deployable reporting systems for PET/CT.",
+      "authors": [
+        "Yuchen Liu",
+        "Wenbo Zhang",
+        "Liling Peng",
+        "Yichi Zhang",
+        "Yu Fu",
+        "Xin Guo",
+        "Chao Qu",
+        "Yuan Qi",
+        "Le Xue"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-11T09:08:25+00:00",
+      "link": "https://arxiv.org/pdf/2603.10560v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "parameter-efficient fine-tuning of LLMs for medical reports",
+      "llm_evidence_cn": "针对医疗报告的LLM参数高效微调",
+      "llm_evidence": "针对医疗报告的LLM参数高效微调",
+      "canonical_evidence": "针对医疗报告的LLM参数高效微调",
+      "llm_tldr_en": "Presents a benchmark and a domain-adapted 7B model fine-tuned using PEFT for PET/CT report generation.",
+      "llm_tldr_cn": "提出了一个基准，并使用PEFT微调了一个用于PET/CT报告生成的领域适配7B模型。",
+      "llm_tldr": "提出了一个基准，并使用PEFT微调了一个用于PET/CT报告生成的领域适配7B模型。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.07926v2",
+      "title": "IMSE: Intrinsic Mixture of Spectral Experts Fine-tuning for Test-Time Adaptation",
+      "abstract": "Test-time adaptation (TTA) has been widely explored to prevent performance degradation when test data differ from the training distribution. However, fully leveraging the rich representations of large pretrained models with minimal parameter updates remains underexplored. In this paper, we propose Intrinsic Mixture of Spectral Experts (IMSE) that leverages the spectral experts inherently embedded in Vision Transformers. We decompose each linear layer via singular value decomposition (SVD) and adapt only the singular values, while keeping the singular vectors fixed. We further identify a key limitation of entropy minimization in TTA: it often induces feature collapse, causing the model to rely on domain-specific features rather than class-discriminative features. To address this, we propose a diversity maximization loss based on expert-input alignment, which encourages diverse utilization of spectral experts during adaptation. In the continual test-time adaptation (CTTA) scenario, beyond preserving pretrained knowledge, it is crucial to retain and reuse knowledge from previously observed domains. We introduce Domain-Aware Spectral Code Retrieval, which estimates input distributions to detect domain shifts, and retrieves adapted singular values for rapid adaptation. Consequently, our method achieves state-of-the-art performance on various distribution-shift benchmarks under the TTA setting. In CTTA and Gradual CTTA, it further improves accuracy by 3.4 percentage points (pp) and 2.4 pp, respectively, while requiring 385 times fewer trainable parameters. Our code is available at https://github.com/baek85/IMSE.",
+      "authors": [
+        "Sunghyun Baek",
+        "Jaemyung Yu",
+        "Seunghee Koh",
+        "Minsu Kim",
+        "Hyeonseong Jeon",
+        "Junmo Kim"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-03-09T03:42:44+00:00",
+      "link": "https://arxiv.org/pdf/2603.07926v2",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "adapting singular values via SVD for minimal parameter updates",
+      "llm_evidence_cn": "通过SVD调整奇异值以实现极小参数更新",
+      "llm_evidence": "通过SVD调整奇异值以实现极小参数更新",
+      "canonical_evidence": "通过SVD调整奇异值以实现极小参数更新",
+      "llm_tldr_en": "Introduces IMSE for test-time adaptation by decomposing layers via SVD and updating only singular values.",
+      "llm_tldr_cn": "提出IMSE，通过SVD分解并仅更新奇异值来实现高效的测试时模型微调。",
+      "llm_tldr": "提出IMSE，通过SVD分解并仅更新奇异值来实现高效的测试时模型微调。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2603.08708v1",
+      "title": "FVG-PT: Adaptive Foreground View-Guided Prompt Tuning for Vision-Language Models",
+      "abstract": "CLIP-based prompt tuning enables pretrained Vision-Language Models (VLMs) to efficiently adapt to downstream tasks. Although existing studies have made significant progress, they pay limited attention to changes in the internal attention representations of VLMs during the tuning process. In this paper, we attribute the failure modes of prompt tuning predictions to shifts in foreground attention of the visual encoder, and propose Foreground View-Guided Prompt Tuning (FVG-PT), an adaptive plug-and-play foreground attention guidance module, to alleviate the shifts. Concretely, FVG-PT introduces a learnable Foreground Reliability Gate to automatically enhance the foreground view quality, applies a Foreground Distillation Compensation module to guide visual attention toward the foreground, and further introduces a Prior Calibration module to mitigate generalization degradation caused by excessive focus on the foreground. Experiments on multiple backbone models and datasets show the effectiveness and compatibility of FVG-PT. Codes are available at: https://github.com/JREion/FVG-PT",
+      "authors": [
+        "Haoyang Li",
+        "Liang Wang",
+        "Siyu Zhou",
+        "Jiacheng Sun",
+        "Jing Jiang",
+        "Chao Wang",
+        "Guodong Long",
+        "Yan Peng"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-09T17:59:18+00:00",
+      "link": "https://arxiv.org/pdf/2603.08708v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Adaptive prompt tuning for vision-language models",
+      "llm_evidence_cn": "视觉语言模型的自适应提示微调",
+      "llm_evidence": "视觉语言模型的自适应提示微调",
+      "canonical_evidence": "视觉语言模型的自适应提示微调",
+      "llm_tldr_en": "Proposes FVG-PT to improve prompt tuning in VLMs by guiding foreground attention.",
+      "llm_tldr_cn": "提出FVG-PT，通过引导前景注意力来改进视觉语言模型的提示微调效果。",
+      "llm_tldr": "提出FVG-PT，通过引导前景注意力来改进视觉语言模型的提示微调效果。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Soft prompt tuning and prefix tuning techniques",
+      "matched_requirement_id": "req-3",
+      "selection_source": "carryover_cache",
+      "paper_id": "2603.08708v1",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2603.04589v1",
+      "title": "ECG-MoE: Mixture-of-Expert Electrocardiogram Foundation Model",
+      "abstract": "Electrocardiography (ECG) analysis is crucial for cardiac diagnosis, yet existing foundation models often fail to capture the periodicity and diverse features required for varied clinical tasks. We propose ECG-MoE, a hybrid architecture that integrates multi-model temporal features with a cardiac period-aware expert module. Our approach uses a dual-path Mixture-of-Experts to separately model beat-level morphology and rhythm, combined with a hierarchical fusion network using LoRA for efficient inference. Evaluated on five public clinical tasks, ECG-MoE achieves state-of-the-art performance with 40% faster inference than multi-task baselines.",
+      "authors": [
+        "Yuhao Xu",
+        "Xiaoda Wang",
+        "Yi Wu",
+        "Wei Jin",
+        "Xiao Hu",
+        "Carl Yang"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-03-04T20:36:05+00:00",
+      "link": "https://arxiv.org/pdf/2603.04589v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "hierarchical fusion network using LoRA",
+      "llm_evidence_cn": "使用LoRA的分层融合网络",
+      "llm_evidence": "使用LoRA的分层融合网络",
+      "canonical_evidence": "使用LoRA的分层融合网络",
+      "llm_tldr_en": "Uses LoRA within a Mixture-of-Experts architecture for efficient electrocardiogram foundation model inference.",
+      "llm_tldr_cn": "在混合专家架构中使用LoRA，实现心电图基础模型的高效推理。",
+      "llm_tldr": "在混合专家架构中使用LoRA，实现心电图基础模型的高效推理。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.04972v1",
+      "title": "Functionality-Oriented LLM Merging on the Fisher--Rao Manifold",
+      "abstract": "Weight-space merging aims to combine multiple fine-tuned LLMs into a single model without retraining, yet most existing approaches remain fundamentally parameter-space heuristics. This creates three practical limitations. First, linear averaging, task vectors, and related rules operate on Euclidean coordinates, even though the desired goal is to merge functionality, i.e., predictive behaviors across tasks. Second, when the source checkpoints are farther apart or more heterogeneous, Euclidean blends often trigger representation collapse, manifested as activation variance shrinkage and effective-rank degradation, which sharply degrades accuracy. Third, many geometry-inspired methods are most natural for two-model interpolation and do not extend cleanly to merging N>2 experts with a principled objective.   We address these issues by formulating model merging as computing a weighted Karcher mean on the Fisher--Rao manifold, which is locally equivalent to minimizing a KL-based function distance between predictive distributions. We derive a practical fixed-point algorithm using a lightweight spherical proxy that preserves norms and generalizes directly to multi-expert merging. Across various benchmarks and collapse diagnostics, our method remains stable as the number and heterogeneity of merged models increase, consistently outperforming prior baselines.",
+      "authors": [
+        "Jiayu Wang",
+        "Zuojun Ye",
+        "Wenpeng Yin"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.CL"
+      ],
+      "published": "2026-03-05T09:08:38+00:00",
+      "link": "https://arxiv.org/pdf/2603.04972v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "combine multiple fine-tuned LLMs without retraining",
+      "llm_evidence_cn": "无需重新训练即可合并多个微调后的模型",
+      "llm_evidence": "无需重新训练即可合并多个微调后的模型",
+      "canonical_evidence": "无需重新训练即可合并多个微调后的模型",
+      "llm_tldr_en": "Proposes a geometric framework for merging fine-tuned LLMs to preserve functionality without retraining.",
+      "llm_tldr_cn": "提出一种几何框架，用于合并微调后的模型，在无需重训的情况下保留功能。",
+      "llm_tldr": "提出一种几何框架，用于合并微调后的模型，在无需重训的情况下保留功能。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.09892v1",
+      "title": "MSSR: Memory-Aware Adaptive Replay for Continual LLM Fine-Tuning",
+      "abstract": "Continual fine-tuning of large language models (LLMs) is becoming increasingly crucial as these models are deployed in dynamic environments where tasks and data distributions evolve over time. While strong adaptability enables rapid acquisition of new knowledge, it also exposes LLMs to catastrophic forgetting, where previously learned skills degrade during sequential training. Existing replay-based strategies, such as fixed interleaved replay, accuracy-supervised, and loss-driven scheduling, remain limited: some depend on heuristic rules and provide only partial mitigation of forgetting, while others improve performance but incur substantial computational overhead. Motivated by retention dynamics under sequential fine-tuning, we propose Memory-Inspired Sampler and Scheduler Replay (MSSR), an experience replay framework that estimates sample-level memory strength and schedules rehearsal at adaptive intervals to mitigate catastrophic forgetting while maintaining fast adaptation. Extensive experiments across three backbone models and 11 sequential tasks show that MSSR consistently outperforms state-of-the-art replay baselines, with particularly strong gains on reasoning-intensive and multiple-choice benchmarks.",
+      "authors": [
+        "Yiyang Lu",
+        "Yu He",
+        "Jianlong Chen",
+        "Hongyuan Zha"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI",
+        "cs.CL"
+      ],
+      "published": "2026-03-10T16:49:44+00:00",
+      "link": "https://arxiv.org/pdf/2603.09892v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Memory-Aware Adaptive Replay for Continual LLM Fine-Tuning",
+      "llm_evidence_cn": "用于持续大模型微调的内存感知自适应回放",
+      "llm_evidence": "用于持续大模型微调的内存感知自适应回放",
+      "canonical_evidence": "用于持续大模型微调的内存感知自适应回放",
+      "llm_tldr_en": "Proposes MSSR to mitigate catastrophic forgetting in sequential LLM fine-tuning with memory efficiency.",
+      "llm_tldr_cn": "提出MSSR，以内存高效的方式缓解大语言模型顺序微调中的灾难性遗忘。",
+      "llm_tldr": "提出MSSR，以内存高效的方式缓解大语言模型顺序微调中的灾难性遗忘。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Memory-efficient fine-tuning strategies for large models",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2603.05400v1",
+      "title": "An Exploration-Analysis-Disambiguation Reasoning Framework for Word Sense Disambiguation with Low-Parameter LLMs",
+      "abstract": "Word Sense Disambiguation (WSD) remains a key challenge in Natural Language Processing (NLP), especially when dealing with rare or domain-specific senses that are often misinterpreted. While modern high-parameter Large Language Models (LLMs) such as GPT-4-Turbo have shown state-of-the-art WSD performance, their computational and energy demands limit scalability. This study investigates whether low-parameter LLMs (<4B parameters) can achieve comparable results through fine-tuning strategies that emphasize reasoning-driven sense identification. Using the FEWS dataset augmented with semi-automated, rationale-rich annotations, we fine-tune eight small-scale open-source LLMs (e.g. Gemma and Qwen). Our results reveal that Chain-of-Thought (CoT)-based reasoning combined with neighbour-word analysis achieves performance comparable to GPT-4-Turbo in zero-shot settings. Importantly, Gemma-3-4B and Qwen-3-4B models consistently outperform all medium-parameter baselines and state-of-the-art models on FEWS, with robust generalization to unseen senses. Furthermore, evaluation on the unseen \"Fool Me If You Can'' dataset confirms strong cross-domain adaptability without task-specific fine-tuning. This work demonstrates that with carefully crafted reasoning-centric fine-tuning, low-parameter LLMs can deliver accurate WSD while substantially reducing computational and energy demands.",
+      "authors": [
+        "Deshan Sumanathilaka",
+        "Nicholas Micallef",
+        "Julian Hough"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-03-05T17:27:42+00:00",
+      "link": "https://arxiv.org/pdf/2603.05400v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "fine-tuning strategies for low-parameter LLMs",
+      "llm_evidence_cn": "低参数大语言模型的微调策略",
+      "llm_evidence": "低参数大语言模型的微调策略",
+      "canonical_evidence": "低参数大语言模型的微调策略",
+      "llm_tldr_en": "Explores reasoning-driven fine-tuning for LLMs under 4B parameters to match high-parameter model performance.",
+      "llm_tldr_cn": "探索了针对4B以下低参数大模型的推理驱动微调策略，旨在达到高参数模型的性能。",
+      "llm_tldr": "探索了针对4B以下低参数大模型的推理驱动微调策略，旨在达到高参数模型的性能。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "New architectures for low resource model fine tuning",
+      "matched_requirement_id": "req-11",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.04976v1",
+      "title": "3D-RFT: Reinforcement Fine-Tuning for Video-based 3D Scene Understanding",
+      "abstract": "Reinforcement Learning with Verifiable Rewards ( RLVR ) has emerged as a transformative paradigm for enhancing the reasoning capabilities of Large Language Models ( LLMs), yet its potential in 3D scene understanding remains under-explored. Existing approaches largely rely on Supervised Fine-Tuning ( SFT), where the token-level cross-entropy loss acts as an indirect proxy for optimization, leading to a misalignment between training objectives and task performances. To bridge this gap, we present Reinforcement Fine-Tuning for Video-based 3D Scene Understanding (3D-RFT ), the first framework to extend RLVR to video-based 3D perception and reasoning. 3D-RFT shifts the paradigm by directly optimizing the model towards evaluation metrics. 3D-RFT first activates 3D-aware Multi-modal Large Language Models ( MLLM s) via SFT, followed by reinforcement fine-tuning using Group Relative Policy Optimization ( GRPO) with strictly verifiable reward functions. We design task-specific reward functions directly from metrics like 3D IoU and F1-Score to provide more effective signals to guide model training. Extensive experiments demonstrate that 3D-RFT-4B achieves state-of-the-art performance on various video-based 3D scene understanding tasks. Notably, 3D-RFT-4B significantly outperforms larger models (e.g., VG LLM-8B) on 3D video detection, 3D visual grounding, and spatial reasoning benchmarks. We further reveal good properties of 3D-RFT such as robust efficacy, and valuable insights into training strategies and data impact. We hope 3D-RFT can serve as a robust and promising paradigm for future development of 3D scene understanding.",
+      "authors": [
+        "Xiongkun Linghu",
+        "Jiangyong Huang",
+        "Baoxiong Jia",
+        "Siyuan Huang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-03-05T09:15:16+00:00",
+      "link": "https://arxiv.org/pdf/2603.04976v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "reinforcement fine-tuning for foundation models",
+      "llm_evidence_cn": "基础模型的强化学习微调",
+      "llm_evidence": "基础模型的强化学习微调",
+      "canonical_evidence": "基础模型的强化学习微调",
+      "llm_tldr_en": "Extends reinforcement fine-tuning to video-based 3D scene understanding to optimize models toward evaluation metrics.",
+      "llm_tldr_cn": "将强化学习微调扩展到视频3D场景理解，直接针对评估指标优化模型。",
+      "llm_tldr": "将强化学习微调扩展到视频3D场景理解，直接针对评估指标优化模型。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.10156v1",
+      "title": "Mashup Learning: Faster Finetuning by Remixing Past Checkpoints",
+      "abstract": "Finetuning on domain-specific data is a well-established method for enhancing LLM performance on downstream tasks. Training on each dataset produces a new set of model weights, resulting in a multitude of checkpoints saved in-house or on open-source platforms. However, these training artifacts are rarely reused for subsequent experiments despite containing improved model abilities for potentially similar tasks. In this paper, we propose Mashup Learning, a simple method to leverage the outputs of prior training runs to enhance model adaptation to new tasks. Our procedure identifies the most relevant historical checkpoints for a target dataset, aggregates them with model merging, and uses the result as an improved initialization for training. Across 8 standard LLM benchmarks, four models, and two collections of source checkpoints, Mashup Learning consistently improves average downstream accuracy by 0.5-5 percentage points over training from scratch. It also accelerates convergence, requiring 41-46% fewer training steps and up to 37% less total wall-clock time to match from-scratch accuracy, including all selection and merging overhead.",
+      "authors": [
+        "Sofia Maria Lo Cicero Vaina",
+        "Artem Chumachenko",
+        "Max Ryabinin"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-03-10T18:46:26+00:00",
+      "link": "https://arxiv.org/pdf/2603.10156v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "faster finetuning by remixing past checkpoints",
+      "llm_evidence_cn": "通过重组历史检查点实现更快的微调",
+      "llm_evidence": "通过重组历史检查点实现更快的微调",
+      "canonical_evidence": "通过重组历史检查点实现更快的微调",
+      "llm_tldr_en": "Introduces Mashup Learning to accelerate adaptation by merging relevant historical checkpoints for initialization.",
+      "llm_tldr_cn": "引入Mashup Learning，通过合并相关的历史检查点作为初始化来加速模型适配。",
+      "llm_tldr": "引入Mashup Learning，通过合并相关的历史检查点作为初始化来加速模型适配。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Recent advances in efficient adaptation of large language models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2603.07445v1",
+      "title": "Few Tokens, Big Leverage: Preserving Safety Alignment by Constraining Safety Tokens during Fine-tuning",
+      "abstract": "Large language models (LLMs) often require fine-tuning (FT) to perform well on downstream tasks, but FT can induce safety-alignment drift even when the training dataset contains only benign data. Prior work shows that introducing a small fraction of harmful data can substantially compromise LLM refusal behavior, causing LLMs to comply with harmful requests. Existing defense methods often rely on model-wide interventions, such as restricting which parameters are updated or injecting additional safety data, which can limit generality and degrade downstream task performance. To address these limitations, we propose a fine-tuning framework called Preserving Safety Alignment via Constrained Tokens (PACT), which stabilizes the model's confidence on safety tokens. Our approach is motivated by the empirical observation that safety-aligned behavior is reflected in the model's token-level output confidence and is often concentrated on a small subset of safety-related tokens. During downstream fine-tuning, we regularize the fine-tuned model to match the aligned reference model's confidence on safety-related tokens at each response step, while leaving non-safety tokens largely unconstrained to allow effective task adaptation. This targeted constraint prevents alignment drift without imposing global restrictions that typically trade off with model utility.",
+      "authors": [
+        "Guoli Wang",
+        "Haonan Shi",
+        "Tu Ouyang",
+        "An Wang"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.LG"
+      ],
+      "published": "2026-03-08T03:42:55+00:00",
+      "link": "https://arxiv.org/pdf/2603.07445v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "fine-tuning framework restricting parameter updates for safety",
+      "llm_evidence_cn": "限制参数更新以保证安全性的微调框架",
+      "llm_evidence": "限制参数更新以保证安全性的微调框架",
+      "canonical_evidence": "限制参数更新以保证安全性的微调框架",
+      "llm_tldr_en": "Proposes PACT, a fine-tuning framework that constrains safety tokens to prevent alignment drift.",
+      "llm_tldr_cn": "提出PACT微调框架，通过约束安全Token来防止模型对齐漂移。",
+      "llm_tldr": "提出PACT微调框架，通过约束安全Token来防止模型对齐漂移。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.05354v1",
+      "title": "Exploring the potential and limitations of Model Merging for Multi-Domain Adaptation in ASR",
+      "abstract": "Model merging is a scalable alternative to multi-task training that combines the capabilities of multiple specialised models into a single model. This is particularly attractive for large speech foundation models, which are typically adapted through domain-specific fine-tuning, resulting in multiple customised checkpoints, for which repeating full fine-tuning when new data becomes available is computationally prohibitive. In this work, we study model merging for multi-domain ASR and benchmark 11 merging algorithms for 10 European Portuguese domains, evaluating in-domain accuracy, robustness under distribution shift, as well as English and multilingual performance. We further propose BoostedTSV-M, a new merging algorithm based on TSV-M that mitigates rank collapse via singular-value boosting and improves numerical stability. Overall, our approach outperforms full fine-tuning on European Portuguese while preserving out-of-distribution generalisation in a single model.",
+      "authors": [
+        "Carlos Carvalho",
+        "Francisco Teixeira",
+        "Thomas Rolland",
+        "Alberto Abad"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "eess.AS"
+      ],
+      "published": "2026-03-05T16:34:24+00:00",
+      "link": "https://arxiv.org/pdf/2603.05354v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "model merging as an alternative to full fine-tuning",
+      "llm_evidence_cn": "模型合并作为全量微调的替代方案",
+      "llm_evidence": "模型合并作为全量微调的替代方案",
+      "canonical_evidence": "模型合并作为全量微调的替代方案",
+      "llm_tldr_en": "Studies model merging as a scalable alternative to fine-tuning for multi-domain adaptation in speech models.",
+      "llm_tldr_cn": "研究模型合并作为语音模型多领域适配中全量微调的一种可扩展替代方案。",
+      "llm_tldr": "研究模型合并作为语音模型多领域适配中全量微调的一种可扩展替代方案。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Recent advances in efficient adaptation of large language models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.10872v1",
+      "title": "Bilevel Layer-Positioning LoRA for Real Image Dehazing",
+      "abstract": "Learning-based real image dehazing methods have achieved notable progress, yet they still face adaptation challenges in diverse real haze scenes. These challenges mainly stem from the lack of effective unsupervised mechanisms for unlabeled data and the heavy cost of full model fine-tuning. To address these challenges, we propose the haze-to-clear text-directed loss that leverages CLIP's cross-modal capabilities to reformulate real image dehazing as a semantic alignment problem in latent space, thereby providing explicit unsupervised cross-modal guidance in the absence of reference images. Furthermore, we introduce the Bilevel Layer-positioning LoRA (BiLaLoRA) strategy, which learns both the LoRA parameters and automatically search the injection layers, enabling targeted adaptation of critical network layers. Extensive experiments demonstrate our superiority against state-of-the-art methods on multiple real-world dehazing benchmarks. The code is publicly available at https://github.com/YanZhang-zy/BiLaLoRA.",
+      "authors": [
+        "Yan Zhang",
+        "Long Ma",
+        "Yuxin Feng",
+        "Zhe Huang",
+        "Fan Zhou",
+        "Zhuo Su"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-11T15:22:41+00:00",
+      "link": "https://arxiv.org/pdf/2603.10872v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Bilevel Layer-positioning LoRA strategy",
+      "llm_evidence_cn": "双层层定位LoRA策略",
+      "llm_evidence": "双层层定位LoRA策略",
+      "canonical_evidence": "双层层定位LoRA策略",
+      "llm_tldr_en": "Introduces BiLaLoRA to automatically search injection layers for efficient adaptation in image dehazing.",
+      "llm_tldr_cn": "引入BiLaLoRA策略，通过自动搜索注入层实现图像去雾的高效适配。",
+      "llm_tldr": "引入BiLaLoRA策略，通过自动搜索注入层实现图像去雾的高效适配。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2603.07523v1",
+      "title": "One-for-All Model Initialization with Frequency-Domain Knowledge",
+      "abstract": "Transferring knowledge by fine-tuning large-scale pre-trained networks has become a standard paradigm for downstream tasks, yet the knowledge of a pre-trained model is tightly coupled with monolithic architecture, which restricts flexible reuse across models of varying scales. In response to this challenge, recent approaches typically resort to either parameter selection, which fails to capture the interdependent structure of this knowledge, or parameter prediction using generative models that depend on impractical access to large network collections. In this paper, we empirically demonstrate that a model's foundational, task-agnostic knowledge, its \"learngene\", is encoded within the low-frequency components of its weights, and can be efficiently inherited by downstream models. Based on this insight, we propose FRONT (FRequency dOmain kNowledge Transfer), a novel framework that uses the Discrete Cosine Transform (DCT) to isolate the low-frequency \"learngene\". This learngene can be seamlessly adapted to initialize models of arbitrary size via simple truncation or padding, a process that is entirely training-free. For enhanced performance, we propose an optional low-cost refinement process that introduces a spectral regularizer to further improve the learngene's transferability. Extensive experiments demonstrate that FRONT achieves the state-of-the-art performance, accelerates convergence by up to 15 times in vision tasks, and reduces training FLOPs by an average of 40.5% in language tasks.",
+      "authors": [
+        "Jianlu Shen",
+        "Fu Feng",
+        "Yucheng Xie",
+        "Jiaqi Lv",
+        "Xin Geng"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-03-08T08:25:49+00:00",
+      "link": "https://arxiv.org/pdf/2603.07523v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Efficiently inheriting foundational knowledge for model initialization",
+      "llm_evidence_cn": "高效继承基础知识用于模型初始化",
+      "llm_evidence": "高效继承基础知识用于模型初始化",
+      "canonical_evidence": "高效继承基础知识用于模型初始化",
+      "llm_tldr_en": "Explores frequency-domain knowledge for efficient model initialization and reuse across scales.",
+      "llm_tldr_cn": "探索频域知识，实现跨规模模型的高效初始化与知识继承。",
+      "llm_tldr": "探索频域知识，实现跨规模模型的高效初始化与知识继承。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "New architectures for low resource model fine tuning",
+      "matched_requirement_id": "req-11",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}

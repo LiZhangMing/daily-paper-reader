@@ -1,0 +1,1099 @@
+Title: Mashup Learning: Faster Finetuning by Remixing Past Checkpoints
+
+URL Source: https://arxiv.org/pdf/2603.10156v1
+
+Published Time: Thu, 12 Mar 2026 00:08:04 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 
+
+Sofia Maria Lo Cicero Vaina ♪ Artem Chumachenko ♪ Max Ryabinin ♪
+
+## Abstract 
+
+Finetuning on domain-specific data is a well-established method for enhancing LLM perfor-mance on downstream tasks. Training on each dataset produces a new set of model weights, re-sulting in a multitude of checkpoints saved in-house or on open-source platforms. However, these training artifacts are rarely reused for sub-sequent experiments despite containing improved model abilities for potentially similar tasks. In this paper, we propose Mashup Learning, a simple method to leverage the outputs of prior training runs to enhance model adaptation to new tasks. Our procedure identifies the most relevant histor-ical checkpoints for a target dataset, aggregates them with model merging, and uses the result as an improved initialization for training. Across 8 standard LLM benchmarks, four models, and two collections of source checkpoints, Mashup Learn-ing consistently improves average downstream accuracy by 0.5–5 percentage points over train-ing from scratch. It also accelerates convergence, requiring 41–46% fewer training steps and up to 37% less total wall-clock time to match from-scratch accuracy, including all selection and merg-ing overhead. 
+
+## 1. Introduction 
+
+The training process for foundation models could be split into two stages: pretraining on vast amounts of general-domain data, followed by post-training on smaller datasets to specialize for particular tasks (Grattafiori et al., 2024; Yang et al., 2025; Team Olmo et al., 2025). Given that the pretraining stage is more compute-intensive, the base model obtained after this stage is often finetuned multiple times on different datasets and with varied hyperparameter combinations. While this procedure is relatively inexpen-sive, its computational cost can become more significant over multiple iterations to find the best training setup for a general-purpose model (Wortsman et al., 2022; Cohere 
+
+> ♪
+
+Together AI. Correspondence to: Sofia Maria Lo Cicero Vaina 
+
+<s.lochichero@gmail.com >.
+
+Preprint. March 12, 2026. 
+
+Figure 1. A schematic example of Mashup Learning. 
+
+et al., 2025) or to adapt the base checkpoint to multiple downstream scenarios (Wei et al., 2022; Wang et al., 2022). Moreover, training the largest models even on small datasets can present a challenge for academic researchers and en-thusiasts due to the associated engineering and hardware requirements (Dettmers et al., 2023; Lv et al., 2024). Lastly, achieving the best results on a given task through finetuning might be complicated due to a limited number of training examples available in the provided dataset. On the other hand, running multiple finetuning experiments generates a rich collection of checkpoints that can serve as historic data — whether from continual learning, re-sumed training, hyperparameter sweeps, or the thousands of community-published adapted versions of open models 1.Prior work has shown that such checkpoint collections can be combined to improve model quality without training, e.g. by averaging models from different hyperparameter runs (Wortsman et al., 2022) or by merging with earlier checkpoints during training to mitigate catastrophic forget-ting (Kleiman et al., 2025). This, together with the gen-eral success of transfer learning (Le et al., 2012; Howard & Ruder, 2018), leads us to hypothesize that model adap-tation might benefit from other finetuned checkpoints as well. However, to the best of our knowledge, no prior work has explored using merged checkpoints as an initialization for finetuning on new tasks. Furthermore, recent research demonstrates that the parameter space of trained versions for the same model has a low-dimensional structure, which can be leveraged for model reuse (Kaushik et al., 2025). Another branch of research dedicated to data mixtures finds evidence 
+
+> 1
+
+For example, there are over 2,000 finetuned versions of Llama 3.1-8B-Instruct on the Hugging Face Hub. 
+
+1
+
+> arXiv:2603.10156v1 [cs.LG] 10 Mar 2026 Mashup Learning: Faster Finetuning by Remixing Past Checkpoints
+
+that different tasks can be characterized through linear com-binations of meta-tasks (Zhang et al., 2025; Xie et al., 2023). This suggests that models get repeatedly trained on the same meta-tasks, which creates an opportunity for optimization. Inspired by the above observations, we suggest taking a dif-ferent approach to model post-training, which leverages the information from previous finetuned checkpoints and does not discard the compute resources that were spent on their corresponding experiments. We propose a new model adap-tation paradigm, named Mashup Learning , which recycles model checkpoints trained on prior datasets to provide a set of better initial weights for a new task. The checkpoints could be chosen from a collection of arbitrary size based on a criterion that measures the training loss for each of those checkpoints on a small subsample of the new dataset. Mashup Learning is easy to implement, does not require any changes to the training procedure itself, and could be scaled to large checkpoint collections due to the embarrassingly parallel nature of relevance estimation. In practice, Mashup Learning produces stronger models when training with the same token budget, and reaches the same quality as training from scratch in fewer iterations. An illustration of Mashup Learning is displayed in Figure 1. Our contributions are as follows: 1. We propose Mashup Learning, a model- and domain-agnostic method that leverages historical checkpoints to construct custom initializations for finetuning on new tasks, without requiring any modifications to the training procedure. To the best of our knowledge, this is the first method to repurpose historical checkpoints for improved finetuning initialization. 2. We evaluate Mashup Learning in its simplest form: selecting checkpoints by loss on the target task and av-eraging them to obtain an initialization. This procedure yields consistent improvements across Gemma-3 4B, Gemma-3 1B, Gemma-2 2B, and Mistral-7B-Instruct-v0.2 on 8 standard LLM benchmarks with two collec-tions of source checkpoints 2. Across all configurations, Mashup Learning improves average downstream ac-curacy by 0.5–5 percentage points while accelerating convergence, matching from-scratch accuracy in 41– 46% fewer steps and up to 37% less wall-clock time, including all overhead. 3. We thoroughly verify our design choices and show that performance can be further improved by replacing aver-aging with model merging techniques, and by selecting checkpoints through task-specific metrics.  
+
+> 2The code to reproduce our experiments is publicly available at github.com/2son1a/mashup-learning .
+
+## 2. Background 
+
+Modern large language models (Grattafiori et al., 2024; Yang et al., 2025; Kimi Team et al., 2026) are capable of solving general problems. Still, a broad number of tasks benefit from further training on domain-specific data, which is called finetuning. During finetuning, practitioners aim to achieve the best quality on their validation dataset while spending less money on collecting custom datasets, incur-ring less storage overhead, and spending fewer GPU hours on re-training models in search of optimal hyperparame-ters (Schulman & Thinking Machines Lab, 2025). These challenges motivate multiple methods that improve data effi-ciency, parameter efficiency, and hyperparameter robustness, respectively (Xu et al., 2023; Bini et al., 2024; Deb et al., 2025). In our experiments, along with full finetuning we train Low-Rank Adaptation (LoRA, Hu et al., 2021) adapters. LoRA is a parameter-efficient finetuning method (Xu et al., 2023) that freezes model weights and injects low-rank trainable matrices, reducing the number of trainable parameters and the memory footprint of trained checkpoints. LoRA has been shown to match the performance of full finetuning on smaller tasks (Biderman et al., 2024). 
+
+## 3. Method 
+
+In this section, we describe the Mashup Learning method for initializing models using historical checkpoints before finetuning on a new downstream task. Mashup Learning requires a library of checkpoints trained on various downstream tasks. These checkpoints must share the same architecture as the target model. For LoRA-based models, hyperparameters such as target modules, rank, and 
+
+α must also match. Such checkpoints can be obtained from open-source repositories like Hugging Face Hub or collected in-house. In the latter case, the initial parameter values of historical experiments can also be collected, enabling more sophisticated model merging methods. We elaborate on this topic in Section 5.3. The next step is to identify the checkpoints from the library that will be merged. We evaluate each checkpoint on a small subset of the target task’s training data and select the top-k
+
+checkpoints with the lowest loss value. We use the training set to ensure that the method is applicable in practice, when validation data is not available. Our analysis in Section 5.2 demonstrates that 256 samples provide sufficient signal for checkpoint selection, with larger evaluation sets yielding di-minishing returns. Furthermore, Section 5.1 shows that this selection method efficiently approximates the “oracle” per-formance of choosing the best possible combination. When available, task-specific metrics such as accuracy can be used instead of perplexity to further improve final performance. 2Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 
+
+Algorithm 1 Mashup Learning 
+
+Require: Target task dataset D = ( Dtrain , Dval )
+
+Require: Set of N model checkpoints {θ1, . . . , θ N } with matching architecture 
+
+Ensure: Initialized parameters θ∗ for finetuning  
+
+> 1:
+
+Step 1: Rank checkpoints by task performance  
+
+> 2:
+
+for i = 1 , . . . , N do  
+
+> 3:
+
+ℓi ← L (θi; Dtrain ) {Evaluate loss } 
+
+> 4:
+
+end for  
+
+> 5:
+
+π ← argsort([ ℓ1, . . . , ℓ N ]) {Sort ascending } 
+
+> 6:
+
+Step 2: Average top-k checkpoints  
+
+> 7:
+
+θ∗ ← 1
+
+> k
+
+Pki=1 θπi 
+
+> 8:
+
+Step 3: Fine-tune on the target task  
+
+> 9:
+
+θfinal ← Train( θ∗; Dtrain ) 
+
+> 10:
+
+Return θfinal 
+
+Finally, we aggregate the selected checkpoints, obtaining a single set of model parameters, and use the result as ini-tialization for training on the target task. While simple aver-aging can be used, more advanced model merging methods may yield better results by resolving conflicting parame-ters across checkpoints. Some of these methods require the model initialization in order for task vectors/delta parame-ters to be computed. For example, DARE-TIES we found to be top-performing in our experiments. In the case of full finetuning, it is natural to expect that the initial foun-dation model weights are available for the given historical checkpoints. However, in the case of LoRAs, initializations are typically not present. We compare the performance of different merging methods and explore the optimal number of checkpoints to select in Section 5.3. The complete description of Mashup Learning is outlined in Algorithm 1. 
+
+## 4. Experiments 
+
+In this section, we summarize the evaluation of Mashup Learning on finetuning large language models. Our primary goal is to study the effectiveness of the method and the extent of its advantages compared to training from scratch. 
+
+4.1. Setup 
+
+We conduct all experiments with large language models using the Transformer (Vaswani et al., 2023) architecture. We focus on this class of models due to the broad availability of both downstream NLP benchmarks and pretrained models that benefit from training on such benchmarks. This choice also aligns with our related work, where the merging and adaptation methods we compare against were designed for and evaluated on Transformer models. Although it would be highly valuable to explore other modalities and architectures, here we aim to focus on the behavior of the method itself and leave such an exploration to future work.  
+
+> Table 1. Dataset summary for our primary experiments.
+
+Dataset Short name Train size Val size 
+
+ARC-Easy ARC-e 2,251 570 CommonsenseQA CSQA 9,741 1,221 HellaSwag Hella. 39,905 10,042 MathQA MathQA 29,837 4,475 OpenBookQA OBQA 4,957 500 PIQA PIQA 16,113 1,838 SocialIQA SIQA 33,410 1,954 WinoGrande Wino. 40,398 1,267 
+
+Datasets We evaluate all methods on a variety of academic datasets commonly used to benchmark modern foundation models (Gemma Team et al., 2025). Additionally, these datasets represent popular downstream tasks for finetun-ing and are frequently used in our related work (Charakorn et al., 2025; Yu et al., 2024). We use the following eight benchmarks: ARC-Easy (Clark et al., 2018), which evalu-ates grade-school reasoning; OpenBookQA (Mihaylov et al., 2018), which contains open-book question answering prob-lems; WinoGrande (Sakaguchi et al., 2019) and PIQA (Bisk et al., 2020), which assess commonsense and physical rea-soning; MathQA (Amini et al., 2019), which tests mathe-matical reasoning; HellaSwag (Zellers et al., 2019), which measures commonsense natural language inference; So-cialIQA (Sap et al., 2019), which benchmarks social inter-action understanding; and CommonsenseQA (Talmor et al., 2019), which evaluates commonsense question answering. A summary of dataset statistics is given in Table 1. Every benchmark is a multiple-choice task, a model is required to select the correct answer. To conduct the evaluation, we provide the model with the possible answers, represented as their corresponding tokens. Then, we prompt the model to generate a token for the answer, counting the example as solved if the answer matches the ground truth, and assess the quality of its response by measuring accuracy on the validation set. The evaluation prompts can be found in our GitHub repository. 
+
+Experiment protocol Mashup Learning requires a collec-tion of checkpoints for task-specific model initialization. In our main experiments, we use the eight datasets described above in a leave-one-out setup: each dataset is treated in turn as the target, while models trained on the remaining seven serve as checkpoint sources. Training from scratch on each dataset provides the baselines against which we eval-uate Mashup Learning. To verify the generality of our ap-proach, we conduct experiments in two popular setups: full-parameter finetuning and LoRA training (Hu et al., 2021). 
+
+Models We use Gemma-3 4B, Gemma-3 1B, and Gemma-2 2B (Gemma Team et al., 2024; 2025) as our primary mod-els, as they are the top three models with fewer than 5B pa-3Mashup Learning: Faster Finetuning by Remixing Past Checkpoints   
+
+> Table 2. Finetuning methods comparison on Mistral-7B-Instruct-v0.2, Lots-of-LoRAs setup. Accuracy results across six benchmarks comparing different LoRA merging and initialization approaches. The best result is highlighted in bold.
+
+Method ARC-e Hella. MathQA OBQA PIQA Wino. Avg. 
+
+From scratch 84.0 93.2 21.7 74.6 85.2 81.4 73.4 Text-to-LoRA 82.4 47.6 26.3 71.2 80.2 66.1 62.3 Text-to-LoRA used as init 83.1 91.6 26.2 74.6 85.1 74.2 72.5 Mashup Learning at init 85.0 61.2 26.4 77.9 80.6 64.9 66.0 Mashup Learning 87.9 95.1 32.1 86.6 86.5 82.5 78.5 
+
+rameters on the LM Arena leaderboard (Chiang et al., 2024), performing on par with larger models such as Ministral-8B and Llama-3-8B-Instruct; the full ranking is provided in Table 7. To compare against Charakorn et al. (2025), which relies on pretrained checkpoints from Br ¨uel-Gabrielsson et al. (2025), we additionally experiment with Mistral-7B-Instruct-v0.2 (Jiang et al., 2023). 
+
+Baselines In the case of LoRA training, we compare Mashup Learning with two primary baselines: random ini-tialization of parameters (Hu et al., 2021) and the Text-to-LoRA model (Charakorn et al., 2025). For random initial-ization, we use a random Gaussian initialization for A and zeros for B. For Text-to-LoRA, we use the model provided by the authors to generate adapters for each task. The hy-pernetwork requires a text description of a task as input. We use the prompts provided by the authors of the original paper. Each task has three different prompts, and we report their aggregated metrics in Table 2. 
+
+Hyperparameters Learning rates for full finetuning and LoRA are swept over [5e −6, 5e −5] and [5e −5, 5e −4] , re-spectively, and tuned separately for each model and dataset, following Lee et al. (2026). In experiments where we use LoRA, we target all Transformer modules with a rank of 8 and α = 2 r, following the best practices proposed by Bi-derman et al. (2024). One of our experiments includes a comparison with a Text-to-LoRA baseline that recycles the Lots-of-LoRAs collection; for this experiment, LoRA hy-perparameters are adjusted to be comparable with theirs. Full hyperparameters for both full finetuning and LoRA are reported in Appendix B. 
+
+Computational resources Individual LoRA runs average 5–8 minutes and full finetuning runs 15–18 minutes on a single H100 GPU. The complete set of experiments required approximately 500 GPU-hours on H100 GPUs. 
+
+4.2. Results Accuracy The results of our primary experiments in the leave-one-out setup are presented in Table 3. Across all three model families and both training regimes, Mashup Learning consistently improves over training from scratch. For LoRA finetuning, average accuracy increases by 1.8, 0.7, and 1.0 percentage points on Gemma-3 1B, Gemma-2 2B, and Gemma-3 4B, respectively. Full finetuning ex-hibits comparable gains: +1.9 on Gemma-3 1B and +0.5 on Gemma-2 2B. The improvements are broad rather than con-centrated on a single task—Mashup Learning matches or ex-ceeds the from-scratch baseline on nearly every benchmark, with the largest per-task gains observed on OpenBookQA (+5.3 for Gemma-3 1B LoRA) and ARC-Easy (+4.2 for Gemma-3 1B full FT). 
+
+Convergence speed Beyond final accuracy, Mashup Learning accelerates convergence (Table 4). Even from-scratch training often reaches 99% of its own converged accuracy well before training ends (at 59–79% of steps on average), indicating that later steps yield diminishing re-turns. Mashup Learning converges substantially faster still: on average, it matches the converged from-scratch accuracy after only 51–59% of training, depending on the model and setup. LoRA benefits the most, with Mashup converging at 55.5–59.1% of training versus 69.4–79.4% from scratch. For full finetuning, Mashup reaches parity at 51.8–56.1% compared to 59.0–67.3% from scratch. Individual tasks can converge much earlier (e.g., ARC-Easy at just 9.0% for Gemma-3 4B LoRA). 
+
+Wall-clock time Table 5 reports end-to-end wall-clock time, including the overhead of relevance estimation and checkpoint merging. Even with this overhead, Mashup Learning reduces total training time in the large majority of configurations, with full finetuning completing in 63– 81% of the from-scratch wall-clock time on average and LoRA in 86–88%. In a small number of LoRA cases (e.g., SIQA on Gemma-3 1B and Gemma-3 4B), the overhead slightly exceeds the convergence savings, resulting in ratios marginally above 100%. 
+
+Comparison with baselines Text-to-LoRA (Charakorn et al., 2025) showed improved results over model merg-ing in zero-shot adaptation. To compare, we fine-tuned the adapters generated by Text-to-LoRA on the target 4Mashup Learning: Faster Finetuning by Remixing Past Checkpoints                                                                                                                                
+
+> Table 3. Mashup Learning vs. training from scratch, leave-one-out setup. Average accuracy results across eight benchmarks over three seeds. The best result for each model is highlighted in bold.
+> Model Setup Method ARC-e CSQA Hella. MathQA OBQA PIQA SIQA Wino. Avg.
+> Gemma-3 1B LoRA From scratch 75.0 71.9 81.4 39.3 70.3 77.0 74.2 70.6 70.0 Mashup Learning 78.8 73.5 82.7 39.8 75.6 78.4 74.1 71.2 71.8
+> Full FT From scratch 73.9 68.8 79.8 37.3 68.3 76.1 73.0 69.2 68.3 Mashup Learning 78.1 70.5 80.2 39.1 73.1 77.7 73.3 69.6 70.2
+> Gemma-2 2B LoRA From scratch 90.1 82.5 93.5 44.7 85.0 85.3 81.5 83.6 80.8 Mashup Learning 91.6 82.7 93.6 45.8 85.5 86.3 81.7 84.4 81.5
+> Full FT From scratch 89.3 77.7 91.1 40.5 80.8 83.0 79.0 78.6 77.5 Mashup Learning 90.1 78.4 91.7 40.7 81.2 83.1 79.5 78.9 78.0
+> Gemma-3 4B LoRA From scratch 91.6 83.2 94.3 54.9 85.6 87.9 82.4 85.9 83.2 Mashup Learning 93.5 83.8 94.7 56.9 87.7 88.5 82.2 86.2 84.2
+> Full FT From scratch 90.7 80.6 92.6 46.2 83.9 86.1 79.5 81.9 80.2 Mashup Learning 92.3 80.7 92.7 46.5 84.6 85.9 81.0 83.3 80.9
+
+dataset and report both the original and fine-tuned results. Since their method uses Lots-of-LoRAs collection of 1,000 adapters trained on a variety of tasks, we used this same collection as a source of checkpoints for Mashup Learning. As shown in Table 2, Mashup Learning achieves the highest results on Mistral-7B-Instruct-v0.2, outperforming all alter-natives by a wide margin (+5.1 average accuracy over train-ing from scratch). Both the merged initialization without further training (Mashup Learning at init) and the Text-to-LoRA-generated adapters show improvements on individual tasks, but only Mashup Learning with continued fine-tuning yields consistent gains across all benchmarks. Note that this experiment uses six benchmarks rather than the full set used elsewhere, as these are the ones for which the original paper provided prompts. 
+
+## 5. Analysis 
+
+In this section, we study the design decisions that determine the exact form of Mashup Learning, aiming to understand which factors play a critical role in the performance of the method. We examine how to select relevant checkpoints from a library (Section 5.1), how much data is needed for this selection (Section 5.2), which merging method and number of models to use for constructing initializations (Section 5.3), and how the resulting initializations affect learning rate sensitivity (Section 5.4). 
+
+5.1. Checkpoint Selection Method 
+
+Given a new target task, we want to quickly identify relevant checkpoints from a library without exhaustive evaluation. A natural candidate for such a relevance metric is the zero-shot quality of each checkpoint on the target task, which is fast to compute and requires no additional training. We refer to this selection strategy as Mashup checkpoint selection ,which ranks checkpoints by their zero-shot training loss or training accuracy (if available) on the target task. We use the training set rather than the validation set to avoid information leakage during selection. To verify that this metric reliably identifies checkpoints that serve as good initializations, we compare it against two baselines: random selection and an oracle that exhaus-tively evaluates merges of all possible checkpoint combina-tions, establishing an upper bound on performance. Table 6 presents the results for Mistral-7B-Instruct-v0.2. We ob-serve that initializations created from checkpoints selected by Mashup consistently outperform random selection and perform comparably to the oracle. Furthermore, while selec-tion by training accuracy yields slightly higher final quality, the difference compared to selection by training loss is mini-mal on five out of eight datasets. We attribute this to an exact match of the selected checkpoints between the two criteria on those datasets, which guides our decision to use loss-based selection in the general method as the more versatile option, since it does not require discrete labels. 
+
+5.2. Size of dataset for checkpoint selection 
+
+Since the checkpoint selection step (Section 5.1) must be repeated for each new target task and each checkpoint in the library, we want it to be as fast as possible and investigate the minimum number of samples required for reliable selec-tion. We vary the number of evaluation samples, obtain the corresponding checkpoint rankings, merge the top-ranked models, and complete training from each resulting initial-ization. Results are consistent across datasets, so we report only PIQA on Mistral-7B-Instruct-v0.2 in Figure 2. While variance across runs remains relatively high, making it dif-ficult to identify a single optimal sample size, we find that 256 samples offer a reliable trade-off: performance does 5Mashup Learning: Faster Finetuning by Remixing Past Checkpoints                                                                                                                                
+
+> Table 4. Convergence speedup across all models. Percentage of training steps at which each method reached 99% of converged from-scratch accuracy. Lower is better. “—” if any seed did not reach 99% of from-scratch accuracy.
+> Model Setup Method ARC-e CSQA Hella. MathQA OBQA PIQA SIQA Wino. Avg.
+> Gemma-3 1B LoRA From scratch 74.1 80.3 73.9 88.8 82.7 73.0 78.5 84.1 79.4 Mashup 28.9 48.5 61.1 —43.1 47.4 75.0 69.1 59.1
+> Full FT From scratch 62.8 65.5 67.8 72.4 74.2 60.3 70.8 64.8 67.3 Mashup 9.6 53.5 61.0 55.5 41.0 42.1 51.4 —51.8
+> Gemma-2 2B LoRA From scratch 53.7 72.2 65.0 80.8 79.7 66.1 71.2 72.5 70.2 Mashup 11.7 69.4 58.1 74.8 64.9 55.8 73.5 64.0 59.0
+> Full FT From scratch —62.3 47.5 64.1 61.7 39.1 44.4 52.8 59.0 Mashup 058.3 40.8 60.8 —30.3 39.7 —53.7
+> Gemma-3 4B LoRA From scratch 43.1 71.1 62.2 81.6 69.6 74.8 74.4 78.6 69.4 Mashup 9.0 64.9 53.2 67.2 46.5 53.3 71.9 78.0 55.5
+> Full FT From scratch 32.3 64.9 65.9 84.1 62.7 68.1 41.6 67.6 60.9 Mashup 11.7 69.3 64.0 —68.3 50.7 26.9 58.1 56.1
+
+not consistently improve beyond this point, and this size fits within a single evaluation batch, keeping selection efficient. 64 128 256 512 1024  
+
+> Number of samples
+> 0.89
+> 0.90
+> 0.91
+> 0.92
+> Accuracy on PIQA
+> Figure 2. Accuracy on PIQA as a function of the number of samples used for checkpoint selection, evaluated on Mistral-7B-Instruct-v0.2.
+
+5.3. Model Merging Method and Number of Merged Models 
+
+Initialization from a combination of several checkpoints may be beneficial, because the target task may require capa-bilities that were already developed while training on other tasks. Therefore, we explore whether increasing number of checkpoints can improve performance. Along with the naive approach of averaging the checkpoints, we evaluate the performance of several model merging tech-niques. These techniques were introduced for combining multiple task-specific models into a single multi-tasking model and are effective at resolving conflicting parameters. We hypothesize that model merging methods optimized for multi-tasking may not be optimal for model initialization before finetuning. Therefore, we include both modern and classical methods into comparison: • DARE (Yu et al., 2024): Computes delta-parameters as the difference between each model and its initialization; randomly drops them with probability p; rescales the remainder by 11−p .• TIES (Yadav et al., 2023): Computes delta-parameters as in DARE; drops smaller delta-parameters; averages delta-parameters with signs matching the majority. • Fisher merging (Matena & Raffel, 2022): Computes a weighted average of parameters based on each parame-ter’s Fisher information. • RegMean (Jin et al., 2025): Minimizes the difference between the predictions of the merged model and the individual models. The complete results of our comparison are presented in Fig-ure 3 for Mistral-7B-Instruct-v0.2. Across all numbers of merged models, the combination of DARE (Yu et al., 2024) and TIES (Yadav et al., 2023) consistently outperforms other methods. The best overall performance is achieved by DARE-TIES when merging three models. However, DARE-TIES requires access to the initial versions of adapters, which is not always the case when aggregating LoRA check-points obtained from external sources (for example, public parameter hubs). Therefore, in practice we opt for a sim-pler yet effective approach: averaging the weights of the 2 most relevant models. This simple baseline still outperforms Fisher merging and RegMean, which are impractical for our initialization use case due to both their underperformance and their additional computational and storage requirements. Merging additional models beyond 3 provides no further benefit in our finetuning experiments, although it may be beneficial in zero-shot or low-data regimes. Note that when only a single checkpoint is used (i.e., no merging), this reduces to sequential finetuning. As shown 6Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 
+
+Table 5. Wall-clock training time across all models. Training time in seconds at the best learning rate. Mashup includes relevance estimation and merge overhead, with training time scaled by convergence percentage. Ratio < 100% means Mashup is faster. 
+
+Model Setup ARC-e CSQA Hella. MathQA OBQA PIQA SIQA Wino. Avg. 
+
+Gemma-3 1B LoRA From scratch (s) 101 162 611 356 134 261 365 400 299 Mashup (s) 90 146 438 337 99 181 400 356 256 Ratio (%) 89% 90% 72% 95% 73% 69% 109% 89% 86% Full FT From scratch (s) 298 308 2799 1801 231 842 1026 1021 1041 Mashup (s) 127 188 2001 1177 136 398 656 991 709 Ratio (%) 42% 61% 72% 65% 59% 47% 64% 97% 63% Gemma-2 2B LoRA From scratch (s) 152 237 1120 639 188 454 555 664 501 Mashup (s) 81 258 980 565 193 346 547 505 434 Ratio (%) 53% 109% 88% 88% 103% 76% 99% 76% 87% Full FT From scratch (s) 307 404 2151 1297 288 811 1038 1066 920 Mashup (s) 133 361 1235 1073 238 688 720 806 657 Ratio (%) 44% 90% 57% 83% 83% 86% 69% 75% 73% Gemma-3 4B LoRA From scratch (s) 96 186 1170 600 136 430 502 539 457 Mashup (s) 54 197 974 452 123 376 547 518 405 Ratio (%) 56% 106% 83% 75% 90% 87% 109% 96% 88% Full FT From scratch (s) 289 445 2595 1593 349 753 1174 1462 1083 Mashup (s) 126 265 2639 1640 414 800 430 1135 931 Ratio (%) 43% 60% 102% 103% 119% 106% 37% 78% 81% 
+
+Table 6. Relevance Methods Comparison. Accuracy results across multiple benchmarks comparing different relevance selection methods. The best result is highlighted in bold and the second best is underscored. 
+
+Method Checkpoint Selection ARC-e CSQA Hella. MathQA OBQA PIQA SIQA Wino. Avg. 
+
+LoRA – 87.32 83.06 93.38 21.27 84.38 86.90 82.79 84.62 77.96 Mashup Random 88.42 82.73 93.63 21.16 85.42 87.77 32.94 84.54 72.08 By accuracy 88.24 83.47 93.44 40.38 85.62 87.61 80.99 84.46 80.53 By loss 88.24 83.47 93.44 21.54 85.62 86.95 81.71 84.46 78.18 Oracle 89.52 84.79 94.02 42.18 87.50 88.65 82.63 84.94 81.78 
+
+in Figure 3, merging two or more checkpoints consistently outperforms this baseline. 1 2 3 4 5Number of merged models Average DARE-TIES Fisher Merging RegMean TIES Method 14.4 10.6 14.6 16.6 18.0 18.4 9.0 6.8 9.4 9.6 15.5 12.8 10.2 11.4 12.4 25.0 17.7 14.5 12.5 13.6 20.2 11.2 9.9 10.5 10.4 
+
+> 10 15 20 25
+
+Figure 3. Mean rank by accuracy of each combination of merging method and number of merged models across 8 benchmarks (ARC-Easy, CommonsenseQA, HellaSwag, MathQA, OpenBookQA, PIQA, SocialIQA, Winogrande) in a leave-one-out setup for Mistral-7B-Instruct-v0.2. 
+
+5.4. Learning Rate Sensitivity 
+
+Selecting an appropriate learning rate typically requires extensive hyperparameter search. The main results report accuracy at the best learning rate for each method and task. Here, we investigate how performance varies across learn-ing rates by sweeping five learning rates [5e −5, 5e −4] on Gemma-3-4B and comparing training from Mashup initial-ization against training from scratch. Results for LoRA are presented in Figure 4. We find that Mashup initialization consistently outperforms training from scratch across all learning rates, maintaining approximately 1.5–2 percentage points higher mean accuracy. This suggests that Mashup initialization provides a reliable improvement regardless of learning rate choice, reducing the need for extensive hy-perparameter tuning. Per-task breakdowns for this and the remaining models are provided in Appendix C. 7Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 5·10 1.6·10 2.7·10 3.8·10 5·10  
+
+> Learning Rate
+> 80
+> 81
+> 82
+> 83
+> 84
+> Accuracy (%)
+> From scratch (mean)
+> Mashup Learning (mean)
+> Figure 4. Gemma-3 4B LoRA sensitivity of training results to learning rates. Mean accuracy on 8 benchmarks across 3 seeds
+
+## 6. Related Work 
+
+Model Merging . Works related to model merging usually focus on resolving conflicts between weights of different task-specific models in order to achieve a single model capa-ble of multi-tasking. Task Arithmetic (Ilharco et al., 2023) introduces the concept of task vector, which is the difference between weights of a model trained on a task and a pre-trained model. They show it is possible to perform basic op-erations on such vectors and achieve multi-tasking by adding up task vectors of task-specific models. TIES-Merging (Ya-dav et al., 2023) builds upon this idea. They operate on pa-rameters of task vectors—delta parameters—discard small delta parameters, and merge only parameters shared among the majority. DARE (Yu et al., 2024) extends this idea too, but simplifies it significantly by dropping around 90% of delta parameters. There are several distinct works related to model merging; one of them is Fisher Merging (Matena & Raffel, 2022), which estimates Fisher information of each model’s parameters. Another one, which is often used as a baseline model merging method, is RegMean (Jin et al., 2025). Our method does not compete in this category, as we focus on initialization rather than multi-tasking. While model merging techniques aim to combine multiple task-specific models into a single model capable of performing all tasks simultaneously, our approach uses merged check-points solely to initialize training for a single target task. The merged representation serves as a starting point that in-corporates relevant capabilities from historical checkpoints, which is then fine-tuned specifically for the target task. 
+
+Model Souping . A range of works similar to model merg-ing have emerged under the umbrella of souping. The key distinction is that while merging focuses on resolv-ing conflicts between model weights, souping explores op-timal proportions for combining ingredient models. For instance, Kleiman et al. (2025) apply souping to mitigate catastrophic forgetting in continual learning, while Worts-man et al. (2022) average models trained with different hyperparameters. More recently, Maiti et al. (2025) propose splitting tasks into weakly-correlated categories, defining ex-perts within each category, and merging these models with specialized reweighting. In all these cases, the resulting soup is treated as the final model rather than as an initializa-tion for further training. In our paper, we explore whether combinations of historical checkpoints can serve as a better init for fine-tuning on unseen tasks. 
+
+Zero-shot LLM adaptation . Charakorn et al. (2025) trained a hypernetwork that generates LoRA adapters from text descriptions of tasks, allowing the resulting adapters to be used immediately without further training. In contrast, we design our method to benefit from available training data. Our results show that Text-to-LoRA generates worse adapters than those obtained through training. Ostapenko et al. (2024) take a different approach: they select the best-suited LoRA adapter for each hidden state at every token and layer by matching hidden states to LoRA repre-sentations computed as the direction of maximum variance. However, this method imposes computational overhead dur-ing inference and is not applicable to our target use case. 
+
+Recycling LoRAs . Recent concurrent work by Liu et al. (2026) explores a closely related setup, investigat-ing whether practitioners can benefit from applying model merging to historical LoRA checkpoints found in the wild. However, their focus is on zero-shot merging as a final solu-tion, concluding that training a vanilla LoRA from scratch outperforms merged models. In contrast, we use merged checkpoints as an initialization for further training, show-ing that this approach consistently outperforms both vanilla LoRA and zero-shot merging. 
+
+## 7. Conclusion 
+
+We presented Mashup Learning — a method to enhance and accelerate LLM fine-tuning by selecting the most relevant historical checkpoints and aggregating them to obtain a stronger initialization. Across three models and both LoRA and full finetuning, Mashup Learning consistently improves average accuracy by 0.5–1.9 percentage points while matching from-scratch accuracy in 41–46% fewer training steps and up to 37% less wall-clock time, including all overhead. The method is con-ceptually simple and can be viewed as a general framework for initialization through checkpoint recycling that could be extended with existing techniques. The main contribution of our work is exploring a setup that, to our knowledge, has not been tried before and showing that it works. While the performance improvements are modest, they are consistent across different models and datasets, and 8Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 
+
+the method can be easily improved further. For example, we show that applying model merging techniques to checkpoint composition improves quality, and practitioners can further experiment with model souping strategies. Task-specific refinements are also possible: we show that using accuracy instead of loss for checkpoint selection yields better results. One limitation is that the compute savings from recycled checkpoints may be offset by the cost of estimating rele-vance across all source checkpoints. Although we show that a few training batches suffice for relevance estimation, in data-constrained setups spending more compute on selection may be preferable if it improves training outcomes. 
+
+## References 
+
+Amini, A., Gabriel, S., Lin, S., Kohli, P., Susskind, J., and Hooker, S. Mathqa: Towards interpretable math word problem solving with operation-based formalisms. In Pro-ceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th Interna-tional Joint Conference on Natural Language Processing (EMNLP-IJCNLP) , pp. 5447–5457, 2019. Biderman, D., Portes, J., Ortiz, J. J. G., Paul, M., Greengard, P., Jennings, C., King, D., Havens, S., Chiley, V., Frankle, J., Blakeney, C., and Cunningham, J. P. Lora learns less and forgets less, 2024. URL https://arxiv.org/ abs/2405.09673 .Bini, M., Roth, K., Akata, Z., and Khoreva, A. Ether: Efficient finetuning of large-scale models with hyperplane reflections, 2024. URL https://arxiv.org/abs/ 2405.20271 .Bisk, Y., Zellers, R., Goyal, N., Choi, Y., and Hocken-maier, J. Piqa: Reasoning about physical commonsense in natural language. In Proceedings of the 34th AAAI Conference on Artificial Intelligence (AAAI) , volume 34, pp. 9433–9440, 2020. Br ¨uel-Gabrielsson, R., Zhu, J., Bhardwaj, O., Choshen, L., Greenewald, K., Yurochkin, M., and Solomon, J. Com-press then serve: Serving thousands of lora adapters with little overhead, 2025. URL https://arxiv.org/ abs/2407.00066 .Charakorn, R., Cetin, E., Tang, Y., and Lange, R. T. Text-to-lora: Instant transformer adaption, 2025. URL https: //arxiv.org/abs/2506.06105 .Chiang, W.-L., Li, Z., Lin, Z., Sheng, Y., Wu, Z., Zhuang, Y., Zheng, L., Zhuang, S., Chen, Y., Li, D., Xing, E. P., Zhang, H., Gonzalez, J. E., and Stoica, I. Chatbot arena: An open platform for evaluating llms by human prefer-ence, 2024. Clark, P., Cowhey, I., Etzioni, O., Khot, T., Sabharwal, A., Schoenick, C., and Tafjord, O. Think you have solved question answering? try arc, the ai2 reasoning challenge. In Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing (EMNLP) , pp. 4459–4470, 2018. Cohere, T., :, Aakanksha, Ahmadian, A., Ahmed, M., Alam-mar, J., Alizadeh, M., Alnumay, Y., Althammer, S., Arkhangorodsky, A., Aryabumi, V., Aumiller, D., Avalos, R., Aviv, Z., Bae, S., Baji, S., Barbet, A., Bartolo, M., Bebensee, B., Beladia, N., Beller-Morales, W., B ´erard, A., Berneshawi, A., Bialas, A., Blunsom, P., Bobkin, M., Bongale, A., Braun, S., Brunet, M., Cahyawijaya, S., Cairuz, D., Campos, J. A., Cao, C., Cao, K., Castagn ´e, R., Cendrero, J., Currie, L. C., Chandak, Y., Chang, D., Chatziveroglou, G., Chen, H., Cheng, C., Chevalier, A., Chiu, J. T., Cho, E., Choi, E., Choi, E., Chung, T., Cirik, V., Cismaru, A., Clavier, P., Conklin, H., Crawhall-Stein, L., Crouse, D., Cruz-Salinas, A. F., Cyrus, B., D’souza, D., Dalla-Torre, H., Dang, J., Darling, W., Domingues, O. D., Dash, S., Debugne, A., Dehaze, T., Desai, S., Devassy, J., Dholakia, R., Duffy, K., Edalati, A., El-deib, A., Elkady, A., Elsharkawy, S., Erg ¨un, I., Ermis, B., Fadaee, M., Fan, B., Fayoux, L., Flet-Berliac, Y., Frosst, N., Gall ´e, M., Galuba, W., Garg, U., Geist, M., Azar, M. G., Gilsenan-McMahon, E., Goldfarb-Tarrant, S., Goldsack, T., Gomez, A., Gonzaga, V. M., Govin-darajan, N., Govindassamy, M., Grinsztajn, N., Gritsch, N., Gu, P., Guo, S., Haefeli, K., Hajjar, R., Hawes, T., He, J., Hofst ¨atter, S., Hong, S., Hooker, S., Hosking, T., Howe, S., Hu, E., Huang, R., Jain, H., Jain, R., Jakobi, N., Jenkins, M., Jordan, J., Joshi, D., Jung, J., Kalyan-pur, T., Kamalakara, S. R., Kedrzycki, J., Keskin, G., Kim, E., Kim, J., Ko, W.-Y., Kocmi, T., Kozakov, M., Kry ´sci ´nski, W., Jain, A. K., Teru, K. K., Land, S., Lasby, M., Lasche, O., Lee, J., Lewis, P., Li, J., Li, J., Lin, H., Locatelli, A., Luong, K., Ma, R., Mach, L., Machado, M., Magbitang, J., Lopez, B. M., Mann, A., Marchisio, K., Markham, O., Matton, A., McKinney, A., McLoughlin, D., Mokry, J., Morisot, A., Moulder, A., Moynehan, H., Mozes, M., Muppalla, V., Murakhovska, L., Nagarajan, H., Nandula, A., Nasir, H., Nehra, S., Netto-Rosen, J., Ohashi, D., Owers-Bardsley, J., Ozuzu, J., Padilla, D., Park, G., Passaglia, S., Pekmez, J., Penstone, L., Piktus, A., Ploeg, C., Poulton, A., Qi, Y., Raghvendra, S., Ramos, M., Ranjan, E., Richemond, P., Robert-Michon, C., Ro-driguez, A., Roy, S., Ruder, S., Ruis, L., Rust, L., Sachan, A., Salamanca, A., Saravanakumar, K. K., Satyakam, I., Sebag, A. S., Sen, P., Sepehri, S., Seshadri, P., Shen, Y., Sherborne, T., Shi, S. S., Shivaprasad, S., Shmyhlo, V., Shrinivason, A., Shteinbuk, I., Shukayev, A., Simard, M., Snyder, E., Spataru, A., Spooner, V., Starostina, T., Strub, F., Su, Y., Sun, J., Talupuru, D., Tarassov, E., Tom-9Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 
+
+masone, E., Tracey, J., Trend, B., Tumer, E., ¨Ust ¨un, A., Venkitesh, B., Venuto, D., Verga, P., Voisin, M., Wang, A., Wang, D., Wang, S., Wen, E., White, N., Willman, J., Winkels, M., Xia, C., Xie, J., Xu, M., Yang, B., Yi-Chern, T., Zhang, I., Zhao, Z., and Zhao, Z. Command a: An enterprise-ready large language model, 2025. URL 
+
+https://arxiv.org/abs/2504.00698 .Deb, R., Thekumparampil, K., Kalantari, K., Hiranandani, G., Sabach, S., and Kveton, B. Fishersft: Data-efficient supervised fine-tuning of language models using informa-tion gain, 2025. URL https://arxiv.org/abs/ 2505.14826 .Dettmers, T., Pagnoni, A., Holtzman, A., and Zettlemoyer, L. Qlora: Efficient finetuning of quantized llms. In Oh, A., Naumann, T., Globerson, A., Saenko, K., Hardt, M., and Levine, S. (eds.), Advances in Neural Information Processing Systems , volume 36, pp. 10088–10115. Cur-ran Associates, Inc., 2023. URL https://proceedi ngs.neurips.cc/paper_files/paper/202 3/file/1feb87871436031bdc0f2beaa62a0 49b-Paper-Conference.pdf .Gemma Team, Riviere, M., Pathak, S., Sessa, P. G., Hardin, C., Bhupatiraju, S., Hussenot, L., Mesnard, T., Shahriari, B., Ram ´e, A., Ferret, J., Liu, P., Tafti, P., Friesen, A., Casbon, M., Ramos, S., Kumar, R., Lan, C. L., Jerome, S., Tsitsulin, A., Vieillard, N., Stanczyk, P., Girgin, S., Momchev, N., Hoffman, M., Thakoor, S., Grill, J.-B., Neyshabur, B., Bachem, O., Walton, A., Severyn, A., Par-rish, A., Ahmad, A., Hutchison, A., Abdagic, A., Carl, A., Shen, A., Brock, A., Coenen, A., Laforge, A., Pater-son, A., Bastian, B., Piot, B., Wu, B., Royal, B., Chen, C., Kumar, C., Perry, C., Welty, C., Choquette-Choo, C. A., Sinopalnikov, D., Weinberger, D., Vijaykumar, D., Rogozi ´nska, D., Herbison, D., Bandy, E., Wang, E., Noland, E., Moreira, E., Senter, E., Eltyshev, E., Visin, F., Rasskin, G., Wei, G., Cameron, G., Martins, G., Hashemi, H., Klimczak-Pluci ´nska, H., Batra, H., Dhand, H., Nar-dini, I., Mein, J., Zhou, J., Svensson, J., Stanway, J., Chan, J., Zhou, J. P., Carrasqueira, J., Iljazi, J., Becker, J., Fernandez, J., van Amersfoort, J., Gordon, J., Lipschultz, J., Newlan, J., yeong Ji, J., Mohamed, K., Badola, K., Black, K., Millican, K., McDonell, K., Nguyen, K., Sod-hia, K., Greene, K., Sjoesund, L. L., Usui, L., Sifre, L., Heuermann, L., Lago, L., McNealus, L., Soares, L. B., Kilpatrick, L., Dixon, L., Martins, L., Reid, M., Singh, M., Iverson, M., G ¨orner, M., Velloso, M., Wirth, M., Davidow, M., Miller, M., Rahtz, M., Watson, M., Ris-dal, M., Kazemi, M., Moynihan, M., Zhang, M., Kahng, M., Park, M., Rahman, M., Khatwani, M., Dao, N., Bar-doliwalla, N., Devanathan, N., Dumai, N., Chauhan, N., Wahltinez, O., Botarda, P., Barnes, P., Barham, P., Michel, P., Jin, P., Georgiev, P., Culliton, P., Kuppala, P., Co-manescu, R., Merhej, R., Jana, R., Rokni, R. A., Agarwal, R., Mullins, R., Saadat, S., Carthy, S. M., Cogan, S., Perrin, S., Arnold, S. M. R., Krause, S., Dai, S., Garg, S., Sheth, S., Ronstrom, S., Chan, S., Jordan, T., Yu, T., Eccles, T., Hennigan, T., Kocisky, T., Doshi, T., Jain, V., Yadav, V., Meshram, V., Dharmadhikari, V., Barkley, W., Wei, W., Ye, W., Han, W., Kwon, W., Xu, X., Shen, Z., Gong, Z., Wei, Z., Cotruta, V., Kirk, P., Rao, A., Giang, M., Peran, L., Warkentin, T., Collins, E., Bar-ral, J., Ghahramani, Z., Hadsell, R., Sculley, D., Banks, J., Dragan, A., Petrov, S., Vinyals, O., Dean, J., Has-sabis, D., Kavukcuoglu, K., Farabet, C., Buchatskaya, E., Borgeaud, S., Fiedel, N., Joulin, A., Kenealy, K., Dadashi, R., and Andreev, A. Gemma 2: Improving open language models at a practical size, 2024. URL 
+
+https://arxiv.org/abs/2408.00118 .Gemma Team, Kamath, A., Ferret, J., Pathak, S., Vieil-lard, N., Merhej, R., Perrin, S., Matejovicova, T., Ram ´e, A., Rivi `ere, M., Rouillard, L., Mesnard, T., Cideron, G., bastien Grill, J., Ramos, S., Yvinec, E., Casbon, M., Pot, E., Penchev, I., Liu, G., Visin, F., Kenealy, K., Beyer, L., Zhai, X., Tsitsulin, A., Busa-Fekete, R., Feng, A., Sachdeva, N., Coleman, B., Gao, Y., Mustafa, B., Barr, I., Parisotto, E., Tian, D., Eyal, M., Cherry, C., Peter, J.-T., Sinopalnikov, D., Bhupatiraju, S., Agarwal, R., Kazemi, M., Malkin, D., Kumar, R., Vilar, D., Brusilovsky, I., Luo, J., Steiner, A., Friesen, A., Sharma, A., Sharma, A., Gilady, A. M., Goedeckemeyer, A., Saade, A., Feng, A., Kolesnikov, A., Bendebury, A., Abdagic, A., Vadi, A., Gy ¨orgy, A., Pinto, A. S., Das, A., Bapna, A., Miech, A., Yang, A., Paterson, A., Shenoy, A., Chakrabarti, A., Piot, B., Wu, B., Shahriari, B., Petrini, B., Chen, C., Lan, C. L., Choquette-Choo, C. A., Carey, C., Brick, C., Deutsch, D., Eisenbud, D., Cattle, D., Cheng, D., Paparas, D., Sreepathihalli, D. S., Reid, D., Tran, D., Zelle, D., Noland, E., Huizenga, E., Kharitonov, E., Liu, F., Amirkhanyan, G., Cameron, G., Hashemi, H., Klimczak-Pluci ´nska, H., Singh, H., Mehta, H., Lehri, H. T., Hazimeh, H., Ballantyne, I., Szpektor, I., Nardini, I., Pouget-Abadie, J., Chan, J., Stanton, J., Wieting, J., Lai, J., Orbay, J., Fernandez, J., Newlan, J., yeong Ji, J., Singh, J., Black, K., Yu, K., Hui, K., Vodrahalli, K., Greff, K., Qiu, L., Valentine, M., Coelho, M., Ritter, M., Hoffman, M., Watson, M., Chaturvedi, M., Moyni-han, M., Ma, M., Babar, N., Noy, N., Byrd, N., Roy, N., Momchev, N., Chauhan, N., Sachdeva, N., Bunyan, O., Botarda, P., Caron, P., Rubenstein, P. K., Culliton, P., Schmid, P., Sessa, P. G., Xu, P., Stanczyk, P., Tafti, P., Shivanna, R., Wu, R., Pan, R., Rokni, R., Willoughby, R., Vallu, R., Mullins, R., Jerome, S., Smoot, S., Gir-gin, S., Iqbal, S., Reddy, S., Sheth, S., P ˜oder, S., Bhat-nagar, S., Panyam, S. R., Eiger, S., Zhang, S., Liu, T., Yacovone, T., Liechty, T., Kalra, U., Evci, U., Misra, 10 Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 
+
+V., Roseberry, V., Feinberg, V., Kolesnikov, V., Han, W., Kwon, W., Chen, X., Chow, Y., Zhu, Y., Wei, Z., Egyed, Z., Cotruta, V., Giang, M., Kirk, P., Rao, A., Black, K., Babar, N., Lo, J., Moreira, E., Martins, L. G., Sanseviero, O., Gonzalez, L., Gleicher, Z., Warkentin, T., Mirrokni, V., Senter, E., Collins, E., Barral, J., Ghahra-mani, Z., Hadsell, R., Matias, Y., Sculley, D., Petrov, S., Fiedel, N., Shazeer, N., Vinyals, O., Dean, J., Hass-abis, D., Kavukcuoglu, K., Farabet, C., Buchatskaya, E., Alayrac, J.-B., Anil, R., Dmitry, Lepikhin, Borgeaud, S., Bachem, O., Joulin, A., Andreev, A., Hardin, C., Dadashi, R., and Hussenot, L. Gemma 3 technical report, 2025. URL https://arxiv.org/abs/2503.19786 .Grattafiori, A., Dubey, A., Jauhri, A., Pandey, A., Kadian, A., Al-Dahle, A., Letman, A., Mathur, A., Schelten, A., Vaughan, A., Yang, A., Fan, A., Goyal, A., Hartshorn, A., Yang, A., Mitra, A., Sravankumar, A., Korenev, A., Hinsvark, A., Rao, A., Zhang, A., Rodriguez, A., Gregerson, A., Spataru, A., Roziere, B., Biron, B., Tang, B., Chern, B., Caucheteux, C., Nayak, C., Bi, C., Marra, C., McConnell, C., Keller, C., Touret, C., Wu, C., Wong, C., Ferrer, C. C., Nikolaidis, C., Allonsius, D., Song, D., Pintz, D., Livshits, D., Wyatt, D., Esiobu, D., Choudhary, D., Mahajan, D., Garcia-Olano, D., Perino, D., Hupkes, D., Lakomkin, E., AlBadawy, E., Lobanova, E., Dinan, E., Smith, E. M., Radenovic, F., Guzm ´an, F., Zhang, F., Synnaeve, G., Lee, G., Anderson, G. L., Thattai, G., Nail, G., Mialon, G., Pang, G., Cucurell, G., Nguyen, H., Ko-revaar, H., Xu, H., Touvron, H., Zarov, I., Ibarra, I. A., Kloumann, I., Misra, I., Evtimov, I., Zhang, J., Copet, J., Lee, J., Geffert, J., Vranes, J., Park, J., Mahadeokar, J., Shah, J., van der Linde, J., Billock, J., Hong, J., Lee, J., Fu, J., Chi, J., Huang, J., Liu, J., Wang, J., Yu, J., Bitton, J., Spisak, J., Park, J., Rocca, J., Johnstun, J., Saxe, J., Jia, J., Alwala, K. V., Prasad, K., Upasani, K., Plawiak, K., Li, K., Heafield, K., Stone, K., El-Arini, K., Iyer, K., Malik, K., Chiu, K., Bhalla, K., Lakhotia, K., Rantala-Yeary, L., van der Maaten, L., Chen, L., Tan, L., Jenkins, L., Martin, L., Madaan, L., Malo, L., Blecher, L., Landzaat, L., de Oliveira, L., Muzzi, M., Pasupuleti, M., Singh, M., Paluri, M., Kardas, M., Tsimpoukelli, M., Oldham, M., Rita, M., Pavlova, M., Kambadur, M., Lewis, M., Si, M., Singh, M. K., Hassan, M., Goyal, N., Torabi, N., Bashlykov, N., Bogoychev, N., Chatterji, N., Zhang, N., Duchenne, O., C¸ elebi, O., Alrassy, P., Zhang, P., Li, P., Vasic, P., Weng, P., Bhargava, P., Dubal, P., Krishnan, P., Koura, P. S., Xu, P., He, Q., Dong, Q., Srinivasan, R., Ganapathy, R., Calderer, R., Cabral, R. S., Stojnic, R., Raileanu, R., Maheswari, R., Girdhar, R., Patel, R., Sauvestre, R., Polidoro, R., Sumbaly, R., Taylor, R., Silva, R., Hou, R., Wang, R., Hosseini, S., Chennabasappa, S., Singh, S., Bell, S., Kim, S. S., Edunov, S., Nie, S., Narang, S., Raparthy, S., Shen, S., Wan, S., Bhosale, S., Zhang, S., Vandenhende, S., Batra, S., Whitman, S., Sootla, S., Collot, S., Gururangan, S., Borodinsky, S., Herman, T., Fowler, T., Sheasha, T., Georgiou, T., Scialom, T., Speck-bacher, T., Mihaylov, T., Xiao, T., Karn, U., Goswami, V., Gupta, V., Ramanathan, V., Kerkez, V., Gonguet, V., Do, V., Vogeti, V., Albiero, V., Petrovic, V., Chu, W., Xiong, W., Fu, W., Meers, W., Martinet, X., Wang, X., Wang, X., Tan, X. E., Xia, X., Xie, X., Jia, X., Wang, X., Gold-schlag, Y., Gaur, Y., Babaei, Y., Wen, Y., Song, Y., Zhang, Y., Li, Y., Mao, Y., Coudert, Z. D., Yan, Z., Chen, Z., Papakipos, Z., Singh, A., Srivastava, A., Jain, A., Kelsey, A., Shajnfeld, A., Gangidi, A., Victoria, A., Goldstand, A., Menon, A., Sharma, A., Boesenberg, A., Baevski, A., Feinstein, A., Kallet, A., Sangani, A., Teo, A., Yunus, A., Lupu, A., Alvarado, A., Caples, A., Gu, A., Ho, A., Poul-ton, A., Ryan, A., Ramchandani, A., Dong, A., Franco, A., Goyal, A., Saraf, A., Chowdhury, A., Gabriel, A., Bharambe, A., Eisenman, A., Yazdan, A., James, B., Maurer, B., Leonhardi, B., Huang, B., Loyd, B., Paola, B. D., Paranjape, B., Liu, B., Wu, B., Ni, B., Hancock, B., Wasti, B., Spence, B., Stojkovic, B., Gamido, B., Montalvo, B., Parker, C., Burton, C., Mejia, C., Liu, C., Wang, C., Kim, C., Zhou, C., Hu, C., Chu, C.-H., Cai, C., Tindal, C., Feichtenhofer, C., Gao, C., Civin, D., Beaty, D., Kreymer, D., Li, D., Adkins, D., Xu, D., Testuggine, D., David, D., Parikh, D., Liskovich, D., Foss, D., Wang, D., Le, D., Holland, D., Dowling, E., Jamil, E., Mont-gomery, E., Presani, E., Hahn, E., Wood, E., Le, E.-T., Brinkman, E., Arcaute, E., Dunbar, E., Smothers, E., Sun, F., Kreuk, F., Tian, F., Kokkinos, F., Ozgenel, F., Cag-gioni, F., Kanayet, F., Seide, F., Florez, G. M., Schwarz, G., Badeer, G., Swee, G., Halpern, G., Herman, G., Sizov, G., Guangyi, Zhang, Lakshminarayanan, G., Inan, H., Shojanazeri, H., Zou, H., Wang, H., Zha, H., Habeeb, H., Rudolph, H., Suk, H., Aspegren, H., Goldman, H., Zhan, H., Damlaj, I., Molybog, I., Tufanov, I., Leontiadis, I., Veliche, I.-E., Gat, I., Weissman, J., Geboski, J., Kohli, J., Lam, J., Asher, J., Gaya, J.-B., Marcus, J., Tang, J., Chan, J., Zhen, J., Reizenstein, J., Teboul, J., Zhong, J., Jin, J., Yang, J., Cummings, J., Carvill, J., Shepard, J., McPhie, J., Torres, J., Ginsburg, J., Wang, J., Wu, K., U, K. H., Saxena, K., Khandelwal, K., Zand, K., Matosich, K., Veeraraghavan, K., Michelena, K., Li, K., Jagadeesh, K., Huang, K., Chawla, K., Huang, K., Chen, L., Garg, L., A, L., Silva, L., Bell, L., Zhang, L., Guo, L., Yu, L., Moshkovich, L., Wehrstedt, L., Khabsa, M., Avalani, M., Bhatt, M., Mankus, M., Hasson, M., Lennie, M., Reso, M., Groshev, M., Naumov, M., Lathi, M., Keneally, M., Liu, M., Seltzer, M. L., Valko, M., Restrepo, M., Patel, M., Vyatskov, M., Samvelyan, M., Clark, M., Macey, M., Wang, M., Hermoso, M. J., Metanat, M., Rastegari, M., Bansal, M., Santhanam, N., Parks, N., White, N., Bawa, N., Singhal, N., Egebo, N., Usunier, N., Mehta, N., Laptev, N. P., Dong, N., Cheng, N., Chernoguz, O., 11 Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 
+
+Hart, O., Salpekar, O., Kalinli, O., Kent, P., Parekh, P., Saab, P., Balaji, P., Rittner, P., Bontrager, P., Roux, P., Dollar, P., Zvyagina, P., Ratanchandani, P., Yuvraj, P., Liang, Q., Alao, R., Rodriguez, R., Ayub, R., Murthy, R., Nayani, R., Mitra, R., Parthasarathy, R., Li, R., Hogan, R., Battey, R., Wang, R., Howes, R., Rinott, R., Mehta, S., Siby, S., Bondu, S. J., Datta, S., Chugh, S., Hunt, S., Dhillon, S., Sidorov, S., Pan, S., Mahajan, S., Verma, S., Yamamoto, S., Ramaswamy, S., Lindsay, S., Lindsay, S., Feng, S., Lin, S., Zha, S. C., Patil, S., Shankar, S., Zhang, S., Zhang, S., Wang, S., Agarwal, S., Sajuyigbe, S., Chintala, S., Max, S., Chen, S., Kehoe, S., Satter-field, S., Govindaprasad, S., Gupta, S., Deng, S., Cho, S., Virk, S., Subramanian, S., Choudhury, S., Goldman, S., Remez, T., Glaser, T., Best, T., Koehler, T., Robinson, T., Li, T., Zhang, T., Matthews, T., Chou, T., Shaked, T., Vontimitta, V., Ajayi, V., Montanez, V., Mohan, V., Kumar, V. S., Mangla, V., Ionescu, V., Poenaru, V., Mi-hailescu, V. T., Ivanov, V., Li, W., Wang, W., Jiang, W., Bouaziz, W., Constable, W., Tang, X., Wu, X., Wang, X., Wu, X., Gao, X., Kleinman, Y., Chen, Y., Hu, Y., Jia, Y., Qi, Y., Li, Y., Zhang, Y., Zhang, Y., Adi, Y., Nam, Y., Yu, Wang, Zhao, Y., Hao, Y., Qian, Y., Li, Y., He, Y., Rait, Z., DeVito, Z., Rosnbrick, Z., Wen, Z., Yang, Z., Zhao, Z., and Ma, Z. The llama 3 herd of models, 2024. URL 
+
+https://arxiv.org/abs/2407.21783 .Howard, J. and Ruder, S. Universal language model fine-tuning for text classification. In Gurevych, I. and Miyao, Y. (eds.), Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pp. 328–339, Melbourne, Australia, July 2018. Association for Computational Linguistics. doi: 10.18653/v1/P18-1031. URL https://aclantho logy.org/P18-1031/ .Hu, E. J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L., and Chen, W. Lora: Low-rank adaptation of large language models, 2021. URL https://arxi v.org/abs/2106.09685 .Ilharco, G., Ribeiro, M. T., Wortsman, M., Gururangan, S., Schmidt, L., Hajishirzi, H., and Farhadi, A. Editing models with task arithmetic, 2023. URL https://ar xiv.org/abs/2212.04089 .Jiang, A. Q., Sablayrolles, A., Mensch, A., Bamford, C., Chaplot, D. S., de las Casas, D., Bressand, F., Lengyel, G., Lample, G., Saulnier, L., Lavaud, L. R., Lachaux, M.-A., Stock, P., Scao, T. L., Lavril, T., Wang, T., Lacroix, T., and Sayed, W. E. Mistral 7b, 2023. URL https: //arxiv.org/abs/2310.06825 .Jin, X., Ren, X., Preotiuc-Pietro, D., and Cheng, P. Dataless knowledge fusion by merging weights of language mod-els, 2025. URL https://arxiv.org/abs/2212 .09849 .Kaushik, P., Chaudhari, S., Vaidya, A., Chellappa, R., and Yuille, A. The universal weight subspace hypothesis, 2025. URL https://arxiv.org/abs/2512.0 5117 .Kimi Team, Bai, Y., Bao, Y., Charles, Y., Chen, C., Chen, G., Chen, H., Chen, H., Chen, J., Chen, N., Chen, R., Chen, Y., Chen, Y., Chen, Y., Chen, Z., Cui, J., Ding, H., Dong, M., Du, A., Du, C., Du, D., Du, Y., Fan, Y., Feng, Y., Fu, K., Gao, B., Gao, C., Gao, H., Gao, P., Gao, T., Ge, Y., Geng, S., Gu, Q., Gu, X., Guan, L., Guo, H., Guo, J., Hao, X., He, T., He, W., He, W., He, Y., Hong, C., Hu, H., Hu, Y., Hu, Z., Huang, W., Huang, Z., Huang, Z., Jiang, T., Jiang, Z., Jin, X., Kang, Y., Lai, G., Li, C., Li, F., Li, H., Li, M., Li, W., Li, Y., Li, Y., Li, Y., Li, Z., Li, Z., Lin, H., Lin, X., Lin, Z., Liu, C., Liu, C., Liu, H., Liu, J., Liu, J., Liu, L., Liu, S., Liu, T. Y., Liu, T., Liu, W., Liu, Y., Liu, Y., Liu, Y., Liu, Y., Liu, Z., Lu, E., Lu, H., Lu, L., Luo, Y., Ma, S., Ma, X., Ma, Y., Mao, S., Mei, J., Men, X., Miao, Y., Pan, S., Peng, Y., Qin, R., Qin, Z., Qu, B., Shang, Z., Shi, L., Shi, S., Song, F., Su, J., Su, Z., Sui, L., Sun, X., Sung, F., Tai, Y., Tang, H., Tao, J., Teng, Q., Tian, C., Wang, C., Wang, D., Wang, F., Wang, H., Wang, H., Wang, J., Wang, J., Wang, J., Wang, S., Wang, S., Wang, S., Wang, X., Wang, Y., Wang, Y., Wang, Y., Wang, Y., Wang, Y., Wang, Z., Wang, Z., Wang, Z., Wang, Z., Wei, C., Wei, Q., Wu, H., Wu, W., Wu, X., Wu, Y., Xiao, C., Xie, J., Xie, X., Xiong, W., Xu, B., Xu, J., Xu, L. H., Xu, L., Xu, S., Xu, W., Xu, X., Xu, Y., Xu, Z., Xu, J., Xu, J., Yan, J., Yan, Y., Yang, H., Yang, X., Yang, Y., Yang, Y., Yang, Z., Yang, Z., Yang, Z., Yao, H., Yao, X., Ye, W., Ye, Z., Yin, B., Yu, L., Yuan, E., Yuan, H., Yuan, M., Yuan, S., Zhan, H., Zhang, D., Zhang, H., Zhang, W., Zhang, X., Zhang, Y., Zhang, Y., Zhang, Y., Zhang, Y., Zhang, Y., Zhang, Y., Zhang, Y., Zhang, Y., Zhang, Z., Zhao, H., Zhao, Y., Zhao, Z., Zheng, H., Zheng, S., Zhong, L., Zhou, J., Zhou, X., Zhou, Z., Zhu, J., Zhu, Z., Zhuang, W., and Zu, X. Kimi k2: Open agentic intelligence, 2026. URL https://arxiv.org/abs/2507.20534 .Kleiman, A., Dziugaite, G. K., Frankle, J., Kakade, S., and Paul, M. Soup to go: mitigating forgetting during continual learning with model averaging, 2025. URL 
+
+https://arxiv.org/abs/2501.05559 .Le, Q. V., Ranzato, M., Monga, R., Devin, M., Chen, K., Corrado, G. S., Dean, J., and Ng, A. Y. Building high-level features using large scale unsupervised learning, 2012. URL https://arxiv.org/abs/1112.6 209 .Lee, Y.-A., Ko, C.-Y., Chen, P.-Y., and Yeh, M.-Y. Learning rate matters: Vanilla lora may suffice for llm fine-tuning, 12 Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 
+
+2026. URL https://arxiv.org/abs/2602.0 4998 .Liu, H., Je, G. H., Ciccone, M., Xu, Z., YSS, P., and Raffel, C. The appeal and reality of recycling loras with adaptive merging, 2026. URL https://arxiv.org/abs/ 2602.12323 .Lv, K., Yang, Y., Liu, T., Guo, Q., and Qiu, X. Full param-eter fine-tuning for large language models with limited resources. In Ku, L.-W., Martins, A., and Srikumar, V. (eds.), Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pp. 8187–8198, Bangkok, Thailand, Au-gust 2024. Association for Computational Linguistics. doi: 10.18653/v1/2024.acl-long.445. URL https: //aclanthology.org/2024.acl-long.445/ .Maiti, S., Budhiraja, A., Gauri, B., Chaurasia, G., Pro-topopov, A., Audran-Reiss, A., Slater, M., Magka, D., Shavrina, T., Raileanu, R., and Bachrach, Y. Souper-model: How simple arithmetic unlocks state-of-the-art llm performance, 2025. URL https://arxiv.org/ abs/2511.13254 .Matena, M. and Raffel, C. Merging models with fisher-weighted averaging, 2022. URL https://arxiv.or g/abs/2111.09832 .Mihaylov, T., Clark, P., Khot, T., and Sabharwal, A. Open-bookqa: A ”can a first-grader answer this question?” style qa dataset. In Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing (EMNLP) , pp. 5377–5382, 2018. Ostapenko, O., Su, Z., Ponti, E. M., Charlin, L., Roux, N. L., Pereira, M., Caccia, L., and Sordoni, A. Towards modular llms by building and reusing a library of loras, 2024. URL 
+
+https://arxiv.org/abs/2405.11157 .Sakaguchi, K., Bras, R. L., Todorovic, M., Bhagavatula, C., and Choi, Y. Winogrande: An adversarial winograd schema challenge at scale. In Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP) , pp. 5255–5266, 2019. Sap, M., Le Bras, R., Allaway, E., Bhagavatula, C., Lourie, N., Rashkin, H., Roof, B., Smith, N. A., and Choi, Y. Socialiqa: Commonsense reasoning about social interac-tions. In Proceedings of the 2019 Conference on Empir-ical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP) , pp. 1253–1265, 2019. Schulman, J. and Thinking Machines Lab. Lora without regret. Thinking Machines Lab: Connectionism , 2025. doi: 10.64434/tml.20250929. https://thinking machines.ai/blog/lora/ .Talmor, A., Herzig, J., Lourie, N., and Berant, J. Com-monsenseqa: A question answering challenge targeting commonsense knowledge. In Proceedings of the 2019 Conference of the North American Chapter of the Associ-ation for Computational Linguistics: Human Language Technologies (NAACL-HLT) , volume 1, pp. 4149–4158, 2019. Team Olmo, Ettinger, A., Bertsch, A., Kuehl, B., Gra-ham, D., Heineman, D., Groeneveld, D., Brahman, F., Timbers, F., Ivison, H., Morrison, J., Poznanski, J., Lo, K., Soldaini, L., Jordan, M., Chen, M., Noukhovitch, M., Lambert, N., Walsh, P., Dasigi, P., Berry, R., Ma-lik, S., Shah, S., Geng, S., Arora, S., Gupta, S., An-derson, T., Xiao, T., Murray, T., Romero, T., Graf, V., Asai, A., Bhagia, A., Wettig, A., Liu, A., Rangapur, A., Anastasiades, C., Huang, C., Schwenk, D., Trivedi, H., Magnusson, I., Lochner, J., Liu, J., Miranda, L. J. V., Sap, M., Morgan, M., Schmitz, M., Guerquin, M., Wilson, M., Huff, R., Bras, R. L., Xin, R., Shao, R., Skjonsberg, S., Shen, S. Z., Li, S. S., Wilde, T., Pyatkin, V., Merrill, W., Chang, Y., Gu, Y., Zeng, Z., Sabharwal, A., Zettlemoyer, L., Koh, P. W., Farhadi, A., Smith, N. A., and Hajishirzi, H. Olmo 3, 2025. URL 
+
+https://arxiv.org/abs/2512.13961 .Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, L., and Polosukhin, I. Attention is all you need, 2023. URL https://arxiv.org/ abs/1706.03762 .Wang, Y., Mishra, S., Alipoormolabashi, P., Kordi, Y., Mirzaei, A., Naik, A., Ashok, A., Dhanasekaran, A. S., Arunkumar, A., Stap, D., Pathak, E., Karamanolakis, G., Lai, H., Purohit, I., Mondal, I., Anderson, J., Kuz-nia, K., Doshi, K., Pal, K. K., Patel, M., Moradshahi, M., Parmar, M., Purohit, M., Varshney, N., Kaza, P. R., Verma, P., Puri, R. S., Karia, R., Doshi, S., Sampat, S. K., Mishra, S., Reddy A, S., Patro, S., Dixit, T., and Shen, X. Super-NaturalInstructions: Generalization via declar-ative instructions on 1600+ NLP tasks. In Goldberg, Y., Kozareva, Z., and Zhang, Y. (eds.), Proceedings of the 2022 Conference on Empirical Methods in Natural Lan-guage Processing , pp. 5085–5109, Abu Dhabi, United Arab Emirates, December 2022. Association for Compu-tational Linguistics. doi: 10.18653/v1/2022.emnlp-main. 340. URL https://aclanthology.org/2022. emnlp-main.340/ .Wei, J., Bosma, M., Zhao, V. Y., Guu, K., Yu, A. W., Lester, B., Du, N., Dai, A. M., and Le, Q. V. Finetuned language 13 Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 
+
+models are zero-shot learners, 2022. URL https:// arxiv.org/abs/2109.01652 .Wortsman, M., Ilharco, G., Gadre, S. Y., Roelofs, R., Gontijo-Lopes, R., Morcos, A. S., Namkoong, H., Farhadi, A., Carmon, Y., Kornblith, S., and Schmidt, L. Model soups: averaging weights of multiple fine-tuned models improves accuracy without increasing inference time, 2022. URL https://arxiv.org/abs/22 03.05482 .Xie, S. M., Pham, H., Dong, X., Du, N., Liu, H., Lu, Y., Liang, P., Le, Q. V., Ma, T., and Yu, A. W. Doremi: Optimizing data mixtures speeds up language model pre-training, 2023. URL https://arxiv.org/abs/ 2305.10429 .Xu, L., Xie, H., Qin, S.-Z. J., Tao, X., and Wang, F. L. Parameter-efficient fine-tuning methods for pretrained language models: A critical review and assessment, 2023. URL https://arxiv.org/abs/2312.12148 .Yadav, P., Tam, D., Choshen, L., Raffel, C., and Bansal, M. Ties-merging: Resolving interference when merging models, 2023. URL https://arxiv.org/abs/23 06.01708 .Yang, A., Li, A., Yang, B., Zhang, B., Hui, B., Zheng, B., Yu, B., Gao, C., Huang, C., Lv, C., Zheng, C., Liu, D., Zhou, F., Huang, F., Hu, F., Ge, H., Wei, H., Lin, H., Tang, J., Yang, J., Tu, J., Zhang, J., Yang, J., Yang, J., Zhou, J., Zhou, J., Lin, J., Dang, K., Bao, K., Yang, K., Yu, L., Deng, L., Li, M., Xue, M., Li, M., Zhang, P., Wang, P., Zhu, Q., Men, R., Gao, R., Liu, S., Luo, S., Li, T., Tang, T., Yin, W., Ren, X., Wang, X., Zhang, X., Ren, X., Fan, Y., Su, Y., Zhang, Y., Zhang, Y., Wan, Y., Liu, Y., Wang, Z., Cui, Z., Zhang, Z., Zhou, Z., and Qiu, Z. Qwen3 technical report, 2025. URL https: //arxiv.org/abs/2505.09388 .Yu, L., Yu, B., Yu, H., Huang, F., and Li, Y. Language models are super mario: Absorbing abilities from ho-mologous models as a free lunch, 2024. URL https: //arxiv.org/abs/2311.03099 .Zellers, R., Holtzman, A., Bisk, Y., Farhadi, A., and Choi, Y. Hellaswag: Can a machine really finish your sentence? In 
+
+Proceedings of the 57th Annual Meeting of the Associa-tion for Computational Linguistics (ACL) , pp. 4791–4800, 2019. Zhang, M., Tissue, H., Wang, L., and Qiu, X. Domain2vec: Vectorizing datasets to find the optimal data mixture with-out training, 2025. URL https://arxiv.org/ab s/2506.10952 .14 Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 
+
+## Appendix A. Model Choice 
+
+Table 7. Top 10 open-source models under 9B parameters on the LM Arena text leaderboard (February 2026). 
+
+Model Score Params 
+
+Gemma 3n E4B IT 1319 4B Gemma 3 4B IT 1303 4B Ministral 8B 1237 8B Llama 3 8B Instruct 1224 8B Llama 3.1 8B Instruct 1212 8B Gemma 2 2B IT 1199 2B Gemma 1.1 7B IT 1180 7B Phi-3 Small 8K 1172 7B Llama 3.2 3B Instruct 1167 3B Mistral 7B Instruct v0.2 1150 7B 
+
+## B. Training Hyperparameters 
+
+Table 8. Training hyperparameters for LoRA and full fine-tuning on Mistral-7B-Instruct-v0.2 and Gemma models. 
+
+Hyperparameter LoRA Full FT 
+
+Optimizer AdamW AdamW Weight Decay 0.01 0.01 LR Schedule Cosine Cosine LR Warmup 10% 10% Batch Size 32 32 Epochs 1 1
+
+LoRA-specific 
+
+Rank ( r) 8 –Alpha ( α) 16 –Target modules qkv proj, MLP –
+
+Table 9. Selected learning rates. Best learning rate per model, setup, method, and task, chosen by maximizing mean validation accuracy across seeds. LoRA rates are swept over [5e −5, 5e −4] ; full fine-tuning rates over [5e −6, 5e −5] .
+
+Model Setup Method ARC-e CSQA Hella. MathQA OBQA PIQA SIQA Wino. 
+
+Gemma-3 1B LoRA From scratch 2.7e-4 5e-4 2.7e-4 2.7e-4 5e-4 3.8e-4 3.8e-4 3.8e-4
+
+Mashup Learning 2.7e-4 3.8e-4 3.8e-4 2.7e-4 3.8e-4 1.6e-4 5e-4 3.8e-4
+
+Full FT From scratch 1.6e-5 2.7e-5 2.7e-5 1.6e-5 2.7e-5 2.7e-5 2.7e-5 2.7e-5
+
+Mashup Learning 2.7e-5 2.7e-5 2.7e-5 1.6e-5 2.7e-5 1.6e-5 1.6e-5 2.7e-5
+
+Gemma-2 2B LoRA From scratch 2.7e-4 3.8e-4 1.6e-4 1.6e-4 3.8e-4 2.7e-4 1.6e-4 1.6e-4
+
+Mashup Learning 3.8e-4 2.7e-4 1.6e-4 2.7e-4 3.8e-4 3.8e-4 1.6e-4 1.6e-4
+
+Full FT From scratch 5e-6 2.7e-5 5e-6 5e-6 2.7e-5 5e-6 5e-6 5e-6
+
+Mashup Learning 5e-6 2.7e-5 5e-6 5e-6 2.7e-5 5e-6 5e-6 5e-6
+
+Gemma-3 4B LoRA From scratch 3.8e-4 5e-4 2.7e-4 3.8e-4 5e-4 5e-4 3.8e-4 2.7e-4
+
+Mashup Learning 5e-4 3.8e-4 2.7e-4 2.7e-4 5e-4 2.7e-4 1.6e-4 2.7e-4
+
+Full FT From scratch 5e-6 2.7e-5 2.7e-5 2.7e-5 2.7e-5 2.7e-5 5e-6 2.7e-5
+
+Mashup Learning 5e-6 2.7e-5 2.7e-5 2.7e-5 2.7e-5 2.7e-5 5e-6 2.7e-5
+
+15 Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 
+
+## C. Per-Task Learning Rate Sensitivity 5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+72 
+
+74 
+
+76 
+
+78 
+
+> Accuracy (%)
+
+ARC-e 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+62 
+
+64 
+
+66 
+
+68 
+
+70 
+
+72 
+
+74 
+
+CSQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+76 
+
+78 
+
+80 
+
+82 
+
+Hella. 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+20 
+
+25 
+
+30 
+
+35 
+
+40 
+
+MathQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+60 
+
+65 
+
+70 
+
+75 
+
+> Accuracy (%)
+
+OBQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+74 
+
+75 
+
+76 
+
+77 
+
+78 
+
+PIQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+70 
+
+71 
+
+72 
+
+73 
+
+74 
+
+SIQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+64 
+
+66 
+
+68 
+
+70 
+
+Wino. 
+
+From scratch Mashup Learning 
+
+(a) LoRA (3 seeds) 5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+68 
+
+70 
+
+72 
+
+74 
+
+76 
+
+78 
+
+> Accuracy (%)
+
+ARC-e 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+57.5 
+
+60.0 
+
+62.5 
+
+65.0 
+
+67.5 
+
+70.0 
+
+CSQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+65 
+
+70 
+
+75 
+
+80 
+
+Hella. 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+25 
+
+30 
+
+35 
+
+40 
+
+MathQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+55 
+
+60 
+
+65 
+
+70 
+
+75 
+
+> Accuracy (%)
+
+OBQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+72 
+
+74 
+
+76 
+
+78 
+
+PIQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+64 
+
+66 
+
+68 
+
+70 
+
+72 
+
+74 
+
+SIQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+50 
+
+55 
+
+60 
+
+65 
+
+70 
+
+Wino. 
+
+From scratch Mashup Learning 
+
+(b) Full FT (3 seeds) 
+
+Figure 5. Gemma-3 1B: per-task learning rate sensitivity. 
+
+16 Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+88 
+
+89 
+
+90 
+
+91 
+
+92 
+
+> Accuracy (%)
+
+ARC-e 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+79 
+
+80 
+
+81 
+
+82 
+
+83 
+
+CSQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+92.0 
+
+92.5 
+
+93.0 
+
+93.5 
+
+Hella. 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+20 
+
+25 
+
+30 
+
+35 
+
+40 
+
+45 
+
+MathQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+81 
+
+82 
+
+83 
+
+84 
+
+85 
+
+86 
+
+> Accuracy (%)
+
+OBQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+83.5 
+
+84.0 
+
+84.5 
+
+85.0 
+
+85.5 
+
+86.0 
+
+86.5 
+
+PIQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+79.5 
+
+80.0 
+
+80.5 
+
+81.0 
+
+81.5 
+
+82.0 
+
+SIQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+80 
+
+81 
+
+82 
+
+83 
+
+84 
+
+85 
+
+Wino. 
+
+From scratch Mashup Learning 
+
+(a) LoRA (3 seeds) 5·10 2.7·10 5·10 
+
+65 
+
+70 
+
+75 
+
+80 
+
+85 
+
+90 
+
+> Accuracy (%)
+
+ARC-e 
+
+5·10 2.7·10 5·10 
+
+65.0 
+
+67.5 
+
+70.0 
+
+72.5 
+
+75.0 
+
+77.5 
+
+CSQA 
+
+5·10 2.7·10 5·10 
+
+75 
+
+80 
+
+85 
+
+90 
+
+Hella. 
+
+5·10 2.7·10 5·10 
+
+25 
+
+30 
+
+35 
+
+40 
+
+MathQA 
+
+5·10 2.7·10 5·10 
+
+Learning Rate 
+
+65 
+
+70 
+
+75 
+
+80 
+
+> Accuracy (%)
+
+OBQA 
+
+5·10 2.7·10 5·10 
+
+Learning Rate 
+
+50 
+
+60 
+
+70 
+
+80 
+
+PIQA 
+
+5·10 2.7·10 5·10 
+
+Learning Rate 
+
+50 
+
+60 
+
+70 
+
+80 
+
+SIQA 
+
+5·10 2.7·10 5·10 
+
+Learning Rate 
+
+50 
+
+55 
+
+60 
+
+65 
+
+70 
+
+75 
+
+80 
+
+Wino. 
+
+From scratch Mashup Learning 
+
+(b) Full FT (3 seeds) 
+
+Figure 6. Gemma-2 2B: per-task learning rate sensitivity. 
+
+17 Mashup Learning: Faster Finetuning by Remixing Past Checkpoints 5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+90 
+
+91 
+
+92 
+
+93 
+
+94 
+
+> Accuracy (%)
+
+ARC-e 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+80 
+
+81 
+
+82 
+
+83 
+
+84 
+
+CSQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+93.0 
+
+93.5 
+
+94.0 
+
+94.5 
+
+Hella. 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+42.5 
+
+45.0 
+
+47.5 
+
+50.0 
+
+52.5 
+
+55.0 
+
+57.5 
+
+MathQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+82 
+
+84 
+
+86 
+
+88 
+
+> Accuracy (%)
+
+OBQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+86 
+
+87 
+
+88 
+
+PIQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+81.0 
+
+81.5 
+
+82.0 
+
+82.5 
+
+SIQA 
+
+5·10 1.6·10 2.7·10 3.8·10 5·10 
+
+Learning Rate 
+
+83 
+
+84 
+
+85 
+
+86 
+
+Wino. 
+
+From scratch Mashup Learning 
+
+(a) LoRA (3 seeds) 5·10 2.7·10 5·10 
+
+80.0 
+
+82.5 
+
+85.0 
+
+87.5 
+
+90.0 
+
+92.5 
+
+> Accuracy (%)
+
+ARC-e 
+
+5·10 2.7·10 5·10 
+
+76 
+
+77 
+
+78 
+
+79 
+
+80 
+
+81 
+
+CSQA 
+
+5·10 2.7·10 5·10 
+
+88 
+
+89 
+
+90 
+
+91 
+
+92 
+
+93 
+
+Hella. 
+
+5·10 2.7·10 5·10 
+
+20 
+
+25 
+
+30 
+
+35 
+
+40 
+
+45 
+
+MathQA 
+
+5·10 2.7·10 5·10 
+
+Learning Rate 
+
+78 
+
+80 
+
+82 
+
+84 
+
+86 
+
+> Accuracy (%)
+
+OBQA 
+
+5·10 2.7·10 5·10 
+
+Learning Rate 
+
+80 
+
+82 
+
+84 
+
+86 
+
+PIQA 
+
+5·10 2.7·10 5·10 
+
+Learning Rate 
+
+74 
+
+76 
+
+78 
+
+80 
+
+SIQA 
+
+5·10 2.7·10 5·10 
+
+Learning Rate 
+
+72 
+
+74 
+
+76 
+
+78 
+
+80 
+
+82 
+
+84 
+
+Wino. 
+
+From scratch Mashup Learning 
+
+(b) Full FT (3 seeds) 
+
+Figure 7. Gemma-3 4B: per-task learning rate sensitivity. 
+
+18

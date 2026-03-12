@@ -1,0 +1,333 @@
+Title: Functionality-Oriented LLM Merging on the Fisher--Rao Manifold
+
+URL Source: https://arxiv.org/pdf/2603.04972v1
+
+Published Time: Fri, 06 Mar 2026 01:46:14 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+## Functionality-Oriented LLM Merging on the Fisher–Rao Manifold 
+
+Jiayu Wang 
+
+Pennsylvania State University 
+
+garion@psu.edu 
+
+Zuojun Ye *
+
+Independent Developer 
+
+jmes100010@gmail.com 
+
+Wenpeng Yin 
+
+Pennsylvania State University 
+
+wenpeng@psu.edu 
+
+Abstract 
+
+Weight-space merging aims to combine mul-tiple fine-tuned LLMs into a single model without retraining, yet most existing ap-proaches remain fundamentally parameter-space heuristics. This creates three practi-cal limitations. First, linear averaging, task vectors, and related rules operate on Eu-clidean coordinates, even though the desired goal is to merge functionality —i.e., predictive behaviors—across tasks . Second, when the source checkpoints are farther apart or more heterogeneous, Euclidean blends often trig-ger representation collapse , manifested as ac-tivation variance shrinkage and effective-rank degradation, which sharply degrades accuracy. Third, many geometry-inspired methods are most natural for two-model interpolation (e.g., SLERP-style rules) and do not extend cleanly to merging N > 2 experts with a principled objective. We address these issues by formulat-ing model merging as computing a (weighted) Karcher/Fréchet mean on the Fisher–Rao mani-fold, which is locally equivalent to minimizing a KL-based function distance between predic-tive distributions. We derive a practical fixed-point algorithm using a lightweight spherical proxy that preserves norms and generalizes di-rectly to multi-expert merging. Across vari-ous benchmarks and collapse diagnostics, our method remains stable as the number and het-erogeneity of merged models increase, consis-tently outperforming prior baselines. 1
+
+1 Introduction 
+
+Model merging aims to combine capabilities from multiple fine-tuned LLMs into a single model with-out additional training. In practice, naive Euclidean     
+
+> *Independent developer. GitHub: https://github.com/ win10ogod
+> 1Code: https://github.com/arcee-ai/mergekit/ commit/09bbb0ae282c6356567f05fe15a28055b9dc9390 .Our implementation builds on MergeKit (Goddard et al., 2025), the MergeKit repository is not authored by us, but the pull request that modifies karcher.py is our contribution.
+
+operations (e.g., averaging weights or task vectors) can lead to function mismatch and collapse : merged representations become weakly input-dependent (variance collapse) and the effective dimensionality of activations degrades (rank collapse), hurting ac-curacy and perplexity (Jordan et al., 2023; Qu and Horvath, 2025; Skorobogatov et al., 2025; Sharma et al., 2024). A geometric explanation is that low-loss regions form curved valleys; fine-tuned check-points often lie on thin shells around a base model, and linear blends shrink norms and drift off the high-performing manifold (Jang et al., 2024). 
+
+From parameter chords to function distance. 
+
+A principled notion of distance between models is the discrepancy between their predictive distri-butions . For small parameter displacements, the Fisher–Rao (FR) metric links parameter-space ge-ometry to distribution-space divergence: 
+
+d2FR (θ, θ′) ≈ (θ − θ′)⊤F(θ) ( θ − θ′)
+
+≈ 2 KL( pθ ∥ pθ′ ) , (1) where F(θ) is the Fisher information matrix and the approximation holds locally. This motivates merging by minimizing an FR-based barycentric objective, which corresponds to minimizing a KL-based function distance . Concretely, for a task distribution D(i) and a teacher model θ(i),
+
+E(x,y )∼D (i)[− log pθ(y | x)] = const + Ex∼D (i)
+
+h
+
+KL 
+
+
+
+pθ(i) (· | x) ∥ pθ(· | x)
+
+i 
+
+.
+
+(2) so reducing the expected KL-to-teachers aligns with improving NLL/PPL. 
+
+Why Karcher means help more when models are farther apart. A key geometric point (often glossed over in practice) is that the difference be-tween a straight chord and the true geodesic grows with distance and curvature . When the source 
+
+> arXiv:2603.04972v1 [cs.LG] 5 Mar 2026
+
+models are close (small task vectors / mild fine-tuning), many merge rules behave similarly be-cause the manifold is nearly flat locally. However, when models are farther apart—e.g., larger fine-tuning deltas, more heterogeneous experts, or sim-ply merging more models—Euclidean averaging cuts across curvature, exacerbating norm shrink-age and interference. In this regime, a geodesic barycenter (Karcher mean) is typically more advan-tageous, because it remains on (or near) the high-performing manifold that connects the experts. Overall, the contributions of this work is three-fold: i) We formulate model merging as computing a (weighted) Karcher/Fréchet mean on the Fisher– Rao manifold, directly targeting KL-based function distance; ii) We derive a practical fixed-point al-gorithm with a lightweight spherical proxy that (i) reduces to SLERP for two-model merges and (ii) scales to N > 2 models; iii) We provide empiri-cal evidence that the proposed merge is stable un-der increasing merge scale and heterogeneity, and mitigates collapse diagnostics compared to strong baselines. 
+
+2 Related Work 
+
+2.1 Weight-space merging Linear/task-vector merges. Model soups and task arithmetic average weights or deltas relative to a base, but can be sensitive to misalignment and interference (Wortsman et al., 2022a; Ainsworth et al., 2022). TIES (Yadav et al., 2023) trims small updates and resolves sign conflicts; DARE (Yu et al., 2023) drops and rescales sparse deltas; DELLA (Deep et al., 2024) uses magnitude-aware sampling. These methods are effective in many settings but remain Euclidean heuristics that can become brittle as models become more diverse. 
+
+2.2 Geometric and Fisher-inspired views Two-model geodesics. SLERP preserves norm on a hypersphere and often outperforms linear inter-polation for two models (Wortsman et al., 2022b). ChipAlign applies geodesic interpolation for in-struction alignment in domain LLMs (Deng et al., 2024). Model Stock highlights thin-shell geome-try and proposes center-of-shell averaging across seeds/checkpoints (Jang et al., 2024). These ideas motivate geodesic reasoning, but are either special-ized to two models (SLERP/ChipAlign) or rely on specific shell structures. 
+
+Fisher weighting. Fisher-weighted averaging merges models by weighting parameters according to Fisher information (Matena and Raffel, 2022). Our approach is complementary: rather than per-forming a Fisher-weighted Euclidean average, we compute a (proxy) Riemannian barycenter moti-vated by Fisher–Rao geometry. 
+
+3 Method: Fisher–Rao Karcher mean merging 
+
+3.1 Notation 
+
+Let θ(0) ∈ Rd denote base (pretrained) parame-ters; experts {θ(i)}Ni=1 are fine-tuned variants; task vectors are δ(i) := θ(i) − θ(0) ; mixture weights 
+
+α(i) ≥ 0 with P 
+
+> i
+
+α(i) = 1 . For an input x and label y, the predictive distribution is pθ(y | x).The Fisher information Fθ induces the Fisher–Rao geodesic distance dFR (·, ·); Log θ(·) and Exp θ(·)
+
+denote Riemannian log/exp maps. 
+
+3.2 Objective 
+
+Given experts {θ(i)}Ni=1 and weights α(i), we tar-get the Fréchet/Karcher mean on the Fisher–Rao manifold: 
+
+θ∗ := arg min 
+
+> θ
+> N
+
+X
+
+> i=1
+
+α(i) d2FR 
+
+
+
+θ, θ(i)
+
+. (3) At an optimum (under mild conditions), the weighted Riemannian first-order condition is 
+
+> N
+
+X
+
+> i=1
+
+α(i) Log θ∗
+
+
+
+θ(i)
+
+= 0. (4) Intuitively, Equation (3) minimizes the average geodesic distance between the merged model and all experts; via Equation (1), this corresponds to minimizing a KL-based function distance. 
+
+3.3 Fixed-point iteration 
+
+A standard approach to computing Karcher means is a fixed-point update (equivalently, a Riemannian gradient step for Equation (3)): 
+
+v(t) =
+
+> N
+
+X
+
+> i=1
+
+α(i) Log θ(t)
+
+
+
+θ(i)
+
+,
+
+θ(t+1) = Exp θ(t)
+
+
+
+η v(t)
+
+,
+
+(5) with step size η ∈ (0 , 1] . For a two-model merge between θ(0) and θ(1) with equal weights, initializ-ing at θ(0) yields θ(1) = Exp θ(0) ( 12 Log θ(0) (θ(1) )) ,i.e., a geodesic midpoint. Under a spherical proxy (below), this reduces to SLERP. Method HellaSwag BBH MMLU-Pro MuSR GPQA-D Avg                                                                                                                         
+
+> Merging m= 2 models
+> (Multi-)SLERP 0.825 0.640 0.523 0.500 0.386 0.575 DARE-LERP 0.770 0.530 0.418 0.460 0.325 0.501 DARE-TIES 0.767 0.542 0.434 0.513 0.330 0.517 DELLA-LERP 0.766 0.547 0.432 0.492 0.320 0.511 DELLA-TIES 0.765 0.541 0.426 0.487 0.325 0.509 LERP 0.825 0.643 0.524 0.504 0.391 0.577 TIES 0.799 0.590 0.471 0.505 0.335 0.540 Arcee Fusion 0.777 0.611 0.490 0.475 0.335 0.538 KARCHER (ours) 0.830 0.653 0.532 0.523 0.448 0.597 Merging m= 5 models
+> (Multi-)SLERP 0.244 0.280 0.105 0.356 0.209 0.239 DARE-LERP 0.259 0.276 0.108 0.364 0.189 0.239 DARE-TIES 0.252 0.283 0.113 0.332 0.209 0.238 DELLA-LERP 0.253 0.281 0.113 0.345 0.214 0.241 DELLA-TIES 0.266 0.269 0.111 0.348 0.244 0.248 LERP 0.811 0.613 0.468 0.499 0.320 0.542 Model Stock 0.823 0.630 0.508 0.468 0.355 0.557 SCE 0.735 0.529 0.342 0.442 0.260 0.461 TIES 0.271 0.288 0.109 0.357 0.239 0.253 KARCHER (ours) 0.836 0.680 0.558 0.532 0.443 0.610
+
+Table 1: Results when merging m = 2 or m = 5 LLMs. All metrics are normalized to the [0 , 1] scale. Hel-laSwag/BBH/MuSR use acc_norm . MMLU-Pro and GPQA-D are reported as normalized accuracies. Avg is the mean over all five tasks. 
+
+3.4 Practical approximation: spherical proxy with norm preservation 
+
+Computing exact Fisher–Rao log/exp maps for modern LLMs is intractable. We adopt a proxy mo-tivated by two empirical observations from prior analyses: (i) fine-tuned checkpoints often lie on a thin shell around the base model, and (ii) norm shrinkage is a major failure mode of Euclidean interpolation (Jang et al., 2024). 
+
+Spherical Karcher mean (directional barycen-ter). We treat each parameter block (e.g., layer or tensor group) as a vector and normalize it to the unit sphere. We then compute the Karcher mean on 
+
+Sd−1 using the closed-form log/exp maps on the sphere, and finally rescale by a representative norm (e.g., the mean norm of sources for that block). This yields a norm-preserving merge that captures a first-order notion of curved geometry while re-maining extremely lightweight. 
+
+Connection to Fisher geometry. Locally, Fisher information weights directions that strongly af-fect the predictive distribution (Matena and Raffel, 2022). In practice, we implement the update block-wise, and can incorporate diagonal/KFAC Fisher estimates as a natural-gradient-style precondition-ing inside the log map approximation. This pro-tects high-Fisher directions and reduces destructive interference in sensitive subspaces. 
+
+Why this mitigates collapse. Variance/rank col-lapse is associated with merges drifting toward bias-dominated or low-dimensional regimes (Jor-dan et al., 2023; Qu and Horvath, 2025; Skoroboga-tov et al., 2025). By minimizing a KL-weighted barycentric objective, the Karcher update keeps the merged predictive distribution close to all experts. Geometrically, the update follows a geodesic-like path that avoids chordal shortcuts responsible for norm shrinkage and feature disappearance. 
+
+4 Experiments 
+
+4.1 Settings 
+
+We evaluate on the following benchmarks: GPQA-Diamond (Rein et al., 2023) ( acc_norm ), Hel-laSwag (Zellers et al., 2019) ( acc_norm ), MMLU-Pro (Wang et al., 2024b) ( 5-shot acc ), MuSR 
+
+(Sprague et al., 2023) ( acc_norm ), and BBH (Suz-gun et al., 2022), plus the unweighted Avg . All evaluations use the LM Evaluation Harness (Gao et al., 2024) with default seed. 
+
+Models and merge scale. Unless otherwise noted, all merges are performed within the Qwen2.5 family (Qwen Team, 2024), so models at a given scale share the same tokenizer and ar-chitecture. We report results in two regimes: (i) 
+
+Pairwise merges (e.g., base ↔ instruct) across mul-tiple model sizes; and (ii) Multi-expert merges 2 3 4 5 6 7 8 9 10 11 
+
+> Number of Models
+> 0.25
+> 0.30
+> 0.35
+> 0.40
+> 0.45
+> 0.50
+> 0.55
+> 0.60
+> Avg. Perf.
+> Method
+> Karcher (Ours) LERP Model Stock (Multi-)SLERP TIES SCE DELLA-TIES Arcee Fusion DARE-TIES DELLA-LERP DARE-LERP
+
+Figure 1: Average performance versus the number of merged models m. As m increases (and the merged set becomes more heterogeneous/farther apart), sev-eral Euclidean-rule baselines exhibit abrupt collapse around m ≈ 5, remaining in a low-performance regime thereafter. The proposed Karcher merge remains stable across m ∈ { 2, . . . , 11 } and achieves the best overall performance. 
+
+on Qwen2.5-14B, where we progressively merge 
+
+m ∈ { 2, . . . , 11 } models from a pool of Qwen2.5-14B-compatible checkpoints. 2
+
+Baselines. We compare against widely used merge methods, implemented via MergeKit (God-dard et al., 2024): Lerp and (Multi-)Slerp (Worts-man et al., 2022b), Model Stock (Jang et al., 2024), Ties (Yadav et al., 2023), DARE-Lerp/Ties 
+
+(Yu et al., 2023), DELLA-Lerp/Ties (Deep et al., 2024), SCE (Wan et al., 2024), and Arcee Fusion 
+
+(Goddard et al., 2024) (where applicable). Un-less otherwise noted, all merges use equal source weights; for two-way SLERP we use t = 0 .5.
+
+4.2 Results & Analysis 
+
+We address four evaluation questions. 
+
+Q1: How does KARCHER compare to base-line methods across benchmarks? Table 1 re-ports detailed performance when merging m = 2 
+
+and m = 5 LLMs. KARCHER consistently out-performs all baselines. Moreover, its advantage 
+
+> 2
+
+HuggingFace model IDs used in the 14B pool: Qwen/Qwen2.5-14B (Yang et al., 2025), 
+
+Qwen/Qwen2.5-14B-Instruct-1M (Team, 2025b; Yang et al., 2025), Qwen/Qwen2.5-Coder-14B-Instruct 
+
+(Yang et al., 2025), Krystalan/DRT-14B (Wang et al., 2024a), deepseek-ai/DeepSeek-R1-Distill-Qwen-14B 
+
+(DeepSeek-AI, 2025), nvidia/OpenReasoning-Nemotron-14B ,
+
+deepcogito/cogito-v1-preview-qwen-14B ,
+
+arcee-ai/SuperNova-Medius ,
+
+netease-youdao/Confucius-o1-14B (Team, 2025a), 
+
+sthenno-com/miscii-14b-0218 (Sthenno and Wang, 2025), 
+
+prithivMLmods/Galactic-Qwen-14B-Exp2 .
+
+Method 135M 360M 1.7B Ties 0.240 0.271 0.391 Slerp 0.230 0.274 0.395 Lerp 0.245 0.269 0.398 KARCHER (ours) 0.246 0.282 0.401 
+
+Table 2: Comparison across LLM scales (when m = 2 ). Scores are normalized in [0 , 1] .0 5 10 15 20 25 30 
+
+> Layer
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> 1200
+> 1400
+> Mean  Σ (activation variance)
+> Activation variance by layer
+> Qwen2.5-14B Lerp-14B Ties-14B MS-14B Karcher-14B Karcher-14B (reg)
+
+(a) Activation variance across layers. 0 5 10 15 20 25 30 
+
+> Layer
+> 0
+> 500
+> 1000
+> 1500
+> 2000
+> EffRank (effective rank)
+> EffRank by layer
+> Qwen2.5-14B Lerp-14B Ties-14B MS-14B Karcher-14B Karcher-14B (reg)
+
+(b) Effective rank across layers. 
+
+Figure 2: Layerwise diagnostics of activation statis-tics. Top: mean activation variance across transformer layers. Bottom: effective rank (EffRank) of the acti-vation covariance. Compared with interpolation-based merges (e.g., Lerp and Ties), Karcher merging preserves both variance and effective dimensionality across mid-to-deep layers, indicating reduced representation col-lapse. 
+
+becomes more pronounced as m increases (partic-ularly at m = 5 ), motivating a closer examination of scalability with respect to the number of merged models (i.e., the next question Q2). 
+
+Q2: Does KARCHER remain effective when merging more than two LLMs? Most baselines are primarily studied and reported in the pairwise (m = 2 ) setting, leaving their multi-model scala-bility unclear or unstable. Figure 1 compares per-formance from m = 2 to m = 11 . KARCHER re-mains stable as m grows, whereas several baselines degrade sharply. This supports the core geometric claim: geodesic barycenters are most beneficial when sources are farther apart or more heteroge-neous, precisely where chord-based averages be-come unreliable. 
+
+Q3: Is KARCHER robust when merging mod-els of different scales? Table 2 presents pair-wise merging across three scales (135M, 360M, and 1.7B). Even in this relatively nearby regime (two related checkpoints, m = 2 ), Karcher remains superior, with a modest gain as expected when ge-ometric discrepancies between models are limited. 
+
+Q4: Can KARCHER relieve the variance and rank collapse problem? A common fail-ure mode of interpolation-based merging is that internal activations lose diversity (variance col-lapse) and become effectively low-rank (rank col-lapse) (Jordan et al., 2023; Qu and Horvath, 2025; Sharma et al., 2024). We report layerwise activa-tion variance and rank-related diagnostics in Figure 2 (please refer to Table 5 in Appendix for more detailed report). Across layers, Karcher-based merges preserve substantially larger effective rank (EffRank) and numerical rank (NumRank) than interpolation baselines (e.g., Lerp and Ties), espe-cially in mid-to-deep layers. 
+
+5 Conclusion 
+
+We formulate model merging as computing a Karcher mean on (a proxy of) the Fisher–Rao man-ifold, yielding a geometry-aware merge that mini-mizes KL-based function distance rather than Eu-clidean chord length. The resulting algorithm (i) generalizes SLERP from two models to N > 2
+
+models via a principled barycentric objective, (ii) is lightweight and tuning-light, and (iii) empirically improves stability and average performance over strong baselines while mitigating collapse diagnos-tics. Importantly, the benefit of Karcher merging is most pronounced in the regime where models are farther apart or more heterogeneous—exactly where Euclidean merging is most prone to failure. 
+
+Limitations 
+
+Our method relies on approximations to Fisher– Rao geometry. In particular, we use a spherical proxy (plus optional blockwise Fisher precondi-tioning) rather than exact Fisher–Rao geodesics, and this proxy may deviate from the true metric in highly nonlinear regions of the loss landscape. The fixed-point iteration may depend on initial-ization, step size, and stopping criteria; we do not provide global convergence guarantees for arbitrary expert sets. Empirically, our evaluations focus on a leaderboard-style suite and a limited set of architec-tures/checkpoints; results may not fully transfer to other model families, modalities, or highly adver-sarial heterogeneous pools. Finally, as with other weight-space merging methods, this work assumes access to model parameters and does not resolve licensing, safety, or policy compatibility issues that can arise when combining models trained under different data and alignment constraints. 
+
+References     
+
+> Samuel Ainsworth, Tom Hayase, and Siddharth Srini-vasa. 2022. Git re-basin: Merging models modulo permutation symmetries. In NeurIPS .Pala Tej Deep, Rishabh Bhardwaj, and Soujanya Po-ria. 2024. Della-merging: Reducing interference in model merging through magnitude-based sampling.
+> Preprint , arXiv:2406.11617. DeepSeek-AI. 2025. Deepseek-r1: Incentivizing rea-soning capability in llms via reinforcement learning.
+> Preprint , arXiv:2501.12948. Chenhui Deng, Yunsheng Bai, and Haoxing Ren. 2024. Chipalign: Instruction alignment in large language models for chip design via geodesic interpolation.
+> Preprint , arXiv:2412.19819. Leo Gao, Jonathan Tow, Baber Abbasi, Stella Bider-man, Sid Black, Anthony DiPofi, Charles Foster, Laurence Golding, Jeffrey Hsu, Alain Le Noac’h, Haonan Li, Kyle McDonell, Niklas Muennighoff, Chris Ociepa, Jason Phang, Laria Reynolds, Hailey Schoelkopf, Aviya Skowron, Lintang Sutawika, and 5 others. 2024. The language model evaluation har-ness. Charles Goddard, Shamane Siriwardhana, Malikeh Ehghaghi, Luke Meyers, Vlad Karpukhin, Brian Benedict, Mark McQuade, and Jacob Solawetz. 2025. Arcee’s mergekit: A toolkit for merging large lan-guage models. Preprint , arXiv:2403.13257. Charles Goddard, Shamane Siriwardhana, Malikeh Ehghaghi, Luke Meyers, Vladimir Karpukhin, Brian Benedict, Mark McQuade, and Jacob Solawetz. 2024. Arcee’s mergekit: A toolkit for merging large lan-guage models. In Proceedings of the 2024 Confer-ence on Empirical Methods in Natural Language Processing: EMNLP 2024 - Industry Track, Miami, Florida, USA, November 12-16, 2024 , pages 477– 485. Association for Computational Linguistics. Wonseok Jang and 1 others. 2024. Model stock: All we need is just a few fine-tuned models. Preprint ,arXiv:2403.19522. Andrew Jordan and 1 others. 2023. Repair: Renormal-izing permuted activations for interpolation repair.
+
+OpenReview. https://openreview.net/forum? id=gU5sJ6ZggcX .Michael Matena and Colin Raffel. 2022. Merging mod-els with fisher-weighted averaging. In Advances in Neural Information Processing Systems 35: Annual Conference on Neural Information Processing Sys-tems 2022, NeurIPS 2022, New Orleans, LA, USA, November 28 - December 9, 2022 .Xingyu Qu and Samuel Horvath. 2025. Vanishing feature: Diagnosing model merging and beyond. 
+
+Preprint , arXiv:2402.05966. Qwen Team. 2024. Qwen2.5 technical report. arXiv preprint arXiv:2412.15115 .David Rein and 1 others. 2023. Gpqa: A graduate-level question answering benchmark. Preprint ,arXiv:2309.11495. Ekansh Sharma, Daniel M. Roy, and Gintare Karolina Dziugaite. 2024. The non-local model merging prob-lem: Permutation symmetries and variance collapse. 
+
+Preprint , arXiv:2410.12766. Georgi Skorobogatov, Karsten Roth, Mariana-Iuliana Georgescu, and Zeynep Akata. 2025. Subspace-boosted model merging. Preprint ,arXiv:2506.16506. Zayne Sprague, Xi Ye, Kaj Bostrom, Swarat Chaudhuri, and Greg Durrett. 2023. Musr: Testing the limits of chain-of-thought with multistep soft reasoning. 
+
+arXiv preprint arXiv:2310.16049 .Sthenno and Jiayu Wang. 2025. miscii-14b-0218 (revi-sion 6f78859). Mirac Suzgun, Nathan Scales, Nathanael Schärli, Se-bastian Gehrmann, Yi Tay, Hyung Won Chung, Aakanksha Chowdhery, Quoc V. Le, Ed H. Chi, Denny Zhou, and Jason Wei. 2022. Challenging big-bench tasks and whether chain-of-thought can solve them. arXiv preprint arXiv:2210.09261 .NetEase Youdao Team. 2025a. Confucius-o1: Open-source lightweight large models to achieve excel-lent chain-of-thought reasoning on consumer-grade graphics cards. Qwen Team. 2025b. Qwen2.5-1m: Deploy your own qwen with context length up to 1m tokens. Fanqi Wan, Longguang Zhong, Ziyi Yang, Rui-jun Chen, and Xiaojun Quan. 2024. Fusechat: Knowledge fusion of chat models. arXiv preprint arXiv:2408.07990 .Jiaan Wang, Fandong Meng, Yunlong Liang, and Jie Zhou. 2024a. Drt: Deep reasoning transla-tion via long chain-of-thought. arXiv preprint arXiv:2412.17498 .Yubo Wang, Xueguang Ma, Ge Zhang, Yuansheng Ni, Abhranil Chandra, Shiguang Guo, Weiming Ren, Aaran Arulraj, Xuan He, Ziyan Jiang, Tianle Li, Max Ku, Kai Wang, Alex Zhuang, Rongqi Fan, Xiang Yue, and Wenhu Chen. 2024b. Mmlu-pro: A more robust and challenging multi-task language understanding benchmark. arXiv preprint arXiv:2406.01574 .Mitchell Wortsman and 1 others. 2022a. Model soups: Averaging weights of multiple fine-tuned models im-proves accuracy without increasing inference time. In ICML .Mitchell Wortsman and 1 others. 2022b. Robust fine-tuning of zero-shot models. In CVPR .Prateek Yadav, Derek Tam, Leshem Choshen, Colin Raf-fel, and Mohit Bansal. 2023. Ties-merging: Resolv-ing interference when merging models. In NeurIPS .An Yang, Bowen Yu, Chengyuan Li, Dayiheng Liu, Fei Huang, Haoyan Huang, Jiandong Jiang, Jianhong Tu, Jianwei Zhang, Jingren Zhou, Junyang Lin, Kai Dang, Kexin Yang, Le Yu, Mei Li, Minmin Sun, Qin Zhu, Rui Men, Tao He, and 9 others. 2025. Qwen2.5-1m technical report. arXiv preprint arXiv:2501.15383 .Le Yu, Bowen Yu, Haiyang Yu, Fei Huang, and Yong-bin Li. 2023. Language models are super mario: Absorbing abilities from homologous models as a free lunch. Preprint , arXiv:2311.03099. Introduces DARE (Drop and REscale) for model merging. Rowan Zellers, Ari Holtzman, Yonatan Bisk, Ali Farhadi, and Yejin Choi. 2019. Hellaswag: Can a machine really finish your sentence? In Proceed-ings of the 57th annual meeting of the association for computational linguistics , pages 4791–4800. 
+
+A Additional results Table 3: Full results across methods and merged model counts (Part 1/3). 
+
+METHOD m H-S WAG BBH MMLU-P RO MUSR GPQA-D AVG 
+
+(M ULTI -)SLERP 2 0.825 0.640 0.523 0.500 0.386 0.575 (M ULTI -)SLERP 3 0.607 0.396 0.254 0.476 0.260 0.399 (M ULTI -)SLERP 4 0.647 0.535 0.390 0.485 0.275 0.466 (M ULTI -)SLERP 5 0.244 0.280 0.105 0.356 0.209 0.239 (M ULTI -)SLERP 6 0.262 0.268 0.105 0.323 0.219 0.235 (M ULTI -)SLERP 7 0.261 0.280 0.105 0.328 0.239 0.243 (M ULTI -)SLERP 8 0.261 0.280 0.105 0.328 0.239 0.243 (M ULTI -)SLERP 9 0.264 0.285 0.105 0.352 0.239 0.249 (M ULTI -)SLERP 10 0.264 0.285 0.105 0.325 0.239 0.244 (M ULTI -)SLERP 11 0.266 0.282 0.102 0.384 0.244 0.256 ARCEE FUSION 2 0.777 0.611 0.490 0.475 0.335 0.538 DARE-LERP 2 0.770 0.530 0.418 0.460 0.325 0.501 DARE-LERP 3 0.719 0.556 0.412 0.467 0.285 0.488 DARE-LERP 4 0.615 0.505 0.391 0.489 0.305 0.461 DARE-LERP 5 0.259 0.276 0.108 0.364 0.189 0.239 DARE-LERP 6 0.258 0.274 0.106 0.343 0.209 0.238 DARE-LERP 7 0.256 0.279 0.106 0.357 0.184 0.236 DARE-LERP 8 0.258 0.293 0.108 0.333 0.148 0.228 DARE-LERP 9 0.264 0.283 0.110 0.357 0.209 0.245 DARE-LERP 10 0.259 0.271 0.107 0.370 0.219 0.245 DARE-LERP 11 0.263 0.282 0.112 0.352 0.169 0.235 DARE-TIES 2 0.767 0.542 0.434 0.513 0.330 0.517 DARE-TIES 3 0.730 0.558 0.404 0.496 0.335 0.504 DARE-TIES 4 0.613 0.467 0.380 0.440 0.285 0.437 DARE-TIES 5 0.252 0.283 0.113 0.332 0.209 0.238 DARE-TIES 6 0.256 0.277 0.108 0.365 0.219 0.245 DARE-TIES 7 0.256 0.283 0.103 0.366 0.204 0.242 DARE-TIES 8 0.259 0.284 0.105 0.340 0.234 0.244 DARE-TIES 9 0.256 0.283 0.113 0.345 0.209 0.241 DARE-TIES 10 0.259 0.280 0.107 0.378 0.229 0.251 DARE-TIES 11 0.250 0.276 0.107 0.349 0.219 0.240 
+
+Table 3: Full results across methods and merged model counts (Part 2/3, continued). 
+
+METHOD m H-S WAG BBH MMLU-P RO MUSR GPQA-D AVG 
+
+DELLA-LERP 2 0.766 0.547 0.432 0.492 0.320 0.511 DELLA-LERP 3 0.713 0.554 0.404 0.525 0.335 0.506 DELLA-LERP 4 0.606 0.498 0.384 0.475 0.285 0.450 DELLA-LERP 5 0.253 0.281 0.113 0.345 0.214 0.241 DELLA-LERP 6 0.264 0.284 0.106 0.361 0.199 0.243 DELLA-LERP 7 0.253 0.283 0.108 0.361 0.194 0.240 DELLA-LERP 8 0.260 0.274 0.103 0.361 0.214 0.242 DELLA-LERP 9 0.255 0.287 0.103 0.373 0.199 0.243 DELLA-LERP 10 0.261 0.280 0.105 0.341 0.244 0.246 DELLA-LERP 11 0.256 0.291 0.105 0.345 0.219 0.243 DELLA-TIES 2 0.765 0.541 0.426 0.487 0.325 0.509 DELLA-TIES 3 0.783 0.574 0.445 0.521 0.355 0.536 DELLA-TIES 4 0.779 0.589 0.475 0.497 0.381 0.544 DELLA-TIES 5 0.266 0.269 0.111 0.348 0.244 0.248 DELLA-TIES 6 0.262 0.283 0.105 0.340 0.214 0.241 DELLA-TIES 7 0.253 0.280 0.114 0.325 0.199 0.234 DELLA-TIES 8 0.264 0.284 0.107 0.340 0.239 0.247 DELLA-TIES 9 0.255 0.279 0.109 0.317 0.244 0.241 DELLA-TIES 10 0.259 0.290 0.108 0.348 0.229 0.247 DELLA-TIES 11 0.260 0.298 0.108 0.325 0.229 0.244 KARCHER (O URS ) 2 0.830 0.653 0.532 0.523 0.448 0.597 KARCHER (O URS ) 3 0.833 0.659 0.538 0.536 0.443 0.602 KARCHER (O URS ) 4 0.835 0.668 0.547 0.536 0.427 0.603 KARCHER (O URS ) 5 0.836 0.680 0.558 0.532 0.443 0.610 KARCHER (O URS ) 6 0.838 0.687 0.562 0.532 0.458 0.615 KARCHER (O URS ) 7 0.833 0.666 0.518 0.503 0.448 0.594 KARCHER (O URS ) 8 0.833 0.667 0.518 0.508 0.458 0.597 KARCHER (O URS ) 9 0.818 0.666 0.530 0.519 0.432 0.593 KARCHER (O URS ) 10 0.833 0.668 0.529 0.520 0.443 0.599 KARCHER (O URS ) 11 0.835 0.678 0.538 0.529 0.443 0.605 Table 3: Full results across methods and merged model counts (Part 3/3, continued). 
+
+METHOD m H-S WAG BBH MMLU-P RO MUSR GPQA-D AVG 
+
+LERP 2 0.825 0.643 0.524 0.504 0.391 0.577 LERP 3 0.826 0.650 0.530 0.512 0.381 0.580 LERP 4 0.829 0.661 0.550 0.508 0.391 0.588 LERP 5 0.811 0.613 0.468 0.499 0.320 0.542 LERP 6 0.818 0.625 0.487 0.508 0.320 0.552 LERP 7 0.826 0.648 0.515 0.512 0.371 0.574 LERP 8 0.826 0.648 0.515 0.512 0.371 0.574 LERP 9 0.825 0.665 0.528 0.492 0.366 0.575 LERP 10 0.828 0.668 0.528 0.513 0.366 0.581 LERP 11 0.829 0.674 0.532 0.510 0.371 0.583 MODEL STOCK 3 0.815 0.610 0.510 0.459 0.376 0.554 MODEL STOCK 4 0.826 0.634 0.528 0.464 0.401 0.570 MODEL STOCK 5 0.823 0.630 0.508 0.468 0.355 0.557 MODEL STOCK 6 0.827 0.638 0.520 0.487 0.355 0.566 MODEL STOCK 7 0.831 0.650 0.529 0.493 0.376 0.576 MODEL STOCK 8 0.830 0.651 0.529 0.497 0.376 0.576 MODEL STOCK 9 0.827 0.673 0.538 0.485 0.396 0.584 MODEL STOCK 10 0.831 0.663 0.536 0.495 0.386 0.582 MODEL STOCK 11 0.830 0.670 0.538 0.495 0.355 0.578 SCE 3 0.804 0.570 0.471 0.503 0.355 0.541 SCE 4 0.801 0.588 0.479 0.496 0.366 0.546 SCE 5 0.735 0.529 0.342 0.442 0.260 0.461 SCE 6 0.715 0.518 0.306 0.423 0.255 0.443 SCE 7 0.715 0.518 0.305 0.435 0.260 0.447 SCE 8 0.714 0.517 0.305 0.435 0.260 0.446 SCE 9 0.628 0.414 0.266 0.353 0.265 0.385 SCE 10 0.716 0.521 0.310 0.423 0.260 0.446 SCE 11 0.716 0.517 0.311 0.411 0.270 0.445 TIES 2 0.799 0.590 0.471 0.505 0.335 0.540 TIES 3 0.811 0.595 0.479 0.505 0.376 0.553 TIES 4 0.810 0.615 0.509 0.505 0.376 0.563 TIES 5 0.271 0.288 0.109 0.357 0.239 0.253 TIES 6 0.265 0.287 0.108 0.360 0.249 0.254 TIES 7 0.261 0.279 0.106 0.346 0.224 0.243 TIES 8 0.261 0.279 0.106 0.346 0.224 0.243 TIES 9 0.259 0.292 0.109 0.336 0.229 0.245 TIES 10 0.263 0.265 0.111 0.354 0.224 0.243 TIES 11 0.263 0.275 0.106 0.331 0.224 0.240 
+
+Table 4: Per-scale results grouped by method .
+
+METHOD SCALE GPQA-D H-S WAG MMLU-P RO MUSR 
+
+Methods (compared) :KARCHER 1.7B 0.323 0.726 0.218 0.351 360M 0.268 0.570 0.120 0.394 135M 0.268 0.437 0.109 0.398 LERP 1.7B 0.303 0.726 0.216 0.350 360M 0.207 0.568 0.117 0.395 135M 0.268 0.434 0.108 0.394 SLERP 1.7B 0.2929 0.726 0.218 0.352 360M 0.2273 0.569 0.117 0.398 135M 0.1919 0.435 0.109 0.395 TIES 1.7B 0.318 0.715 0.207 0.332 360M 0.258 0.562 0.114 0.369 135M 0.2525 0.428 0.108 0.390 ARCEE 1.7B 0.278 0.719 0.218 0.343 360M 0.227 0.563 0.117 0.394 135M 0.207 0.429 0.113 0.416 TA 1.7B 0.298 0.718 0.204 0.341 360M 0.258 0.567 0.111 0.342 135M 0.273 0.429 0.109 0.386 
+
+Reference only (not compared) :BASE 1.7B 0.278 0.714 0.214 0.341 360M 0.247 0.564 0.116 0.399 135M 0.263 0.431 0.110 0.414 INST 1.7B 0.298 0.718 0.204 0.341 360M 0.258 0.567 0.112 0.343 135M 0.273 0.429 0.109 0.386 Model Layer Mean Variance EffRank StableRank PR NumRank Qwen2.5-14B 0 0.0612 ± 0.0012 2284 ± 37 19.89 ± 0.39 1329 ± 16 4880 ± 84 Qwen2.5-14B 4 849 ± 86 40.4 ± 4.9 1.000 ± 0.000 2.67 ± 0.11 45.4 ± 4.3 Qwen2.5-14B 8 870 ± 131 115 ± 20 1.001 ± 0.000 4.12 ± 0.35 100 ± 16 Qwen2.5-14B 16 927 ± 99 245 ± 34 1.001 ± 0.000 6.40 ± 0.54 250 ± 26 Qwen2.5-14B 24 941 ± 69 308 ± 27 1.002 ± 0.000 7.51 ± 0.43 316 ± 19 Qwen2.5-14B 32 1047 ± 118 635 ± 67 1.004 ± 0.000 13.6 ± 1.2 640 ± 45 Karcher-14B 0 0.0766 ± 0.0018 2244 ± 56 19.45 ± 0.68 1299 ± 32 4795 ± 134 Karcher-14B 4 951 ± 53 42.4 ± 3.6 1.000 ± 0.000 2.70 ± 0.09 42.4 ± 4.0 Karcher-14B 8 1155 ± 218 96 ± 20 1.000 ± 0.000 3.77 ± 0.36 81 ± 16 Karcher-14B 16 1112 ± 188 211 ± 36 1.001 ± 0.000 5.80 ± 0.58 213 ± 29 Karcher-14B 24 1283 ± 109 231 ± 29 1.001 ± 0.000 6.21 ± 0.45 244 ± 20 Karcher-14B 32 1121 ± 200 633 ± 108 1.004 ± 0.001 13.5 ± 2.1 618 ± 94 Karcher-14B (reg) 0 0.0765 ± 0.0013 2283 ± 99 19.91 ± 0.40 1322 ± 53 4867 ± 173 Karcher-14B (reg) 4 867 ± 99 49.0 ± 6.4 1.000 ± 0.000 2.85 ± 0.14 48.8 ± 6.2 Karcher-14B (reg) 8 1029 ± 152 110 ± 20 1.001 ± 0.000 4.02 ± 0.34 91 ± 13 Karcher-14B (reg) 16 1214 ± 164 190 ± 31 1.001 ± 0.000 5.46 ± 0.48 195 ± 22 Karcher-14B (reg) 24 1252 ± 164 238 ± 36 1.001 ± 0.000 6.34 ± 0.57 254 ± 26 Karcher-14B (reg) 32 1175 ± 87 585 ± 41 1.004 ± 0.000 12.6 ± 0.8 572 ± 31 Ties-14B 0 0.0478 ± 0.0011 2090 ± 57 31.55 ± 0.56 1223 ± 35 4901 ± 121 Ties-14B 4 14.6 ± 1.3 786 ± 43 1.010 ± 0.001 22.2 ± 1.3 1064 ± 35 Ties-14B 8 41.2 ± 2.5 809 ± 43 1.027 ± 0.004 25.3 ± 1.1 1092 ± 35 Ties-14B 16 45.7 ± 3.1 887 ± 42 1.035 ± 0.007 30.1 ± 1.4 1209 ± 37 Ties-14B 24 49.8 ± 5.0 875 ± 75 1.044 ± 0.009 33.4 ± 2.7 1242 ± 67 Ties-14B 32 57.9 ± 4.9 1188 ± 69 1.073 ± 0.006 64.5 ± 5.3 1741 ± 83 Lerp-14B 0 0.0607 ± 0.0007 2152 ± 76 25.03 ± 0.24 1257 ± 42 4843 ± 148 Lerp-14B 4 104 ± 8 232 ± 20 1.002 ± 0.000 6.67 ± 0.30 317 ± 11 Lerp-14B 8 162 ± 16 387 ± 52 1.003 ± 0.000 9.30 ± 0.80 447 ± 32 Lerp-14B 16 173 ± 11 592 ± 48 1.006 ± 0.000 14.4 ± 1.0 694 ± 36 Lerp-14B 24 193 ± 24 717 ± 80 1.008 ± 0.001 17.9 ± 1.8 831 ± 58 Lerp-14B 32 186 ± 16 1404 ± 117 1.021 ± 0.002 46.2 ± 5.0 1783 ± 136 MS-14B 0 0.0544 ± 0.0006 2235 ± 31 22.23 ± 0.14 1301 ± 18 4891 ± 56 MS-14B 4 416 ± 46 68.1 ± 8.8 1.000 ± 0.000 3.32 ± 0.18 84.6 ± 7.5 MS-14B 8 539 ± 59 150 ± 19 1.001 ± 0.000 4.78 ± 0.32 143 ± 16 MS-14B 16 572 ± 27 289 ± 22 1.002 ± 0.000 7.32 ± 0.35 318 ± 15 MS-14B 24 581 ± 55 370 ± 42 1.003 ± 0.000 8.88 ± 0.72 406 ± 30 MS-14B 32 612 ± 45 825 ± 52 1.006 ± 0.000 18.6 ± 1.2 893 ± 42 
+
+Table 5: Layer-wise activation variance and rank diagnostics (mean ± std over bootstrap draws), where MS indicates the Model Stock method.
