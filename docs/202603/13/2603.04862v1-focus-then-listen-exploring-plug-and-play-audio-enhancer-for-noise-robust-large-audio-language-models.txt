@@ -1,0 +1,370 @@
+Title: Focus Then Listen: Exploring Plug-and-Play Audio Enhancer for Noise-Robust Large Audio Language Models
+
+URL Source: https://arxiv.org/pdf/2603.04862v1
+
+Published Time: Fri, 06 Mar 2026 01:35:15 GMT
+
+Number of Pages: 6
+
+Markdown Content:
+# Focus Then Listen: Exploring Plug-and-Play Audio Enhancer for Noise-Robust Large Audio Language Models 
+
+# Han Yin 1, Yang Xiao 2, Younghoo Kwon 1, Ting Dang 2, Jung-Woo Choi 1,∗∗ 
+
+1 School of Electrical Engineering, KAIST, Daejeon, Republic of Korea 
+
+2 University of Melbourne, Australia 
+
+hanyin@kaist.ac.kr, jwoo@kaist.ac.kr 
+
+# Abstract 
+
+Large audio language models (LALMs) are a class of founda-tion models for audio understanding. Existing LALMs tend to degrade significantly in real-world noisy acoustic conditions where speech and non-speech sounds interfere. While noise-aware fine-tuning can improve robustness, it requires task-specific noisy data and expensive retraining, limiting scalability. To address this issue, we propose Focus-Then-Listen (FTL), a plug-and-play audio enhancer that improves LALMs’ noise ro-bustness. Specifically, FTL first separates the input waveform into speech and non-speech, and a modality router is applied to predict the target audio modality (e.g., speech) based on the user’s instruction. Finally, a modality-aware fusion block gener-ates a task-adaptive enhanced signal for improved downstream perception and reasoning. Experiments across multiple LALMs and tasks show that FTL improves performance across different noise levels without fine-tuning on LALMs. 
+
+Index Terms : large audio language models, noise-robust audio understanding, audio enhancement 
+
+# 1. Introduction 
+
+Large audio language models (LALMs) have recently emerged as a powerful paradigm for unified audio understanding and rea-soning [1, 2, 3]. By integrating audio perception with large lan-guage models (LLMs), LALMs enable a wide range of appli-cations, including speech recognition, acoustic scene analysis, and audio question answering [4, 5, 6]. Noise robustness remains a fundamental challenge for LALMs [7]. Here, the noise refers to acoustic signals that are irrelevant to the user’s intent in a given task. For instance, in speech understanding tasks, non-speech sounds can be the noise, whereas in environmental sound analysis, speech may act as interference. In real-world environments, audio inputs are rarely clean and often contain multiple overlapping or irrel-evant components. Without sufficient robustness to such task-irrelevant signals, LALMs may misinterpret the user’s intent, resulting in degraded interaction quality and unreliable system behavior, particularly in safety-critical applications [8, 9, 10]. Recent work has begun to investigate this problem. SSEU-Bench [11] explicitly models the coexistence of speech and non-speech sounds and considers their energy imbalance across diverse scenarios. An important observation is that cross-component interference significantly affects model perfor-mance: when performing speech understanding, strong non-speech sounds can degrade recognition, and similarly, dom-inant speech can negatively impact non-speech sound under-standing. To address this issue, SSEU-Bench uses chain-of-
+
+> **
+
+indicates the corresponding author. Speech Understanding        
+
+> Non -speech Understanding
+> Mixture Understanding
+> Audio
+> I should focus on speech!
+> I should focus on non -speech!
+> I should focus on all information!
+
+Figure 1: Process of human audio understanding. 
+
+thought (CoT) prompting to decompose complex audio un-derstanding into simpler steps. However, the improvement is mainly observed in audio tagging tasks, and CoT often re-quires task-specific prompt design. Another straightforward approach to enhance robustness is noise-aware training, which involves fine-tuning models on large-scale datasets augmented with various noise types [12, 13]. This paradigm requires ex-tensive data curation, as covering the infinite variability of real-world noise is practically infeasible. In addition, fine-tuning may also lead to catastrophic forgetting or degrade perfor-mance on clean data [14, 15, 16]. In SEE [17], researchers propose an embedding-based approach for developing noise-robust LALMs, but assumes that noise is explicitly pre-defined (e.g., Gaussian noise) and the isolated pure-noise recordings are available. This assumption is incompatible with our set-ting, where noise cannot be pre-defined but is task-dependent: non-speech acts as noise for speech tasks, and vice versa. To address these issues, we propose Focus-Then-Listen (FTL), an audio enhancer that improves LALMs’ noise robust-ness. Our motivation stems from the human audio understand-ing process. As illustrated in Fig. 1, when confronted with audio, humans selectively focus on the component relevant to their intent. Inspired by this, FTL infers the task-relevant au-dio modality from the user’s instruction and produces a filtered, modality-aligned signal for the LALM, which improves down-stream perception and reasoning in noisy conditions. Specifi-cally, an audio separator decomposes the raw input audio into distinct speech and non-speech components. In parallel, an LLM-based modality router analyzes the user’s textual instruc-tion to infer the target audio modality (speech, non-speech, or mixture). Finally, a modality-aware fusion block produces a task-adaptive enhanced signal that mitigates interference while preserving essential information. Our key contributions are: • To the best of our knowledge, FTL is the first work to explore mitigating speech and non-speech interference for LALMs via instruction-aware audio enhancement. Experi-ments across multiple LALMs and benchmarks demonstrate its effectiveness in both perception and reasoning tasks. • We introduce MMAU-Pro-Ctrl, a new evaluation subset with controllable Signal-to-Noise Ratios (SNRs), to assess speech and non-speech interference in audio reasoning tasks. All code, demos, and data are available at the project page 1.
+
+> 1
+
+https://sites.google.com/view/ftl-lalm    
+
+> arXiv:2603.04862v1 [cs.SD] 5 Mar 2026 Raw Audio
+> Audio Separator
+> Speech
+> Non -Speech
+> Text Prompt Target
+> Audio Modality
+> Modality -
+> Aware
+> Fusion
+> Bloc k
+> (MAFB) Enhanced Audio
+> LALM
+> User’s Instruction
+> Response
+> FTL
+> Modality Router
+> ⊕
+
+Figure 2: Overview of proposed audio enhancer (FTL) for noise-robust large audio language models. 
+
+# 2. Proposed Methods 
+
+2.1. Overview 
+
+As shown in Fig. 2, in FTL, we first use an audio separator to separate the raw input audio into speech and non-speech tracks, which can be expressed as: 
+
+Ssp , Sns = Sep (Sra ) (1) where Sep (·) is the audio separator, Sra is the raw audio, Ssp 
+
+and Sns are the separated speech and non-speech, respectively. We then introduce a modality router to determine the tar-get audio modality m based on the user’s instruction. If the task only requires speech-related information, the router should output “ speech ”; if the task focuses on non-speech content, the router outputs “ non-speech ”. For more complex tasks that re-quire both modalities, the router outputs “ mixture ”. Specif-ically, we use an LLM as the modality router; the detailed prompt used for the LLM is provided on our project page 1. Fi-nally, we employ a modality-aware fusion block (MAFB) to generate task-adaptive enhanced audio conditioned on the se-lected modality. The goal of the MAFB is to refine the acoustic signal to better align with the user’s task. Through FTL, we aim to amplify task-relevant information while suppressing irrele-vant components in the audio, allowing the downstream LALM to focus more effectively on informative acoustic cues. 
+
+2.2. Modality-Aware Fusion Block 
+
+The MAFB is designed to generate task-adaptive enhanced au-dio based on the modality selected by the router. Specifically, the enhanced audio Sen is computed as: 
+
+Sen =
+
+
+
+αsp Ssp + (1 − αsp )Sra , if m = “speech ”
+
+αns Sns + (1 − αns )Sra , if m = “non-speech ”
+
+Sra , if m = “mixture ”(2) where m denotes the target audio modality predicted by the router. The coefficients αsp and αns are hyperparameters that control the strength of enhancement (ranging from 0 to 1). The MAFB performs modality-aware signal fusion between sepa-rated signals and raw audio. This design balances modality en-hancement and signal fidelity. When separated signals contain artifacts, mixing in some original audio preserves natural acous-tics and improves LALM downstream robustness. 
+
+2.3. Audio Separator 
+
+We use three different separators to explore the impact of sepa-ration. We first employ two state-of-the-art (SOTA) pre-trained models: SE-Mamba ( SEM ) [18] and SAM-Audio ( SAM ) [19]. Specifically, SEM is a GAN [20]-based speech enhancement model; the enhanced speech is first estimated from the mix-ture, and the non-speech signal is obtained by subtracting the enhanced speech from the mixture. SAM is a generative sepa-ration model that simultaneously estimates both the target and residual stems from an audio mixture, conditioned on text or visual prompts; we use a text prompt with the content “ speech ”. However, SEM is trained with speech enhancement objec-tives instead of separation, and SAM may generate signal com-ponents not present in the raw audio, which can potentially mis-lead downstream audio understanding tasks. Therefore, we de-velop SNSep , a separator specialized for speech and non-speech separation, which operates in the short-time Fourier transform domain using a masking-based approach. Specifically, we adopt the separation network from AudioSep [21, 22] as the back-bone. We design SNSep with a dual-decoder architecture: one decoder reconstructs the speech track, while a parallel decoder independently extracts the non-speech track. 
+
+2.4. MMAU-Pro-Ctrl 
+
+MMAU-Pro [23] is a widely used audio reasoning benchmark, which comprises various audio-based question–answer (QA) pairs. However, MMAU-Pro does not provide specific SNRs for speech and non-speech components within an audio sample. Therefore, we curate a new subset of MMAU-Pro with control-lable SNR conditions, i.e., MMAU-Pro-Ctrl .Specifically, we collect 130 speech- and 130 non-speech-QAs from MMAU-Pro. For the speech-QA subset, the audio consists of clean speech (4s to 300s) with questions explicitly target speech content. Conversely, the non-speech subset con-tains non-speech audio (5s to 293s) with questions. To simulate realistic noisy speech-QAs, we utilize the non-speech samples as the noise. For each pair, noise shorter than the speech is randomly inserted, whereas longer noise is cropped to match its duration. The same mixing protocol is used for non-speech QAs, with speech treated as noise. Following SSEU-Bench, we range the SNR from 10 dB to -10 dB. 
+
+# 3. Experimental Setups 
+
+3.1. Detailed Configurations SNSep Training: For training SNSep, we sample 50 hours of speech from LJSpeech, Librispeech, VoxPopuli, and Gi-gaSpeech training sets [24, 25, 26, 27] and 50 hours of non-speech from VocalSound, VGGSound, CochlScene, AudioSet, FSD50K, and UrbanSound8K training sets [28, 29, 30, 31, 32, 33]. During training, a speech and a non-speech sample are mixed with an SNR randomly selected from -10 dB to 10 dB as the input, and all audio samples are resampled to 16 kHz. For other configurations, we follow the previous work [21]. 
+
+Modality Router and LALM: For the modality router, we use Qwen3-8B [34] and ChatGPT5.2. For the LALM, we adopt three SOTA models, including Audio Flamingo 3 ( AF3 ) [35], Fun-Audio-Chat ( FAC ) [36], and Qwen3-Omni ( Q3O ) [37]. Table 1: ASR results of LALMs on SSEU-Bench. “SNR-Speech” denotes the speech-to-non-speech ratio; “ +∞” indicates pure speech. 
+
+LALM FTL αsp 
+
+SNR-Speech ( dB) 
+
++∞ 10 5 0 -5 -10 WER(%) HR(%) WER(%) HR(%) WER(%) HR(%) WER(%) HR(%) WER(%) HR(%) WER(%) HR(%) AF3 
+
+✗ - 2.18 0.00 2.71 0.00 3.27 0.00 4.73 0.00 10.45 0.18 27.45 0.54 
+
+✔ 1.0 2.21 0.00 3.13 0.00 3.93 0.00 6.32 0.00 15.93 0.00 37.50 0.45 
+
+✔ 0.9 2.15 0.00 2.89 0.00 3.49 0.00 5.45 0.00 12.29 0.00 31.15 0.27 
+
+✔ 0.5 2.17 0.00 2.66 0.00 3.20 0.00 4.61 0.00 9.83 0.00 25.39 0.45 
+
+✔ 0.1 2.16 0.00 2.70 0.00 3.43 0.00 4.63 0.00 9.93 0.09 26.73 0.36 FAC 
+
+✗ - 2.61 0.00 3.38 0.00 3.99 0.00 5.75 0.00 12.54 0.00 31.67 1.16 
+
+✔ 1.0 2.82 0.00 3.66 0.09 4.94 0.18 8.47 0.45 20.38 0.54 44.41 2.33 
+
+✔ 0.9 2.58 0.00 3.37 0.00 4.26 0.00 6.69 0.00 15.20 0.09 35.63 0.72 
+
+✔ 0.5 2.61 0.00 3.24 0.00 3.86 0.00 5.44 0.00 11.54 0.00 28.41 0.90 
+
+✔ 0.1 2.58 0.00 3.32 0.00 3.91 0.00 5.71 0.00 12.00 0.00 30.78 0.63 
+
+Q3O 
+
+✗ - 2.16 0.00 2.31 0.00 2.56 0.00 3.64 0.00 7.04 0.00 20.42 0.54 
+
+✔ 1.0 2.05 0.00 2.18 0.00 2.66 0.00 3.99 0.00 9.33 0.00 29.12 0.00 
+
+✔ 0.9 2.14 0.00 2.45 0.00 2.66 0.00 3.55 0.00 7.86 0.00 23.75 0.00 
+
+✔ 0.5 2.23 0.00 2.31 0.00 2.49 0.00 3.38 0.00 5.97 0.00 18.61 0.18 
+
+✔ 0.1 2.20 0.00 2.38 0.00 2.58 0.00 3.55 0.00 6.82 0.00 19.94 0.18 0.25 0.50 0.75 1.00       
+
+> sp
+> 4
+> 5
+> 6
+> 7
+> 8
+> WER (%)
+> SNR-Speech = 0dB
+> AF3
+> FAC
+> Q3O
+> 0.25 0.50 0.75 1.00
+> sp
+> 7.5
+> 10.0
+> 12.5
+> 15.0
+> 17.5
+> 20.0
+> WER (%)
+> SNR-Speech = -5dB
+> AF3
+> FAC
+> Q3O
+> 0.25 0.50 0.75 1.00
+> sp
+> 20
+> 25
+> 30
+> 35
+> 40
+> 45
+> WER (%)
+> SNR-Speech = -10dB
+> AF3
+> FAC
+> Q3O
+
+Figure 3: Impact of αsp on ASR task of SSEU-Bench. 
+
+3.2. Evaluation 
+
+We use SSEU-Bench to evaluate audio perception perfor-mance in noisy conditions, where each audio sample is mixed with a speech and a non-speech sound with a specific SNR. Two classic tasks in speech and environmental sound domains are in-cluded : Automatic Speech Recognition (ASR) and Audio Tag-ging (AT). For ASR, the LALM is required to output the spoken content of the speaker. For AT, we require the LALM to detect non-speech sound events within the audio. Detailed instructions used for the two tasks are provided in our project page 1. For au-dio reasoning , we use the proposed MMAU-Pro-Ctrl dataset. 
+
+Metrics: We use Word Error Rate (WER) to evaluate ASR. We observe that LALMs occasionally produce severe hal-lucinations in ASR tasks, where a single word is repeatedly generated, resulting in extremely high WER values. To miti-gate this issue, we first report the Hallucination Rate (HR) ,defined as the proportion of hallucinated samples (WER greater than 200%). Then we exclude these samples and compute the average WER over non-hallucinated samples as the final WER. For AT, we use mean Average Precision (mAP) for evaluation. For reasoning tasks, we follow MMAU-Pro and use the aver-aged accuracy for evaluation, denoted as QA-ACC . In addition, we report the Correct Rate (CR) to measure the performance of the modality router, which is defined as the proportion of samples where the target audio modality is correctly predicted. 
+
+# 4. Results and Discussions 
+
+4.1. Noise-Robust Audio Perception Imperfect Audio Separation Harms Speech Perception: Ta-ble 1 presents the ASR performance of AF3, FAC, and Q3O on SSEU-Bench. For FTL, we use SNSep as the separator and Qwen3-8B as the modality router. Details of the separation per-formance are provided in Fig. 4. For the ASR instruction, the router always predicts “ speech ”, resulting in a CR of 100%. We observe that LALMs are sensitive to artifacts introduced by sep-aration. Although non-speech signals are largely removed after Table 2: AT performance of LALMs on SSEU-Bench. Metric is mAP(%). “SNR-Non-Speech” refers to non-speech to speech ratio, where “SNR-Non-Speech= +∞” means pure non-speech. 
+
+LALM FTL αns SNR-Non-Speech ( dB) 
+
++∞ 10 5 0 -5 -10 AF3 
+
+✗ - 38.80 36.18 34.56 31.00 28.86 27.36 
+
+✔ 1.0 39.22 38.55 37.43 36.44 34.86 31.94 
+
+✔ 0.9 39.28 39.26 38.95 38.19 34.94 31.56 
+
+✔ 0.5 39.16 36.52 35.34 32.92 31.24 29.29 
+
+✔ 0.1 39.19 36.06 33.01 31.51 29.34 27.70 FAC 
+
+✗ - 36.34 21.27 18.33 17.54 16.98 16.34 
+
+✔ 1.0 36.34 33.22 31.73 32.32 31.77 29.30 
+
+✔ 0.9 36.64 31.97 30.32 27.88 24.89 20.75 
+
+✔ 0.5 36.16 26.62 21.10 18.43 17.74 17.39 
+
+✔ 0.1 36.60 21.80 18.58 17.78 17.42 16.31 Q3O 
+
+✗ - 44.43 39.75 38.12 34.84 33.20 31.33 
+
+✔ 1.0 44.66 43.87 43.46 42.01 39.94 37.30 
+
+✔ 0.9 44.27 43.48 42.25 40.32 39.20 37.27 
+
+✔ 0.5 44.38 40.49 38.65 37.58 34.76 32.97 
+
+✔ 0.1 44.55 40.31 37.83 35.88 33.13 30.98 
+
+separation and the speech becomes perceptually clearer to hu-mans, directly feeding the separated speech into the LALM (i.e., 
+
+αsp = 1 ) instead degrades recognition performance. Similar findings were also reported in ASR studies, where enhanced or separated speech degrades the recognition accuracy [38, 39]. 
+
+Balanced Fusion Brings Better Speech Perception: To mit-igate the negative impact of separation-induced distortions, we introduce a weighted residual connection with the raw audio, as defined in Eq. 2. In Table 1, we explore three fusion settings with αsp = 0 .9, 0.5, and 0.1, where αsp = 0 .5 shows the best performance. To further validate this finding, we provide a more detailed analysis of the impact of αsp in Fig. 3. We observe that for almost all LALMs and under all conditions, αsp = 0 .5 con-sistently achieves the lowest WER, demonstrating that balanced fusion effectively preserves useful components of the raw sig-nal while suppressing interference, resulting in audio that better matches the acoustic characteristics expected by LALMs. 
+
+Audio Separation Benefits Non-speech Perception: In Ta-ble 2, we present the AT results of different LALMs on SSEU-Bench. We still use SNSep as the separator and Qwen3-8B as the router. For the AT instruction, the router consistently pre-dicts “ non-speech ”. Different from speech perception, we ob-serve that audio separation significantly improves the AT perfor-mance, indicating that LALMs are less sensitive to distortions in AT tasks than in ASR tasks. Injecting too much residual raw audio degrades mAP, as it reintroduces interference that is irrel-evant to non-speech event recognition. AF3 achieves the best performance at αns = 0 .9, while FAC and Q3O perform best at αns = 1 .0. However, we recommend setting αns = 0 .9 to avoid losing all speech when the modality router makes incor-rect predictions on complex instructions (e.g., reasoning tasks). 10 5 0 5 10     
+
+> SNR-Speech (dB)
+> 10
+> 5
+> 0
+> 5
+> 10
+> SDR (dB)
+> Speech Separation Performance
+> Mixture
+> SNSep
+> SAM
+> SEM
+> 10 50510
+> SNR-Non-Speech (dB)
+> 10
+> 5
+> 0
+> 5
+> 10
+> 15
+> SDR (dB)
+> Non-Speech Separation Performance
+> Mixture
+> SNSep
+> SAM
+> SEM
+
+Figure 4: Performance of audio separators on SSEU-Bench. 
+
+Table 3: Performance of Audio Flamingo 3 with different audio separators in FTL on SSEU-Bench. 
+
+ASR Performance, Metric: WER (%) 
+
+FTL Sep αsp SNR-Speech ( dB) 10 5 0 -5 -10 
+
+✗ - - 2.71 3.27 4.73 10.45 27.45 
+
+✔ SEM 1.0 2.79 3.13 5.57 14.05 36.56 
+
+✔ SEM 0.5 2.62 3.03 4.08 8.07 23.83 
+
+✔ SAM 1.0 5.06 7.14 14.39 30.38 57.10 
+
+✔ SAM 0.5 2.83 3.31 4.93 10.40 28.72 AT Performance, Metric: mAP (%) 
+
+FTL Sep αns SNR-Non-Speech ( dB) 10 5 0 -5 -10 
+
+✗ - - 36.18 34.56 31.00 28.86 27.36 
+
+✔ SEM 1.0 37.91 37.46 37.01 34.35 32.95 
+
+✔ SEM 0.9 38.36 38.52 36.74 35.12 33.67 
+
+✔ SAM 1.0 35.71 35.19 33.70 33.30 30.96 
+
+✔ SAM 0.9 36.61 37.89 35.56 33.19 31.98 
+
+Scale to Different Audio Separators: To study separator ro-bustness, Table 3 reports the results of AF3 on SSEU-Bench us-ing different separators. The results show that replacing SNSep with SEM or SAM leads to similar trends. By using αsp = 0 .5
+
+and αns = 0 .9, FTL consistently improves both speech and non-speech perception performance. 
+
+Separation vs. Perception: Fig. 4 shows the performance of different separators on SSEU-Bench, where a higher Signal-to-Distortion Ratio (SDR) represents better separation. SNSep and SEM have comparable performance, outperforming SAM across all conditions. For AT, better separation leads to better performance. However, although SNSep performs better than SEM on speech separation, it presents a slightly higher WER (Table 1 & 3), indicating that cleaner signals do not lead to bet-ter ASR for LALMs in some scenarios. As shown in Fig. 5, despite the higher SDR of SNSep-separated speech, the WER is higher. Compared with SEM, SNSep removes almost all non-speech signals, introducing unnatural silence, which further de-grades ASR. Incorporating a skip connection from the mixture with αsp = 0 .5 effectively mitigates this negative effect. 
+
+4.2. Noise-Robust Audio Reasoning Smarter Modality Router Brings Better Reasoning: In Ta-ble 4, we show the reasoning performance of Q3O on MMAU-Pro-Ctrl. For FTL, we use SNSep as the audio separator, with 
+
+αsp = 0 .5 and αns = 0 .9 in the MAFB. The CR of the router plays an essential role in FTL’s efficacy. As shown in Table 4, Qwen3-8B struggles with task classification. It tends to predict “mixture ”, failing to activate the correct enhancement path and resulting in similar performance to the baseline. In contrast, ChatGPT5.2 achieves higher CRs, enabling consistent gains via correct routing. By applying FTL with the ChatGPT5.2 router, we achieve consistent improvements, particularly in high-noise conditions. For instance, at -10 dB, FTL boosts QA-ACC by Table 4: Reasoning performance (QA-ACC(%)) across different modality routers (LLM: Qwen3-Omni on MMAU-Pro-Ctrl). 
+
+Speech Reasoning 
+
+FTL Modality Router CR(%) SNR-Speech ( dB) 
+
++∞ 10 5 0 -5 -10 
+
+✗ - - 75.4 75.4 75.4 74.6 73.1 70.0 
+
+✔ Qwen3-8B 23.8 75.4 74.6 74.6 73.8 74.6 70.0 
+
+✔ ChatGPT5.2 88.5 75.4 76.2 75.4 75.4 74.6 73.1 
+
+✔ GroundTruth 100.0 76.2 75.4 75.4 75.4 73.8 72.3 
+
+Non-Speech Reasoning 
+
+FTL Modality Router CR(%) SNR-Non-Speech ( dB) 
+
++∞ 10 5 0 -5 -10 
+
+✗ - - 43.1 35.4 38.5 37.7 36.2 34.6 
+
+✔ Qwen3-8B 0.0 43.1 35.4 38.5 37.7 36.2 34.6 
+
+✔ ChatGPT5.2 47.7 41.5 42.3 43.1 40.0 39.2 38.5 
+
+✔ GroundTruth 100.0 42.3 42.3 40.8 40.0 39.2 38.5 0      
+
+> 50
+> Frequency  Clean speech (WER=0.00%)
+> 0
+> 50
+> Frequency  Mixture of the clean speech and a non-speech with an SNR-Speech of 5dB (SDR=3.52dB, WER=10.71%)
+> 0
+> 50
+> Frequency  Separated speech from the mixture by using SEM (SDR=7.99dB, WER=0.00%)
+> Time Frame
+> 0
+> 50
+> Frequency  Separated speech from the mixture by using SNSep (SDR=8.48dB, WER=3.57%)
+> 0100 200 300 400 500 600
+> Time Frame
+> 0
+> 50
+> Frequency  0.5*Mixture + 0.5*Separated speech with SNSep (SDR=6.45dB, WER=0.00%)
+
+Figure 5: ASR demonstration (mel spectrogram): Each sample is fed into Audio Flamingo 3 to perform ASR. 
+
+3.1% (speech) and 3.9% (non-speech). Ideally, “GroundTruth” should yield the highest QA-ACC. However, in some cases (e.g., -10 dB speech reasoning), the slightly worse performance compared to ChatGPT5.2 suggests that the “optimal” routing based on ground-truth labels might occasionally be suboptimal for specific noisy samples. We observe that when the noise has limited temporal overlap with the target signal, reasoning per-formance is not substantially affected; in such cases, applying separation may introduce slight distortions or artifacts, which may degrade downstream reasoning accuracy. 
+
+Performance on Real Mixtures: In this study, we simulate mixtures using real-life recordings to quantitatively evaluate FTL at controlled SNR levels. Since real mixtures lack ground-truth SNRs, we provide qualitative demonstrations of FTL on real-world mixtures on our project page 1. Results show that FTL can improve the audio reasoning performance in real-world mixtures, especially under highly noisy conditions. 
+
+# 5. Conclusions 
+
+In this work, we propose FTL, an audio enhancement frame-work for noise-robust LALMs. Results show that FTL improves both audio perception and reasoning performance, especially under high-noise conditions. In addition, we reveal a key in-sight: better separation does not necessarily lead to better per-ception, and residual connection with raw signals is critical for robust understanding. These findings provide practical guide-lines for deploying LALMs in real-world noisy scenarios. De-spite its effectiveness, FTL applies a frozen LLM for modality routing, and routing errors may reduce reasoning performance. In addition, the MAFB uses fixed fusion weights; future work will study adaptive fusion and routing to improve robustness. 6. Generative AI Use Disclosure 
+
+We use generative AI tools for polishing the manuscript, e.g., correcting the grammar. 
+
+# 7. References 
+
+[1] Y. Chu, J. Xu, X. Zhou, Q. Yang, S. Zhang, Z. Yan, C. Zhou, and J. Zhou, “Qwen-audio: Advancing universal audio understand-ing via unified large-scale audio-language models,” arXiv preprint arXiv:2311.07919 , 2023. [2] S. Ghosh, S. Kumar, A. Seth, C. K. R. Evuru, U. Tyagi, S. Sak-shi, O. Nieto, R. Duraiswami, and D. Manocha, “Gama: A large audio-language model with advanced audio understanding and complex reasoning abilities,” in Proc. Empirical Methods in Nat-ural Language Processing (EMNLP) , 2024, pp. 6288–6313. [3] Z. Xie, M. Lin, Z. Liu, P. Wu, S. Yan, and C. Miao, “Audio-reasoner: Improving reasoning capability in large audio language models,” arXiv preprint arXiv:2503.02318 , 2025. [4] W. Yu, C. Tang, G. Sun, X. Chen, T. Tan, W. Li, L. Lu, Z. Ma, and C. Zhang, “Connecting speech encoder and large language model for asr,” in Proc. International Conference on Acoustics, Speech and Signal Processing (ICASSP) . IEEE, 2024, pp. 12 637– 12 641. [5] S. Deshmukh, B. Elizalde, R. Singh, and H. Wang, “Pengi: An au-dio language model for audio tasks,” Proc. Advances in Neural In-formation Processing Systems (NIPS) , vol. 36, pp. 18 090–18 108, 2023. [6] B. Wang, X. Zou, G. Lin, S. Sun, Z. Liu, W. Zhang, Z. Liu, A. Aw, and N. Chen, “Audiobench: A universal benchmark for audio large language models,” in Proc. the Nations of the Amer-icas Chapter of the Association for Computational Linguistics: Human Language Technologies (Volume 1: Long Papers) , 2025, pp. 4297–4316. [7] C.-A. Li, T.-H. Lin, and H.-y. Lee, “When silence matters: The impact of irrelevant audio on text reasoning in large audio-language models,” arXiv preprint arXiv:2510.00626 , 2025. [8] M. A. Torad, B. Bouallegue, and A. M. Ahmed, “A voice con-trolled smart home automation system using artificial intelligent and internet of things,” TELKOMNIKA (Telecommunication Com-puting Electronics and Control) , vol. 20, no. 4, pp. 808–816, 2022. [9] M. Schmidt, D. Stier, S. Werner, and W. Minker, “Exploration and assessment of proactive use cases for an in-car voice assistant,” in 
+
+Konferenz elektronische sprachsignalverarbeitung . TUDpress, Dresden, 2019, pp. 148–155. [10] G. Zhang, H.-N. Liang, and Y. Yue, “An investigation of the use of robots in public spaces,” in Proc. International Conference on Cyber Technology in Automation, Control, and Intelligent Systems (CYBER) . IEEE, 2015, pp. 850–855. [11] H. Yin and J.-W. Choi, “Can large audio language models under-stand audio well? speech, scene and events understanding bench-mark for lalms,” Proc. International Conference on Acoustics, Speech and Signal Processing (ICASSP) , 2026. [12] Y. Hu, C. Chen, C.-H. H. Yang, R. Li, C. Zhang, P.-Y. Chen, and E. Chng, “Large language models are efficient learners of noise-robust speech recognition,” Proc. International Conference on Learning Representations (ICLR) , 2024. [13] D. Ding, Z. Ju, Y. Leng, S. Liu, T. Liu, Z. Shang, K. Shen, W. Song, X. Tan, H. Tang et al. , “Kimi-audio technical report,” 
+
+arXiv preprint arXiv:2504.18425 , 2025. [14] Y. Luo, Z. Yang, F. Meng, Y. Li, J. Zhou, and Y. Zhang, “An em-pirical study of catastrophic forgetting in large language models during continual fine-tuning,” IEEE/ACM Transactions on Audio, Speech and Language Processing , 2025. [15] Y. Zhai, S. Tong, X. Li, M. Cai, Q. Qu, Y. J. Lee, and Y. Ma, “Investigating the catastrophic forgetting in multimodal large lan-guage models,” in NeurIPS 2023 Workshop on Instruction Tuning and Instruction Following , 2023. [16] S. Yin, C. Liu, Z. Zhang, Y. Lin, D. Wang, J. Tejedor, T. F. Zheng, and Y. Li, “Noisy training for deep neural networks in speech recognition,” EURASIP Journal on Audio, Speech, and Music Processing , vol. 2015, no. 1, p. 2, 2015. [17] Y. Zhang, J. Tian, Y. Zhang, S. Yan, L. Lin, Z. Zhou, L. Sun, and S. Su, “See: Signal embedding energy for quantifying noise interference in large audio language models,” arXiv preprint arXiv:2601.07331 , 2026. [18] R. Chao, W.-H. Cheng, M. La Quatra, S. M. Siniscalchi, C.-H. H. Yang, S.-W. Fu, and Y. Tsao, “An investigation of incorporating mamba for speech enhancement,” in Spoken Language Technol-ogy Workshop (SLT) . IEEE, 2024, pp. 302–308. [19] B. Shi, A. Tjandra, J. Hoffman, H. Wang, Y.-C. Wu, L. Gao, J. Richter, M. Le, A. Vyas, S. Chen et al. , “Sam audio: Segment anything in audio,” arXiv preprint arXiv:2512.18099 , 2025. [20] I. J. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley, S. Ozair, A. Courville, and Y. Bengio, “Generative adver-sarial nets,” Advances in neural information processing systems ,vol. 27, 2014. [21] X. Liu, Q. Kong, Y. Zhao, H. Liu, Y. Yuan, Y. Liu, R. Xia, Y. Wang, M. D. Plumbley, and W. Wang, “Separate anything you describe,” IEEE/ACM Transactions on Audio, Speech and Lan-guage Processing , vol. 33, pp. 458–471, 2024. [22] H. Yin, M. Wang, J. Bai, D. Shi, W.-S. Gan, and J. Chen, “Sub-band and full-band interactive u-net with dprnn for demixing cross-talk stereo music,” in Proc. International Conference on Acoustics, Speech, and Signal Processing Workshops (ICASSPW) .IEEE, 2024, pp. 21–22. [23] S. Kumar, ˇS. Sedl´ aˇ cek, V. Lokegaonkar, F. L´ opez, W. Yu, N. Anand, H. Ryu, L. Chen, M. Pliˇ cka, M. Hlav´ aˇ cek et al. ,“Mmau-pro: A challenging and comprehensive benchmark for holistic evaluation of audio general intelligence,” AAAI , 2026. [24] K. Ito and L. Johnson, “The lj speech dataset,” https://keithito. com/LJ-Speech-Dataset/, 2017. [25] V. Panayotov, G. Chen, D. Povey, and S. Khudanpur, “Lib-rispeech: an asr corpus based on public domain audio books,” in Proc. International conference on acoustics, speech and signal processing (ICASSP) . IEEE, 2015, pp. 5206–5210. [26] C. Wang, M. Riviere, A. Lee, A. Wu, C. Talnikar, D. Haz-iza, M. Williamson, J. Pino, and E. Dupoux, “Voxpopuli: Alarge-scale multilingual speech corpus for representation learning, semi-supervised learning and interpretation,” in Proc. the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers) , 2021, pp. 993–1003. [27] G. Chen, S. Chai, G.-B. Wang, J. Du, W.-Q. Zhang, C. Weng, D. Su, D. Povey, J. Trmal, J. Zhang et al. , “Gigaspeech: An evolv-ing, multi-domain asr corpus with 10,000 hours of transcribed au-dio,” Interspeech , 2021. [28] Y. Gong, J. Yu, and J. Glass, “Vocalsound: A dataset for improv-ing human vocal sounds recognition,” in Proc. International Con-ference on Acoustics, Speech and Signal Processing (ICASSP) .IEEE, 2022, pp. 151–155. [29] H. Chen, W. Xie, A. Vedaldi, and A. Zisserman, “Vggsound: A large-scale audio-visual dataset,” in Proc. International Con-ference on Acoustics, Speech and Signal Processing (ICASSP) .IEEE, 2020, pp. 721–725. [30] I.-Y. Jeong and J. Park, “Cochlscene: Acquisition of acoustic scene data using crowdsourcing,” in Proc. Asia-Pacific Signal and Information Processing Association Annual Summit and Confer-ence (APSIPA ASC) . IEEE, 2022, pp. 17–21. [31] J. F. Gemmeke, D. P. Ellis, D. Freedman, A. Jansen, W. Lawrence, R. C. Moore, M. Plakal, and M. Ritter, “Audio set: An ontol-ogy and human-labeled dataset for audio events,” in Proc. Inter-national Conference on Acoustics, Speech and Signal Processing (ICASSP) . IEEE, 2017, pp. 776–780. [32] E. Fonseca, X. Favory, J. Pons, F. Font, and X. Serra, “Fsd50k: an open dataset of human-labeled sound events,” IEEE/ACM Trans-actions on Audio, Speech, and Language Processing , vol. 30, pp. 829–852, 2021. [33] J. Salamon, C. Jacoby, and J. P. Bello, “A dataset and taxonomy for urban sound research,” in Proc. ACM International Confer-ence on Multimedia (ACM MM) , 2014, pp. 1041–1044. [34] A. Yang, A. Li, B. Yang, B. Zhang, B. Hui, B. Zheng, B. Yu, C. Gao, C. Huang, C. Lv et al. , “Qwen3 technical report,” arXiv preprint arXiv:2505.09388 , 2025. [35] A. Goel, S. Ghosh, J. Kim, S. Kumar, Z. Kong, S.-g. Lee, C.-H. H. Yang, R. Duraiswami, D. Manocha, R. Valle et al. , “Audio flamingo 3: Advancing audio intelligence with fully open large audio language models,” Proc. Advances in Neural Information Processing Systems (NIPS) , 2025. [36] T. F. Team, Q. Chen, L. Cheng, C. Deng, X. Li, J. Liu, C.-H. Tan, W. Wang, J. Xu, J. Ye et al. , “Fun-audio-chat technical report,” 
+
+arXiv preprint arXiv:2512.20156 , 2025. [37] J. Xu, Z. Guo, H. Hu, Y. Chu, X. Wang, J. He, Y. Wang, X. Shi, T. He, X. Zhu et al. , “Qwen3-omni technical report,” arXiv preprint arXiv:2509.17765 , 2025. [38] K. Iwamoto, T. Ochiai, M. Delcroix, R. Ikeshita, H. Sato, S. Araki, and S. Katagiri, “How bad are artifacts?: Analyzing the impact of speech enhancement errors on asr,” Interspeech , pp. 5418–5422, 2022. [39] Y. Masuyama, X. Chang, W. Zhang, S. Cornell, Z.-Q. Wang, N. Ono, Y. Qian, and S. Watanabe, “An end-to-end integration of speech separation and recognition with self-supervised learn-ing representation,” Computer Speech & Language , vol. 95, p. 101813, 2026.

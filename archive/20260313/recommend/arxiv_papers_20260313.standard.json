@@ -1,0 +1,683 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-03-13T19:22:57.312821+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 6,
+    "deep_cap": 6,
+    "deep_selected": 6,
+    "quick_candidates": 15,
+    "quick_skim_target": 11,
+    "quick_selected": 11
+  },
+  "deep_dive": [
+    {
+      "id": "2603.11653v1",
+      "title": "Simple Recipe Works: Vision-Language-Action Models are Natural Continual Learners with Reinforcement Learning",
+      "abstract": "Continual Reinforcement Learning (CRL) for Vision-Language-Action (VLA) models is a promising direction toward self-improving embodied agents that can adapt in openended, evolving environments. However, conventional wisdom from continual learning suggests that naive Sequential Fine-Tuning (Seq. FT) leads to catastrophic forgetting, necessitating complex CRL strategies. In this work, we take a step back and conduct a systematic study of CRL for large pretrained VLAs across three models and five challenging lifelong RL benchmarks. We find that, contrary to established belief, simple Seq. FT with low-rank adaptation (LoRA) is remarkably strong: it achieves high plasticity, exhibits little to no forgetting, and retains strong zero-shot generalization, frequently outperforming more sophisticated CRL methods. Through detailed analysis, we show that this robustness arises from a synergy between the large pretrained model, parameter-efficient adaptation, and on-policy RL. Together, these components reshape the stability-plasticity trade-off, making continual adaptation both stable and scalable. Our results position Sequential Fine-Tuning as a powerful method for continual RL with VLAs and provide new insights into lifelong learning in the large model era. Code is available at github.com/UT-Austin-RobIn/continual-vla-rl.",
+      "authors": [
+        "Jiaheng Hu",
+        "Jay Shim",
+        "Chen Tang",
+        "Yoonchang Sung",
+        "Bo Liu",
+        "Peter Stone",
+        "Roberto Martin-Martin"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.RO"
+      ],
+      "published": "2026-03-12T08:22:39+00:00",
+      "link": "https://arxiv.org/pdf/2603.11653v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "Sequential fine-tuning with low-rank adaptation (LoRA)",
+      "llm_evidence_cn": "结合低秩自适应（LoRA）的顺序微调",
+      "llm_evidence": "结合低秩自适应（LoRA）的顺序微调",
+      "canonical_evidence": "结合低秩自适应（LoRA）的顺序微调",
+      "llm_tldr_en": "Demonstrates that simple LoRA-based fine-tuning is highly effective for continual learning in VLA models.",
+      "llm_tldr_cn": "研究表明，基于LoRA的简单顺序微调在视觉-语言-动作模型的持续学习中表现优异。",
+      "llm_tldr": "研究表明，基于LoRA的简单顺序微调在视觉-语言-动作模型的持续学习中表现优异。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.11201v1",
+      "title": "Representation Finetuning for Continual Learning",
+      "abstract": "The world is inherently dynamic, and continual learning aims to enable models to adapt to ever-evolving data streams. While pre-trained models have shown powerful performance in continual learning, they still require finetuning to adapt effectively to downstream tasks. However, prevailing Parameter-Efficient Fine-Tuning (PEFT) methods operate through empirical, black-box optimization at the weight level. These approaches lack explicit control over representation drift, leading to sensitivity to domain shifts and catastrophic forgetting in continual learning scenarios. In this work, we introduce Continual Representation Learning (CoRe), a novel framework that for the first time shifts the finetuning paradigm from weight space to representation space. Unlike conventional methods, CoRe performs task-specific interventions within a low-rank linear subspace of hidden representations, adopting a learning process with explicit objectives, which ensures stability for past tasks while maintaining plasticity for new ones. By constraining updates to a low-rank subspace, CoRe achieves exceptional parameter efficiency. Extensive experiments across multiple continual learning benchmarks demonstrate that CoRe not only preserves parameter efficiency but also significantly outperforms existing state-of-the-art methods. Our work introduces representation finetuning as a new, more effective and interpretable paradigm for continual learning.",
+      "authors": [
+        "Haihua Luo",
+        "Xuming Ran",
+        "Tommi Kärkkäinen",
+        "Huiyan Xue",
+        "Zhonghua Chen",
+        "Qi Xu",
+        "Fengyu Cong"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-03-11T18:15:31+00:00",
+      "link": "https://arxiv.org/pdf/2603.11201v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Shifts PEFT paradigm from weight space to representation space",
+      "llm_evidence_cn": "将PEFT范式从权重空间转向表示空间",
+      "llm_evidence": "将PEFT范式从权重空间转向表示空间",
+      "canonical_evidence": "将PEFT范式从权重空间转向表示空间",
+      "llm_tldr_en": "Introduces CoRe, a framework shifting fine-tuning to representation space to mitigate catastrophic forgetting.",
+      "llm_tldr_cn": "提出CoRe框架，将微调范式从权重空间转向表示空间，以减少灾难性遗忘。",
+      "llm_tldr": "提出CoRe框架，将微调范式从权重空间转向表示空间，以减少灾难性遗忘。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.11239v1",
+      "title": "Reversible Lifelong Model Editing via Semantic Routing-Based LoRA",
+      "abstract": "The dynamic evolution of real-world necessitates model editing within Large Language Models. While existing methods explore modular isolation or parameter-efficient strategies, they still suffer from semantic drift or knowledge forgetting due to continual updating. To address these challenges, we propose SoLA, a Semantic routing-based LoRA framework for lifelong model editing. In SoLA, each edit is encapsulated as an independent LoRA module, which is frozen after training and mapped to input by semantic routing, allowing dynamic activation of LoRA modules via semantic matching. This mechanism avoids semantic drift caused by cluster updating and mitigates catastrophic forgetting from parameter sharing. More importantly, SoLA supports precise revocation of specific edits by removing key from semantic routing, which restores model's original behavior. To our knowledge, this reversible rollback editing capability is the first to be achieved in existing literature. Furthermore, SoLA integrates decision-making process into edited layer, eliminating the need for auxiliary routing networks and enabling end-to-end decision-making process. Extensive experiments demonstrate that SoLA effectively learns and retains edited knowledge, achieving accurate, efficient, and reversible lifelong model editing.",
+      "authors": [
+        "Haihua Luo",
+        "Xuming Ran",
+        "Tommi Kärkkäinen",
+        "Zhonghua Chen",
+        "Jiangrong Shen",
+        "Qi Xu",
+        "Fengyu Cong"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-03-11T19:04:59+00:00",
+      "link": "https://arxiv.org/pdf/2603.11239v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Semantic routing-based LoRA framework for parameter-efficient model editing",
+      "llm_evidence_cn": "基于语义路由的 LoRA 框架，用于参数高效的模型编辑",
+      "llm_evidence": "基于语义路由的 LoRA 框架，用于参数高效的模型编辑",
+      "canonical_evidence": "基于语义路由的 LoRA 框架，用于参数高效的模型编辑",
+      "llm_tldr_en": "Introduces SoLA, a framework using independent LoRA modules for lifelong model editing without forgetting.",
+      "llm_tldr_cn": "引入 SoLA 框架，使用独立的 LoRA 模块进行终身模型编辑，避免灾难性遗忘。",
+      "llm_tldr": "引入 SoLA 框架，使用独立的 LoRA 模块进行终身模型编辑，避免灾难性遗忘。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.11873v1",
+      "title": "AdaFuse: Accelerating Dynamic Adapter Inference via Token-Level Pre-Gating and Fused Kernel Optimization",
+      "abstract": "The integration of dynamic, sparse structures like Mixture-of-Experts (MoE) with parameter-efficient adapters (e.g., LoRA) is a powerful technique for enhancing Large Language Models (LLMs). However, this architectural enhancement comes at a steep cost: despite minimal increases in computational load, the inference latency often skyrockets, leading to decoding speeds slowing by over 2.5 times. Through a fine-grained performance analysis, we pinpoint the primary bottleneck not in the computation itself, but in the severe overhead from fragmented, sequential CUDA kernel launches required for conventional dynamic routing. To address this challenge, we introduce AdaFuse, a framework built on a tight co-design between the algorithm and the underlying hardware system to enable efficient dynamic adapter execution. Departing from conventional layer-wise or block-wise routing, AdaFuse employs a token-level pre-gating strategy, which makes a single, global routing decision for all adapter layers before a token is processed. This \"decide-once, apply-everywhere\" approach effectively staticizes the execution path for each token, creating an opportunity for holistic optimization. We capitalize on this by developing a custom CUDA kernel that performs a fused switching operation, merging the parameters of all selected LoRA adapters into the backbone model in a single, efficient pass. Experimental results on popular open-source LLMs show that AdaFuse achieves accuracy on par with state-of-the-art dynamic adapters while drastically cutting decoding latency by a factor of over 2.4x, thereby bridging the gap between model capability and inference efficiency.",
+      "authors": [
+        "Qiyang Li",
+        "Rui Kong",
+        "Yuchen Li",
+        "Hengyi Cai",
+        "Shuaiqiang Wang",
+        "Linghe Kong",
+        "Guihai Chen",
+        "Dawei Yin"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-03-12T12:46:42+00:00",
+      "link": "https://arxiv.org/pdf/2603.11873v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "accelerating dynamic adapter inference for LoRA",
+      "llm_evidence_cn": "加速 LoRA 动态适配器推理",
+      "llm_evidence": "加速 LoRA 动态适配器推理",
+      "canonical_evidence": "加速 LoRA 动态适配器推理",
+      "llm_tldr_en": "Optimizes inference latency for LLMs using dynamic LoRA adapters through kernel fusion and pre-gating.",
+      "llm_tldr_cn": "通过内核融合和预门控技术，优化使用动态 LoRA 适配器的大模型推理延迟。",
+      "llm_tldr": "通过内核融合和预门控技术，优化使用动态 LoRA 适配器的大模型推理延迟。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Low-Rank Adaptation of large language models",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.09374v1",
+      "title": "MIL-PF: Multiple Instance Learning on Precomputed Features for Mammography Classification",
+      "abstract": "Modern foundation models provide highly expressive visual representations, yet adapting them to high-resolution medical imaging remains challenging due to limited annotations and weak supervision. Mammography, in particular, is characterized by large images, variable multi-view studies and predominantly breast-level labels, making end-to-end fine-tuning computationally expensive and often impractical. We propose Multiple Instance Learning on Precomputed Features (MIL-PF), a scalable framework that combines frozen foundation encoders with a lightweight MIL head for mammography classification. By precomputing the semantic representations and training only a small task-specific aggregation module (40k parameters), the method enables efficient experimentation and adaptation without retraining large backbones. The architecture explicitly models the global tissue context and the sparse local lesion signals through attention-based aggregation. MIL-PF achieves state-of-the-art classification performance at clinical scale while substantially reducing training complexity. We release the code for full reproducibility.",
+      "authors": [
+        "Nikola Jovišić",
+        "Milica Škipina",
+        "Nicola Dall'Asen",
+        "Dubravko Ćulibrk"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-03-10T08:49:33+00:00",
+      "link": "https://arxiv.org/pdf/2603.09374v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Training only a small task-specific module (40k parameters)",
+      "llm_evidence_cn": "仅训练一个小的任务特定模块（4万参数）",
+      "llm_evidence": "仅训练一个小的任务特定模块（4万参数）",
+      "canonical_evidence": "仅训练一个小的任务特定模块（4万参数）",
+      "llm_tldr_en": "Adapts foundation models to medical imaging by training only a lightweight 40k parameter head.",
+      "llm_tldr_cn": "通过仅训练4万参数的轻量级头部，实现基础模型在医疗影像任务中的高效适配。",
+      "llm_tldr": "通过仅训练4万参数的轻量级头部，实现基础模型在医疗影像任务中的高效适配。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2603.11617v1",
+      "title": "Noise-aware few-shot learning through bi-directional multi-view prompt alignment",
+      "abstract": "Vision-language models offer strong few-shot capability through prompt tuning but remain vulnerable to noisy labels, which can corrupt prompts and degrade cross-modal alignment. Existing approaches struggle because they often lack the ability to model fine-grained semantic cues and to adaptively separate clean from noisy signals. To address these challenges, we propose NA-MVP, a framework for Noise-Aware few-shot learning through bi-directional Multi-View Prompt alignment. NA-MVP is built upon a key conceptual shift: robust prompt learning requires moving from global matching to region-aware alignment that explicitly distinguishes clean cues from noisy ones. To realize this, NA-MVP employs (1) multi-view prompts combined with unbalanced optimal transport to achieve fine-grained patch-to-prompt correspondence while suppressing unreliable regions; (2) a bi-directional prompt design that captures complementary clean-oriented and noise-aware cues, enabling the model to focus on stable semantics; and (3) an alignment-guided selective refinement strategy that uses optimal transport to correct only mislabeled samples while retaining reliable data. Experiments on synthetic and real-world noisy benchmarks demonstrate that NA-MVP consistently outperforms state-of-the-art baselines, confirming its effectiveness in enabling robust few-shot learning under noisy supervision.",
+      "authors": [
+        "Lu Niu",
+        "Cheng Xue"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-12T07:17:28+00:00",
+      "link": "https://arxiv.org/pdf/2603.11617v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Noise-aware prompt tuning for vision-language models",
+      "llm_evidence_cn": "视觉语言模型的噪声感知提示微调",
+      "llm_evidence": "视觉语言模型的噪声感知提示微调",
+      "canonical_evidence": "视觉语言模型的噪声感知提示微调",
+      "llm_tldr_en": "Proposes NA-MVP for robust few-shot prompt tuning by aligning multi-view prompts to handle noisy labels.",
+      "llm_tldr_cn": "提出NA-MVP框架，通过多视图提示对齐实现鲁棒的少样本提示微调，解决标签噪声问题。",
+      "llm_tldr": "提出NA-MVP框架，通过多视图提示对齐实现鲁棒的少样本提示微调，解决标签噪声问题。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Soft prompt tuning and prefix tuning techniques",
+      "matched_requirement_id": "req-3",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2603.07895v1",
+      "title": "MINT: Molecularly Informed Training with Spatial Transcriptomics Supervision for Pathology Foundation Models",
+      "abstract": "Pathology foundation models learn morphological representations through self-supervised pretraining on large-scale whole-slide images, yet they do not explicitly capture the underlying molecular state of the tissue. Spatial transcriptomics technologies bridge this gap by measuring gene expression in situ, offering a natural cross-modal supervisory signal. We propose MINT (Molecularly Informed Training), a fine-tuning framework that incorporates spatial transcriptomics supervision into pretrained pathology Vision Transformers. MINT appends a learnable ST token to the ViT input to encode transcriptomic information separately from the morphological CLS token, preventing catastrophic forgetting through DINO self-distillation and explicit feature anchoring to the frozen pretrained encoder. Gene expression regression at both spot-level (Visium) and patch-level (Xenium) resolutions provides complementary supervision across spatial scales. Trained on 577 publicly available HEST samples, MINT achieves the best overall performance on both HEST-Bench for gene expression prediction (mean Pearson r = 0.440) and EVA for general pathology tasks (0.803), demonstrating that spatial transcriptomics supervision complements morphology-centric self-supervised pretraining.",
+      "authors": [
+        "Minsoo Lee",
+        "Jonghyun Kim",
+        "Juseung Yun",
+        "Sunwoo Yu",
+        "Jongseong Jang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-09T02:29:10+00:00",
+      "link": "https://arxiv.org/pdf/2603.07895v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Fine-tuning framework using learnable tokens for foundation models",
+      "llm_evidence_cn": "使用可学习Token的基础模型微调框架",
+      "llm_evidence": "使用可学习Token的基础模型微调框架",
+      "canonical_evidence": "使用可学习Token的基础模型微调框架",
+      "llm_tldr_en": "MINT uses a learnable ST token to fine-tune pathology foundation models with spatial transcriptomics.",
+      "llm_tldr_cn": "MINT框架通过添加可学习的ST Token，将空间转录组学监督引入病理基础模型的微调中。",
+      "llm_tldr": "MINT框架通过添加可学习的ST Token，将空间转录组学监督引入病理基础模型的微调中。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "New architectures for low resource model fine tuning",
+      "matched_requirement_id": "req-11",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.04800v1",
+      "title": "MASQuant: Modality-Aware Smoothing Quantization for Multimodal Large Language Models",
+      "abstract": "Post-training quantization (PTQ) with computational invariance for Large Language Models~(LLMs) have demonstrated remarkable advances, however, their application to Multimodal Large Language Models~(MLLMs) presents substantial challenges. In this paper, we analyze SmoothQuant as a case study and identify two critical issues: Smoothing Misalignment and Cross-Modal Computational Invariance. To address these issues, we propose Modality-Aware Smoothing Quantization (MASQuant), a novel framework that introduces (1) Modality-Aware Smoothing (MAS), which learns separate, modality-specific smoothing factors to prevent Smoothing Misalignment, and (2) Cross-Modal Compensation (CMC), which addresses Cross-modal Computational Invariance by using SVD whitening to transform multi-modal activation differences into low-rank forms, enabling unified quantization across modalities. MASQuant demonstrates stable quantization performance across both dual-modal and tri-modal MLLMs. Experimental results show that MASQuant is competitive among the state-of-the-art PTQ algorithms. Source code: https://github.com/alibaba/EfficientAI.",
+      "authors": [
+        "Lulu Hu",
+        "Wenhu Xiao",
+        "Xin Chen",
+        "Xinhua Xu",
+        "Bowen Xu",
+        "Kun Li",
+        "Yongliang Tao"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-03-05T04:41:32+00:00",
+      "link": "https://arxiv.org/pdf/2603.04800v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Quantization for Multimodal LLMs using SVD",
+      "llm_evidence_cn": "使用SVD的多模态大模型量化",
+      "llm_evidence": "使用SVD的多模态大模型量化",
+      "canonical_evidence": "使用SVD的多模态大模型量化",
+      "llm_tldr_en": "Introduces modality-aware smoothing and SVD-based compensation for multimodal LLM quantization.",
+      "llm_tldr_cn": "为多模态大模型量化引入模态感知平滑和基于SVD的补偿机制。",
+      "llm_tldr": "为多模态大模型量化引入模态感知平滑和基于SVD的补偿机制。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Quantized Low-Rank Adaptation for LLMs",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.09938v1",
+      "title": "Model Merging in the Era of Large Language Models: Methods, Applications, and Future Directions",
+      "abstract": "Model merging has emerged as a transformative paradigm for combining the capabilities of multiple neural networks into a single unified model without additional training. With the rapid proliferation of fine-tuned large language models~(LLMs), merging techniques offer a computationally efficient alternative to ensembles and full retraining, enabling practitioners to compose specialized capabilities at minimal cost. This survey presents a comprehensive and structured examination of model merging in the LLM era through the \\textbf{FUSE} taxonomy, a four-dimensional framework organized along \\textbf{F}oundations, \\textbf{U}nification Strategies, \\textbf{S}cenarios, and \\textbf{E}cosystem. We first establish the theoretical underpinnings of merging, including loss landscape geometry, mode connectivity, and the linear mode connectivity hypothesis. We then systematically review the algorithmic landscape, spanning weight averaging, task vector arithmetic, sparsification-enhanced methods, mixture-of-experts architectures, and evolutionary optimization approaches. For each method family, we analyze the core formulation, highlight representative works, and discuss practical trade-offs. We further examine downstream applications across multi-task learning, safety alignment, domain specialization, multilingual transfer, and federated learning. Finally, we survey the supporting ecosystem of open-source tools, community platforms, and evaluation benchmarks, and identify key open challenges including theoretical gaps, scalability barriers, and standardization needs. This survey aims to equip researchers and practitioners with a structured foundation for advancing model merging.",
+      "authors": [
+        "Mingyang Song",
+        "Mao Zheng"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-03-10T17:31:55+00:00",
+      "link": "https://arxiv.org/pdf/2603.09938v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Model merging as a computationally efficient alternative to retraining fine-tuned LLMs",
+      "llm_evidence_cn": "模型合并作为微调大模型重新训练的计算高效替代方案",
+      "llm_evidence": "模型合并作为微调大模型重新训练的计算高效替代方案",
+      "canonical_evidence": "模型合并作为微调大模型重新训练的计算高效替代方案",
+      "llm_tldr_en": "A survey on model merging techniques that combine specialized LLM capabilities without additional training.",
+      "llm_tldr_cn": "关于模型合并技术的综述，探讨了无需额外训练即可结合大模型专业化能力的方法。",
+      "llm_tldr": "关于模型合并技术的综述，探讨了无需额外训练即可结合大模型专业化能力的方法。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.04822v1",
+      "title": "VISA: Value Injection via Shielded Adaptation for Personalized LLM Alignment",
+      "abstract": "Aligning Large Language Models (LLMs) with nuanced human values remains a critical challenge, as existing methods like Reinforcement Learning from Human Feedback (RLHF) often handle only coarse-grained attributes. In practice, fine-tuning LLMs on task-specific datasets to optimize value alignment inevitably incurs an alignment tax: the model's pre-calibrated value system drifts significantly due to latent bias absorption from training data, while the fine-tuning process also causes severe hallucinations and semantic information loss in generated responses. To address this, we propose VISA (Value Injection via Shielded Adaptation), a closed-loop framework designed to navigate this trade-off. VISA's architecture features a high-precision value detector, a semantic-to-value translator, and a core value-rewriter. The value-rewriter is trained via Group Relative Policy Optimization (GRPO) with a composite reward function that simultaneously optimizes for fine-grained value precision, and the preservation of semantic integrity. By learning an optimal policy to balance these competing objectives, VISA effectively mitigates the alignment tax while staying loyal to the original knowledge. Our experiments demonstrate that this approach enables precise control over a model's value expression while maintaining its factual consistency and general capabilities, significantly outperforming both standard fine-tuning methods and prompting-based baselines, including GPT-4o.",
+      "authors": [
+        "Jiawei Chen",
+        "Tianzhuo Yang",
+        "Guoxi Zhang",
+        "Jiaming Ji",
+        "Yaodong Yang",
+        "Juntao Dai"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-03-05T05:12:26+00:00",
+      "link": "https://arxiv.org/pdf/2603.04822v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Shielded adaptation for personalized LLM alignment",
+      "llm_evidence_cn": "用于个性化大模型对齐的屏蔽适配",
+      "llm_evidence": "用于个性化大模型对齐的屏蔽适配",
+      "canonical_evidence": "用于个性化大模型对齐的屏蔽适配",
+      "llm_tldr_en": "Proposes VISA to balance task-specific fine-tuning and pre-calibrated value alignment in LLMs.",
+      "llm_tldr_cn": "提出VISA框架，旨在平衡大模型任务微调与预设价值观对齐之间的冲突。",
+      "llm_tldr": "提出VISA框架，旨在平衡大模型任务微调与预设价值观对齐之间的冲突。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.11021v1",
+      "title": "Leech Lattice Vector Quantization for Efficient LLM Compression",
+      "abstract": "Scalar quantization of large language models (LLMs) is fundamentally limited by information-theoretic bounds. While vector quantization (VQ) overcomes these limits by encoding blocks of parameters jointly, practical implementations must avoid the need for expensive lookup mechanisms or other explicit codebook storage. Lattice approaches address this through highly structured and dense packing. This paper explores the Leech lattice, which, with its optimal sphere packing and kissing configurations at 24 dimensions, is the highest dimensional lattice known with such optimal properties. To make the Leech lattice usable for LLM quantization, we extend an existing search algorithm based on the extended Golay code construction, to i) support indexing, enabling conversion to and from bitstrings without materializing the codebook, ii) allow angular search over union of Leech lattice shells, iii) propose fully-parallelisable dequantization kernel. Together this yields a practical algorithm, namely Leech Lattice Vector Quantization (LLVQ). LLVQ delivers state-of-the-art LLM quantization performance, outperforming recent methods such as Quip\\#, QTIP, and PVQ. These results highlight the importance of high-dimensional lattices for scalable, theoretically grounded model compression.",
+      "authors": [
+        "Tycho F. A. van der Ouderaa",
+        "Mart van Baalen",
+        "Paul Whatmough",
+        "Markus Nagel"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-03-11T17:48:45+00:00",
+      "link": "https://arxiv.org/pdf/2603.11021v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Leech lattice vector quantization for efficient LLM compression",
+      "llm_evidence_cn": "用于高效LLM压缩的Leech晶格矢量量化",
+      "llm_evidence": "用于高效LLM压缩的Leech晶格矢量量化",
+      "canonical_evidence": "用于高效LLM压缩的Leech晶格矢量量化",
+      "llm_tldr_en": "Explores high-dimensional lattice vector quantization for efficient LLM compression and parameter reduction.",
+      "llm_tldr_cn": "探索高维晶格矢量量化技术，用于大语言模型的高效压缩与参数优化。",
+      "llm_tldr": "探索高维晶格矢量量化技术，用于大语言模型的高效压缩与参数优化。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Quantized Low-Rank Adaptation for LLMs",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.04862v1",
+      "title": "Focus Then Listen: Exploring Plug-and-Play Audio Enhancer for Noise-Robust Large Audio Language Models",
+      "abstract": "Large audio language models (LALMs) are a class of foundation models for audio understanding. Existing LALMs tend to degrade significantly in real-world noisy acoustic conditions where speech and non-speech sounds interfere. While noise-aware fine-tuning can improve robustness, it requires task-specific noisy data and expensive retraining, limiting scalability. To address this issue, we propose Focus-Then-Listen (FTL), a plug-and-play audio enhancer that improves LALMs' noise robustness. Specifically, FTL first separates the input waveform into speech and non-speech, and a modality router is applied to predict the target audio modality (e.g., speech) based on the user's instruction. Finally, a modality-aware fusion block generates a task-adaptive enhanced signal for improved downstream perception and reasoning. Experiments across multiple LALMs and tasks show that FTL improves performance across different noise levels without fine-tuning on LALMs.",
+      "authors": [
+        "Han Yin",
+        "Yang Xiao",
+        "Younghoo Kwon",
+        "Ting Dang",
+        "Jung-Woo Choi"
+      ],
+      "primary_category": "cs.SD",
+      "categories": [
+        "cs.SD"
+      ],
+      "published": "2026-03-05T06:35:59+00:00",
+      "link": "https://arxiv.org/pdf/2603.04862v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "plug-and-play adaptation for audio language models",
+      "llm_evidence_cn": "音频语言模型的即插即用适配",
+      "llm_evidence": "音频语言模型的即插即用适配",
+      "canonical_evidence": "音频语言模型的即插即用适配",
+      "llm_tldr_en": "Proposes a plug-and-play enhancer to improve audio LLM robustness without expensive retraining.",
+      "llm_tldr_cn": "提出一种即插即用增强器，无需昂贵的重新训练即可提高音频大模型的鲁棒性。",
+      "llm_tldr": "提出一种即插即用增强器，无需昂贵的重新训练即可提高音频大模型的鲁棒性。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Recent advances in efficient adaptation of large language models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.11542v1",
+      "title": "ReHARK: Refined Hybrid Adaptive RBF Kernels for Robust One-Shot Vision-Language Adaptation",
+      "abstract": "The adaptation of large-scale Vision-Language Models (VLMs) like CLIP to downstream tasks with extremely limited data -- specifically in the one-shot regime -- is often hindered by a significant \"Stability-Plasticity\" dilemma. While efficient caching mechanisms have been introduced by training-free methods such as Tip-Adapter, these approaches often function as local Nadaraya-Watson estimators. Such estimators are characterized by inherent boundary bias and a lack of global structural regularization. In this paper, ReHARK (Refined Hybrid Adaptive RBF Kernels) is proposed as a synergistic training-free framework that reinterprets few-shot adaptation through global proximal regularization in a Reproducing Kernel Hilbert Space (RKHS). A multistage refinement pipeline is introduced, consisting of: (1) Hybrid Prior Construction, where zero-shot textual knowledge from CLIP and GPT-3 is fused with visual class prototypes to form a robust semantic-visual anchor; (2) Support Set Augmentation (Bridging), where intermediate samples are generated to smooth the transition between visual and textual modalities; (3) Adaptive Distribution Rectification, where test feature statistics are aligned with the augmented support set to mitigate domain shifts; and (4) Multi-Scale RBF Kernels, where an ensemble of kernels is employed to capture complex feature geometries across diverse scales. Superior stability and accuracy are demonstrated through extensive experiments on 11 diverse benchmarks. A new state-of-the-art for one-shot adaptation is established by ReHARK, which achieves an average accuracy of 65.83%, significantly outperforming existing baselines. Code is available at https://github.com/Jahid12012021/ReHARK.",
+      "authors": [
+        "Md Jahidul Islam"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-03-12T04:59:09+00:00",
+      "link": "https://arxiv.org/pdf/2603.11542v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "One-shot vision-language adaptation using training-free framework",
+      "llm_evidence_cn": "使用无需训练的框架进行单样本视觉语言适配",
+      "llm_evidence": "使用无需训练的框架进行单样本视觉语言适配",
+      "canonical_evidence": "使用无需训练的框架进行单样本视觉语言适配",
+      "llm_tldr_en": "Proposes a training-free framework for robust one-shot adaptation of large-scale vision-language models.",
+      "llm_tldr_cn": "提出一种无需训练的框架，用于大规模视觉语言模型的鲁棒单样本适配。",
+      "llm_tldr": "提出一种无需训练的框架，用于大规模视觉语言模型的鲁棒单样本适配。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Recent advances in efficient adaptation of large language models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.04964v1",
+      "title": "Replaying pre-training data improves fine-tuning",
+      "abstract": "To obtain a language model for a target domain (e.g. math), the current paradigm is to pre-train on a vast amount of generic web text and then fine-tune on the relatively limited amount of target data. Typically, generic data is only mixed in during fine-tuning to prevent catastrophic forgetting of the generic domain. We surprisingly find that replaying the generic data during fine-tuning can actually improve performance on the (less related) target task. Concretely, in a controlled pre-training environment with 4M target tokens, 4B total tokens, and 150M parameter models, generic replay increases target data efficiency by up to $1.87\\times$ for fine-tuning and $2.06\\times$ for mid-training. We further analyze data schedules that introduce target data during pre-training and find that replay helps more when there is less target data present in pre-training. We demonstrate the success of replay in practice for fine-tuning 8B parameter models, improving agentic web navigation success by $4.5\\%$ and Basque question-answering accuracy by $2\\%$.",
+      "authors": [
+        "Suhas Kotha",
+        "Percy Liang"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.LG"
+      ],
+      "published": "2026-03-05T09:00:49+00:00",
+      "link": "https://arxiv.org/pdf/2603.04964v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "improves fine-tuning efficiency and performance via data replay",
+      "llm_evidence_cn": "通过数据重放提高微调效率和性能",
+      "llm_evidence": "通过数据重放提高微调效率和性能",
+      "canonical_evidence": "通过数据重放提高微调效率和性能",
+      "llm_tldr_en": "Demonstrates that replaying pre-training data during fine-tuning significantly improves target data efficiency.",
+      "llm_tldr_cn": "证明在微调过程中重放预训练数据可以显著提高目标数据的微调效率。",
+      "llm_tldr": "证明在微调过程中重放预训练数据可以显著提高目标数据的微调效率。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.05168v1",
+      "title": "Sparse-BitNet: 1.58-bit LLMs are Naturally Friendly to Semi-Structured Sparsity",
+      "abstract": "Semi-structured N:M sparsity and low-bit quantization (e.g., 1.58-bit BitNet) are two promising approaches for improving the efficiency of large language models (LLMs), yet they have largely been studied in isolation. In this work, we investigate their interaction and show that 1.58-bit BitNet is naturally more compatible with N:M sparsity than full-precision models. To study this effect, we propose Sparse-BitNet, a unified framework that jointly applies 1.58-bit quantization and dynamic N:M sparsification while ensuring stable training for the first time. Across multiple model scales and training regimes (sparse pretraining and dense-to-sparse schedules), 1.58-bit BitNet consistently exhibits smaller performance degradation than full-precision baselines at the same sparsity levels and can tolerate higher structured sparsity before accuracy collapse. Moreover, using our custom sparse tensor core, Sparse-BitNet achieves substantial speedups in both training and inference, reaching up to 1.30X. These results highlight that combining extremely low-bit quantization with semi-structured N:M sparsity is a promising direction for efficient LLMs. Code available at https://github.com/AAzdi/Sparse-BitNet",
+      "authors": [
+        "Di Zhang",
+        "Xun Wu",
+        "Shaohan Huang",
+        "Yudong Wang",
+        "Hanyong Shao",
+        "Yingbo Hao",
+        "Zewen Chi",
+        "Li Dong",
+        "Ting Song",
+        "Yan Xia",
+        "Zhifang Sui",
+        "Furu Wei"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-03-05T13:37:50+00:00",
+      "link": "https://arxiv.org/pdf/2603.05168v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "low-bit quantization and efficiency for LLMs",
+      "llm_evidence_cn": "大模型的低比特量化与效率研究",
+      "llm_evidence": "大模型的低比特量化与效率研究",
+      "canonical_evidence": "大模型的低比特量化与效率研究",
+      "llm_tldr_en": "Investigates the synergy between 1.58-bit quantization and N:M sparsity for efficient LLM training.",
+      "llm_tldr_cn": "研究了1.58比特量化与N:M稀疏性在大模型高效训练中的协同作用。",
+      "llm_tldr": "研究了1.58比特量化与N:M稀疏性在大模型高效训练中的协同作用。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Quantized Low-Rank Adaptation for LLMs",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.07837v1",
+      "title": "AI Steerability 360: A Toolkit for Steering Large Language Models",
+      "abstract": "The AI Steerability 360 toolkit is an extensible, open-source Python library for steering LLMs. Steering abstractions are designed around four model control surfaces: input (modification of the prompt), structural (modification of the model's weights or architecture), state (modification of the model's activations and attentions), and output (modification of the decoding or generation process). Steering methods exert control on the model through a common interface, termed a steering pipeline, which additionally allows for the composition of multiple steering methods. Comprehensive evaluation and comparison of steering methods/pipelines is facilitated by use case classes (for defining tasks) and a benchmark class (for performance comparison on a given task). The functionality provided by the toolkit significantly lowers the barrier to developing and comprehensively evaluating steering methods. The toolkit is Hugging Face native and is released under an Apache 2.0 license at https://github.com/IBM/AISteer360.",
+      "authors": [
+        "Erik Miehling",
+        "Karthikeyan Natesan Ramamurthy",
+        "Praveen Venkateswaran",
+        "Irene Ko",
+        "Pierre Dognin",
+        "Moninder Singh",
+        "Tejaswini Pedapati",
+        "Avinash Balakrishnan",
+        "Matthew Riemer",
+        "Dennis Wei",
+        "Inge Vejsbjerg",
+        "Elizabeth M. Daly",
+        "Kush R. Varshney"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.AI"
+      ],
+      "published": "2026-03-08T22:44:26+00:00",
+      "link": "https://arxiv.org/pdf/2603.07837v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Toolkit for steering LLMs via structural and input modifications",
+      "llm_evidence_cn": "通过结构和输入修改来引导大模型的工具包",
+      "llm_evidence": "通过结构和输入修改来引导大模型的工具包",
+      "canonical_evidence": "通过结构和输入修改来引导大模型的工具包",
+      "llm_tldr_en": "An open-source library for steering LLMs using input, structural, state, and output modifications.",
+      "llm_tldr_cn": "一个开源Python库，通过输入、结构、状态和输出四个层面的修改来引导和控制大模型行为。",
+      "llm_tldr": "一个开源Python库，通过输入、结构、状态和输出四个层面的修改来引导和控制大模型行为。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.08398v1",
+      "title": "Revealing Behavioral Plasticity in Large Language Models: A Token-Conditional Perspective",
+      "abstract": "In this work, we reveal that Large Language Models (LLMs) possess intrinsic behavioral plasticity-akin to chameleons adapting their coloration to environmental cues-that can be exposed through token-conditional generation and stabilized via reinforcement learning. Specifically, by conditioning generation on carefully selected token prefixes sampled from responses exhibiting desired behaviors, LLMs seamlessly adapt their behavioral modes at inference time (e.g., switching from step-by-step reasoning to direct answering) without retraining. Based on this insight, we propose Token-Conditioned Reinforcement Learning (ToCoRL), a principled framework that leverages RL to internalize this chameleon-like plasticity, transforming transient inference-time adaptations into stable and learnable behavioral patterns. ToCoRL guides exploration with token-conditional generation and keep enhancing exploitation, enabling emergence of appropriate behaviors. Extensive experiments show that ToCoRL enables precise behavioral control without capability degradation. Notably, we show that large reasoning models, while performing strongly on complex mathematics, can be effectively adapted to excel at factual question answering, which was a capability previously hindered by their step-by-step reasoning patterns.",
+      "authors": [
+        "Liyuan Mao",
+        "Le Yu",
+        "Jing Zhou",
+        "Chujie Zheng",
+        "Bowen Yu",
+        "Chang Gao",
+        "Shixuan Liu",
+        "An Yang",
+        "Weinan Zhang",
+        "JunYang Lin"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.AI",
+        "cs.LG"
+      ],
+      "published": "2026-03-09T13:56:53+00:00",
+      "link": "https://arxiv.org/pdf/2603.08398v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Token-conditional generation and prefix sampling",
+      "llm_evidence_cn": "标记条件生成与前缀采样",
+      "llm_evidence": "标记条件生成与前缀采样",
+      "canonical_evidence": "标记条件生成与前缀采样",
+      "llm_tldr_en": "Adapts LLM behavior at inference time using token prefixes and reinforcement learning without retraining.",
+      "llm_tldr_cn": "利用标记前缀和强化学习在推理时调整大模型行为，无需重新训练。",
+      "llm_tldr": "利用标记前缀和强化学习在推理时调整大模型行为，无需重新训练。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Soft prompt tuning and prefix tuning techniques",
+      "matched_requirement_id": "req-3",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}
