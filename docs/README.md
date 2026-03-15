@@ -6,73 +6,56 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-03-13
-- 运行时间：2026-03-13 19:26:12 UTC
+- 最新运行日期：2026-03-15
+- 运行时间：2026-03-15 19:18:27 UTC
 - 运行状态：成功
-- 本次总论文数：17
-- 精读区：6
+- 本次总论文数：11
+- 精读区：0
 - 速读区：11
 
 ### 今日简报（AI）
-今日聚焦 17 篇前沿进展，深度复盘 VLA 模型与持续学习的满分突破。
-核心结论指出强化学习能让视觉-语言-动作模型成为天然的持续学习者，而表示微调则是实现长效学习的关键。
-建议优先研读 VLA 与 RL 结合的实操方案，探索大模型在动态环境下的进化潜力。
-- 详情：[/202603/13/README](/202603/13/README)
+今日速览 11 篇前沿论文，深度聚焦 Transformer 架构演进与低比特量化实战。
+重点解析了 Transformer 在循环记忆与知识储备间的权衡，以及 FP4 量化训练中均值偏差的“双刃剑”效应。
+建议关注如何通过自适应循环提升模型“思考”深度，并警惕量化过程中的精度陷阱。
+- 详情：[/202603/15/README](/202603/15/README)
 
 ### 精读区论文标签
-1. [Simple Recipe Works: Vision-Language-Action Models are Natural Continual Learners with Reinforcement Learning](/202603/13/2603.11653v1-simple-recipe-works-vision-language-action-models-are-natural-continual-learners-with-reinforcement-learning)  
-   标签：评分：10.0/10、query:peft
-   evidence：结合低秩自适应（LoRA）的顺序微调
-2. [Representation Finetuning for Continual Learning](/202603/13/2603.11201v1-representation-finetuning-for-continual-learning)  
-   标签：评分：9.0/10、query:peft
-   evidence：将PEFT范式从权重空间转向表示空间
-3. [Reversible Lifelong Model Editing via Semantic Routing-Based LoRA](/202603/13/2603.11239v1-reversible-lifelong-model-editing-via-semantic-routing-based-lora)  
-   标签：评分：9.0/10、query:peft
-   evidence：基于语义路由的 LoRA 框架，用于参数高效的模型编辑
-4. [AdaFuse: Accelerating Dynamic Adapter Inference via Token-Level Pre-Gating and Fused Kernel Optimization](/202603/13/2603.11873v1-adafuse-accelerating-dynamic-adapter-inference-via-token-level-pre-gating-and-fused-kernel-optimization)  
-   标签：评分：9.0/10、query:peft
-   evidence：加速 LoRA 动态适配器推理
-5. [MIL-PF: Multiple Instance Learning on Precomputed Features for Mammography Classification](/202603/13/2603.09374v1-mil-pf-multiple-instance-learning-on-precomputed-features-for-mammography-classification)  
-   标签：评分：8.0/10、query:peft
-   evidence：仅训练一个小的任务特定模块（4万参数）
-6. [Noise-aware few-shot learning through bi-directional multi-view prompt alignment](/202603/13/2603.11617v1-noise-aware-few-shot-learning-through-bi-directional-multi-view-prompt-alignment)  
-   标签：评分：8.0/10、query:peft
-   evidence：视觉语言模型的噪声感知提示微调
+- 本次无精读推荐。
 
 ### 速读区论文标签
-1. [MINT: Molecularly Informed Training with Spatial Transcriptomics Supervision for Pathology Foundation Models](/202603/13/2603.07895v1-mint-molecularly-informed-training-with-spatial-transcriptomics-supervision-for-pathology-foundation-models)  
+1. [Adaptive Loops and Memory in Transformers: Think Harder or Know More?](/202603/15/2603.08391v2-adaptive-loops-and-memory-in-transformers-think-harder-or-know-more)  
    标签：评分：7.0/10、query:peft
-   evidence：使用可学习Token的基础模型微调框架
-2. [Model Merging in the Era of Large Language Models: Methods, Applications, and Future Directions](/202603/13/2603.09938v1-model-merging-in-the-era-of-large-language-models-methods-applications-and-future-directions)  
+   evidence：通过循环Transformer和自适应机制实现参数高效
+2. [Adaptive Loops and Memory in Transformers: Think Harder or Know More?](/202603/15/2603.08391v3-adaptive-loops-and-memory-in-transformers-think-harder-or-know-more)  
    标签：评分：7.0/10、query:peft
-   evidence：模型合并作为微调大模型重新训练的计算高效替代方案
-3. [Leech Lattice Vector Quantization for Efficient LLM Compression](/202603/13/2603.11021v1-leech-lattice-vector-quantization-for-efficient-llm-compression)  
+   evidence：通过循环Transformer和自适应隐藏状态迭代实现参数效率
+3. [The Curse and Blessing of Mean Bias in FP4-Quantized LLM Training](/202603/15/2603.10444v1-the-curse-and-blessing-of-mean-bias-in-fp4-quantized-llm-training)  
    标签：评分：7.0/10、query:peft
-   evidence：用于高效LLM压缩的Leech晶格矢量量化
-4. [ReHARK: Refined Hybrid Adaptive RBF Kernels for Robust One-Shot Vision-Language Adaptation](/202603/13/2603.11542v1-rehark-refined-hybrid-adaptive-rbf-kernels-for-robust-one-shot-vision-language-adaptation)  
+   evidence：低比特FP4量化LLM训练稳定性
+4. [Dynamics-Predictive Sampling for Active RL Finetuning of Large Reasoning Models](/202603/15/2603.10887v1-dynamics-predictive-sampling-for-active-rl-finetuning-of-large-reasoning-models)  
    标签：评分：7.0/10、query:peft
-   evidence：使用无需训练的框架进行单样本视觉语言适配
-5. [MASQuant: Modality-Aware Smoothing Quantization for Multimodal Large Language Models](/202603/13/2603.04800v1-masquant-modality-aware-smoothing-quantization-for-multimodal-large-language-models)  
+   evidence：大模型的高效强化学习微调
+5. [Matching Features, Not Tokens: Energy-Based Fine-Tuning of Language Models](/202603/15/2603.12248v1-matching-features-not-tokens-energy-based-fine-tuning-of-language-models)  
+   标签：评分：7.0/10、query:peft
+   evidence：语言模型微调的特征匹配目标
+6. [A Unified Framework for Knowledge Transfer in Bidirectional Model Scaling](/202603/15/2603.07506v1-a-unified-framework-for-knowledge-transfer-in-bidirectional-model-scaling)  
    标签：评分：6.0/10、query:peft
-   evidence：使用SVD的多模态大模型量化
-6. [VISA: Value Injection via Shielded Adaptation for Personalized LLM Alignment](/202603/13/2603.04822v1-visa-value-injection-via-shielded-adaptation-for-personalized-llm-alignment)  
+   evidence：统一模型缩放中知识迁移的尺寸无关框架
+7. [Nwāchā Munā: A Devanagari Speech Corpus and Proximal Transfer Benchmark for Nepal Bhasha ASR](/202603/15/2603.07554v1-nwch-mun-a-devanagari-speech-corpus-and-proximal-transfer-benchmark-for-nepal-bhasha-asr)  
    标签：评分：6.0/10、query:peft
-   evidence：用于个性化大模型对齐的屏蔽适配
-7. [Focus Then Listen: Exploring Plug-and-Play Audio Enhancer for Noise-Robust Large Audio Language Models](/202603/13/2603.04862v1-focus-then-listen-exploring-plug-and-play-audio-enhancer-for-noise-robust-large-audio-language-models)  
+   evidence：针对低资源语音识别的微调
+8. [Deterministic Differentiable Structured Pruning for Large Language Models](/202603/15/2603.08065v1-deterministic-differentiable-structured-pruning-for-large-language-models)  
    标签：评分：6.0/10、query:peft
-   evidence：音频语言模型的即插即用适配
-8. [Replaying pre-training data improves fine-tuning](/202603/13/2603.04964v1-replaying-pre-training-data-improves-fine-tuning)  
+   evidence：通过结构化剪枝减少LLM推理成本和架构组件
+9. [High-Fidelity Pruning for Large Language Models](/202603/15/2603.08083v1-high-fidelity-pruning-for-large-language-models)  
    标签：评分：6.0/10、query:peft
-   evidence：通过数据重放提高微调效率和性能
-9. [Sparse-BitNet: 1.58-bit LLMs are Naturally Friendly to Semi-Structured Sparsity](/202603/13/2603.05168v1-sparse-bitnet-158-bit-llms-are-naturally-friendly-to-semi-structured-sparsity)  
+   evidence：用于内存高效部署的高保真剪枝
+10. [Learning Adaptive LLM Decoding](/202603/15/2603.09065v1-learning-adaptive-llm-decoding)  
    标签：评分：6.0/10、query:peft
-   evidence：大模型的低比特量化与效率研究
-10. [AI Steerability 360: A Toolkit for Steering Large Language Models](/202603/13/2603.07837v1-ai-steerability-360-a-toolkit-for-steering-large-language-models)  
+   evidence：用于自适应大模型推理的轻量级解码适配器
+11. [An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse](/202603/15/2603.09463v1-an-empirical-study-and-theoretical-explanation-on-task-level-model-merging-collapse)  
    标签：评分：6.0/10、query:peft
-   evidence：通过结构和输入修改来引导大模型的工具包
-11. [Revealing Behavioral Plasticity in Large Language Models: A Token-Conditional Perspective](/202603/13/2603.08398v1-revealing-behavioral-plasticity-in-large-language-models-a-token-conditional-perspective)  
-   标签：评分：6.0/10、query:peft
-   evidence：标记条件生成与前缀采样
+   evidence：分析独立微调后的LLM模型合并问题
 
 
 <div class="dpr-home-promo-card">

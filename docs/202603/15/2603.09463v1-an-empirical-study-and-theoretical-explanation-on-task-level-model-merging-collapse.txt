@@ -1,0 +1,408 @@
+Title: An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse
+
+URL Source: https://arxiv.org/pdf/2603.09463v1
+
+Published Time: Wed, 11 Mar 2026 00:54:13 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse 
+
+Yuan Cao 1 Dezhi Ran ∗† 1 Yuzhe Guo 1 Mengzhou Wu 1 Simin Chen 2 Linyi Li 3 Wei Yang 4 Tao Xie ∗ 1
+
+## Abstract 
+
+Model merging unifies independently fine-tuned LLMs from the same base, enabling reuse and in-tegration of parallel development efforts without retraining. However, in practice we observe that merging does not always succeed: certain com-binations of task-specialist models suffer from catastrophic performance degradation after merg-ing. We refer to this failure mode as merging collapse. Intuitively, collapse arises when the learned representations or parameter adjustments for different tasks are fundamentally incompat-ible, so that merging forces destructive interfer-ence rather than synergy. In this paper, we identify and characterize the phenomenon of task-level merging collapse, where certain task combina-tions consistently trigger huge performance degra-dation across all merging methods. Through ex-tensive experiments and statistical analysis, we demonstrate that representational incompatibility between tasks is strongly correlated with merg-ing collapse, while parameter-space conflict met-rics show minimal correlation, challenging con-ventional wisdom in model merging literature. We provide a theoretical explanation on this phe-nomenon through rate-distortion theory with a dimension-dependent bound, establishing funda-mental limits on task mergeability regardless of methodology. 
+
+## 1. Introduction 
+
+Large language models (LLMs) (Brown, 2020; Bommasani et al., 2021; Achiam et al., 2023; Grattafiori et al., 2024; 
+
+> *
+
+Co-corresponding authors. †Project Leader. 1Key Lab of HCST (PKU), MOE; SCS, Peking University, Beijing, China 
+
+> 2
+
+Computer Science Department at Columbia University, New York, USA 3School of Computing Science, Simon Fraser University, Burnaby, BC, Canada 4Department of Computer Science, Univer-sity of Texas at Dallas, Richardson, USA. Correspondence to: Tao Xie <taoxie@pku.edu.cn>, Dezhi Ran <dezhiran@pku.edu.cn>. 
+
+Preprint. March 11, 2026. 
+
+Yang et al., 2024a; Guo et al., 2025) have demonstrated remarkable success in numerous downstream tasks from natural language processing (Wang et al., 2018; Hendrycks et al., 2020) to code generation (Lu et al., 2021; Chen et al., 2021; Jain et al., 2024; Li et al., 2024). While LLMs achieve strong general performance (Achiam et al., 2023; Grattafiori et al., 2024; Yang et al., 2024a; Guo et al., 2025), adapt-ing them to specific domains through fine-tuning remains computationally intensive (Yadav et al., 2024a), particularly when multiple specialized variants are required for different tasks or applications (Wolf et al., 2020; Yadav et al., 2024a). This challenge has spurred interests in parameter-efficient methods (Hu et al., 2022; Yadav et al., 2024a) to combine and adapt pretrained models without exhaustive retraining. Among emerging solutions, model merging (Zhang et al., 2019; Wortsman et al., 2022; Ilharco et al., 2023; Yadav et al., 2024a; Yu et al., 2024; Lu et al., 2024) has shown par-ticular promise as a computationally efficient approach to combine multiple fine-tuned LLMs derived from the same base model. By merging model parameters directly, model merging aims to consolidate specialized capabilities into a single unified model while avoiding the costs of addi-tional training. By directly combining model parameters, merging leverages the widely observed linear mode con-nectivity (Frankle et al., 2020; Zhou et al., 2024) between fine-tuned variants to create multi-capability models. Task arithmetic methods (Zhang et al., 2019; Wortsman et al., 2022; Ilharco et al., 2023) and their recent extensions (Ya-dav et al., 2024a; Yu et al., 2024; Lu et al., 2024) have shown particular effectiveness for specific task combina-tions. However, a critical question remains underexplored: What fundamental limitations govern which tasks can be successfully merged without model-merging collapse (de-fined in Section 2)? In this paper, we identify and characterize the phenomenon of task-level merging collapse. Through comprehensive em-pirical analysis spanning five state-of-the-art merging meth-ods (Zhang et al., 2019; Wortsman et al., 2022; Ilharco et al., 2023; Yadav et al., 2024a; Yu et al., 2024), diverse LLM architectures (Grattafiori et al., 2024; Yang et al., 2024a), and fine-tuning approaches (Howard & Ruder, 2018; Hu et al., 2022), we observe a consistent and alarming pattern: 1
+
+> arXiv:2603.09463v1 [cs.AI] 10 Mar 2026 An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse
+
+model merging can catastrophically fail when combining certain task combinations, despite each individual model performing well in isolation. Contrary to the prevailing focus on parameter conflicts (Yadav et al., 2024a), our sta-tistical analysis reveals that parameter-space metrics show minimal correlation. To explain this phenomenon and find better correlated met-ric, we introduce the first theoretical framework for ana-lyzing model merging through the lens of rate-distortion theory (Berger, 2003). Under the Locally Modified Compo-nents (LMC) assumption, we prove a fundamental bound re-lating merging distortion to the geometry of hidden represen-tations. Our dimension-dependent theorem establishes that for representations in Rd, no convex merging method can achieve distortion below ∆2 · d 
+
+> 2( d+1)
+
+, where ∆ is the diam-eter of task-specific representation clusters. Our theoretical analysis aligns with the empirical findings, where hidden-state representational incompatibility at the task level is strongly correlated with merging collapse, providing a bet-ter understanding of what drives merging degradation and actionable insights for guiding task selection in improving model merging. In summary, our main findings and contributions are as follows: • Task-level representational incompatibility drives merging collapse. We demonstrate that merging fail-ure is fundamentally determined by task compatibility rather than methodology, with certain task combina-tions consistently causing catastrophic performance degradation across all merging approaches. Through controlled experiments, we establish that task-level rep-resentational conflicts strongly predict merging failure, while parameter-space conflict metrics show minimal correlation, challenging conventional wisdom in model merging literature. • Dimension-aware theoretical framework. We for-malize task-level merging collapse using information theory, proving that for representations in Rd, the min-imum achievable hidden-state distortion is bounded by 
+
+∆2 · d 
+
+> 2( d+1)
+
+(Theorem 1). This dimension-dependent bound establishes precise quantitative limits on task mergeability, connecting empirical collapse to funda-mental information-theoretic constraints. • Empirical validation of theoretical explanation. We validate our theoretical predictions through extensive experiments across diverse model architectures, tasks, and merging methods. Our results confirm that repre-sentation incompatibility statistically correlates with merging collapse, with observed merging collapse fol-lowing the theoretical explanations. These findings provide a principled explanation for previously puz-zling cases of merging collapse. 
+
+## 2. PRELIMINARY 
+
+The development lifecycle of LLMs (Bommasani et al., 2021) typically follows a two-stage paradigm: pre-training and fine-tuning. While the pre-trained model develops a wide-ranging understanding, the representations learned during pre-training are not optimized for any specific ap-plication, necessitating further fine-tuning on task-specific data with targeted objectives. Let Mθ denote a Foundation Model (FM) with trainable parameters θ, which can represent either the entire model for full fine-tuning or a subset of parameters for parameter-efficient fine-tuning techniques (Hu et al., 2022; Liu et al., 2022; Houlsby et al., 2019). In collaborative FM devel-opment environments, multiple teams often independently fine-tune the same base model for different capabilities or on different data distributions (Touvron et al., 2023), resulting in a collection of specialized models. Consider a set of tasks 
+
+T = {t1, t 2, ..., t n}. The based FM Mθ0 is fine-tuned on each task ti, resulting in fine-tuned model Mθi with updated parameters θi. The distributed development creates the need for effective approaches to consolidate these independently evolved models. 
+
+Model merging. Building upon the independent fine-tuning efforts described above, there arises a crucial need to inte-grate the strengths of multiple specialized models. Model merging (Wortsman et al., 2022; Zhang et al., 2019; Ilharco et al., 2023; Chitale et al., 2023; Ortiz-Jimenez et al., 2024; Yadav et al., 2024a; Yu et al., 2024; Yang et al., 2024b) refers to the process of combining multiple independently fine-tuned models with their parameter updates into a uni-fied model that preserves the capabilities of its constituents. Given the updated parameters {θ1, ..., θ n} obtained from fine-tuning the common base model Mθ0 , the goal of model merging is to produce a consolidated model Mθmerged that preserves the task-specific knowledge from each fine-tuned model. In order to achieve merging task-specific knowledge, many existing works (Hendel et al., 2023; Hojel et al., 2024; Il-harco et al., 2023; Chitale et al., 2023; Ortiz-Jimenez et al., 2024) leverage Task vectors , which provides a concise repre-sentation of the model update resulting from fine-tuning on a specific task. Formally, let θ0 ∈ Rd denote the pre-trained model weights, and θt ∈ Rd the weights after fine-tuning on task t. The task vector is defined as τt = θt − θ0, captur-ing both the direction and magnitude of parameter changes induced by fine-tuning. In other words, τt encodes the element-wise modifications made to the model parameters for adapting to task t. Furthermore, task vectors enable a straightforward approach to model merging: by averaging 2An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse 
+
+the task vectors from n tasks, one can construct a merged model as θmerged = θ0 + ( τ1 + τ2 + · · · + τn)/n .
+
+Parameter update conflicts. When merging models fine-tuned on different tasks, conflicts often arise within the parameter updates (Yadav et al., 2024a; Yang et al., 2024b). A direct and intuitive form of conflict occurs when the ele-ments in task vectors for different tasks have opposite signs, implying that the optimal parameter update for one task may be detrimental to another (Yadav et al., 2024a). However, even in the absence of sign differences, significant dispari-ties in the magnitudes of updates can also lead to suboptimal performance in the merged model. Based on established literature (Huang et al., 2024; Yadav et al., 2024a; Ilharco et al., 2023), we focus on these four metrics to provide a comprehensive view of parameter up-date conflicts. •Parameter magnitude change ratio is the ratio between the sum of the difference of each parameter of the same po-sition and the sum of two models’ task vectors’ magnitude. •Parameter sign change ratio is the ratio between the number of positions where two models’ task vector not sharing a same sign and the total number of parameters positions. •Conflicting parameter magnitude change ratio is the ratio between the difference of parameters at positions where two models’ task vector not sharing a same sign and the sum of two models’ task vectors’ magnitude. •Average cosine similarity between pair’s task vec-tors stands for the average cosine similarity between two model’s parameter vectors. 
+
+Merging collapse . Similar to model collapse training on synthesis data (Shumailov et al., 2024), we introduce the concept of merging collapse as phenomenon when distinct fine-tuned models cannot be successfully combined by a given model merging technique while preserving their orig-inal capabilities. Formally, let P (θi, T i) denote the per-formance of model Mθi on task Ti, we quantify merging collapse using the merging loss −100% ≤ L(Ti) ≤ 0% on each task Ti:
+
+L(Ti) = ( P(θmerged , T i)
+
+P(θi, T i) − 1) × 100% (1) As for multiple tasks, we further define the average merging loss across all tasks as the arithmetic mean. In the analysis that follows, we omit the percentage sign “%” for simplicity. 
+
+## 3. Empirical Investigation of Task-Level Model-Merging Collapse 
+
+While previous work has demonstrated that model merging can effectively combine knowledge from multiple fine-tuned models, these studies typically focus on specific merging techniques (Yadav et al., 2024a; Yu et al., 2024) or specific model architecture (Yadav et al., 2024b). A comprehensive understanding of when and why model merging succeeds or fail across different conditions remains an open challenge. To bridge the gap, we conduct a comprehensive empirical study answering the following research questions: • RQ1: How consistently does merging collapse occur across different merging techniques? • RQ2: To what extent is merging collapse method-dependent or task-dependent? Do different merging techniques exhibit similar collapse patterns when con-fronted with the same task combinations? • RQ3: What factor best correlates with merging com-patibility? In particular, how do representation-space metrics (capturing task-level conflicts) compare to parameter-space metrics (measuring weight update conflicts) in explaining merging collapse? 
+
+3.1. Study Setup Models and datasets. We randomly select 64 checkpoints from Lots-of-LoRAs Collection (Brüel-Gabrielsson et al., 2024) to cover a diverse range of tasks, which are fine-tuned with LoRA (Hu et al., 2022) from Mistral-7B (Jiang et al., 2023). We also choose eight tasks COLA, MNLI, MRPC, QNLI, QQP, RTE, SST-2 and WNLI from the GLUE dataset (Wang et al., 2018), which are widely used by previous work (Yadav et al., 2024a; Lu et al., 2024) for evaluating model merging techniques. We fine-tune 5 models including Llama3.2-3B (Grattafiori et al., 2024), Llama3.1-8B (Grattafiori et al., 2024), Qwen2.5-3B, 7B, and 14B (Yang et al., 2024a), T5-Base, T5-Large, and T5-XL (Raffel et al., 2023). These models cover different scales (from 300M to 14B), architectures (decoder-only and encoder-decoder), and training approaches (instruction tuning and task-specific fine-tuning) to improve the repre-sentativeness of our findings. We fine-tune these models on the eight GLUE tasks, resulting in 64 model checkpoints. 
+
+Model merging techniques. We experiment with five state-of-the-art model merging techniques including Lin-ear Averaging (LA) (Zhang et al., 2019; Wortsman et al., 2022), Task Arithmetic (TA) (Ilharco et al., 2023; Chi-tale et al., 2023; Ortiz-Jimenez et al., 2024), TIES (Yadav et al., 2024a), DARE (Yu et al., 2024), and SLERP (Free-den & Törnig, 1981; Goddard et al., 2024) implemented in MergeKit (Goddard et al., 2024). 3An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse                                                                                                                               
+
+> Table 1. Merging Losses on GLUE tasks across Different Merging Techniques and Models.
+> Model Merging Techniques LA TA TIES DARE SLERP
+> Llama3.2-3B 17.3 ±7.5 17.6 ±7.8 21.8 ±16.9 57.0 ±27.5 17.5 ±8.0 Llama3.1-8B 22.0 ±22.2 22.0 ±22.2 31.7 ±19.9 66.1 ±27.9 22.2 ±23.0 Qwen2.5-3B 13.7 ±15.1 13.6 ±15.2 13.3 ±13.0 27.1 ±16.8 13.1 ±14.7 Qwen2.5-7B 17.4 ±23.3 17.0 ±22.2 26.1 ±24.3 62.6 ±24.6 17.6 ±22.6 Qwen2.5-14B 19.0 ±26.3 19.1 ±26.9 18.6 ±25.7 31.9 ±27.8 18.9 ±26.3 T5-Base 29.0 ±19.5 29.5 ±20.5 31.6 ±21.4 44.5 ±13.1 27.7 ±22.5 T5-Large 26.3 ±24.9 34.4 ±27.0 26.8 ±23.5 28.2 ±27.2 28.2 ±27.2 T5-XL 20.0 ±18.8 19.4 ±18.2 19.3 ±18.7 21.2 ±17.3 25.7 ±23.3
+
+Merging settings. For GLUE tasks, we merge every 8 fine-tuned checkpoints from the same base model with all the five model merging techniques. For model checkpoints from Lots-of-LoRAs, we generate 25 task groups (a) ~(y)of merg-ing tasks, with each group containing 8 randomly selected checkpoints. We reproduce linear averaging, task arithmetic and TIES on these checkpoint groups. 
+
+Evaluation metrics. In merging experiments of Lots-of-LoRAs, we measure the performance with rougeL (Lin, 2004) as Lots-of-LoRAs mentioned. In merging experi-ments of checkpoints fine-tuned on GLUE dataset, we mea-sure the performance by classification accuracy. We use the merging loss defined by Equation 1 in Section 2 to quantita-tively measure the model mergeability. 
+
+3.2. RQ1: Model Merging Collapse 
+
+First, we conduct comprehensive experiments on GLUE tasks. Table 1 presents the merging loss range of existing merging techniques on GLUE tasks from which we have two major observations. 
+
+All models suffer from severe mergeability issues in model merging. Regardless of model architecture, model size, or merging technique, every model examined exhibits substantial merging losses when combining multiple models simultaneously. Even the best-performing combinations show double-digit merging losses, with values reaching to -32.8 across different configurations for GLUE tasks. This universal degradation demonstrates that current merg-ing techniques fundamentally break down when scaled to practical multi-model scenarios that more closely resemble real-world deployment needs. 
+
+No model merging technique overcomes the mergeability issue in model merging. While certain techniques perform marginally better in specific contexts, none successfully mit-igates the fundamental mergeability problem at scale. This suggests that mergeability limitations represent an inherent challenge to scaled model merging rather than merely a tech-nical limitation of current approaches. The DARE technique exhibits a steepest increase in loss, which is found out to be due to its failure on certain task as previous work (Deng et al., 2025) shows. Other techniques like LA, TA, TIES, and SLERP show more moderate but still significant loss, typically ranging from 10-25%. To further validate the generalization of model-merging collapse across different models and merging techniques, we conduct comprehensive experiments on Lots-of-LoRAs task groups. Out of the 25 Lots-of-LoRAs task groups we merge, 2/3 of them experience a worst performance loss of more than 30% when merged, and only one group maintains performance within 10% of the original models, demonstrating that severe merging collapse is the norm rather than the exception. 
+
+Answer to RQ1: Model-merging collapse do exist for all merging techniques. Even the best-performing merg-ing techniques show significant degradation. This sug-gests mergeability limitations are inherent to scaled model merging rather than technical shortcomings of specific technique. 
+
+3.3. RQ2: Method vs. Task Dependence in Merging Collapse 
+
+To investigate whether the revealed merging collapse in RQ1 is due to the imperfection of existing merging methods or due to the inherent incompatibility of model checkpoints, in Table 2 we present a detailed merging results with Qwen2.5 models. It can be observed from Table 2 that there exists some tasks, such as MRPC and WNLI, seem to suffer severe merging loss across all merging techniques, indicating the choice of merging technique has little impact over perfor-mance in certain tasks. We further conduct statistic tests on how merging technique and merged task are correlated to merging loss. The sta-tistical evidence presented in Table 3 provides compelling support for task-level incompatibility as the primary cause of merging collapse. Both tables show a stark contrast in p-values between merging technique-level and task-level ef-fects. These consistent findings across different datasets and model architectures strongly suggest that merging collapse stems primarily from fundamental task incompatibilities rather than limitations in merging techniques. The choice of merging technique appears to have minimal impact on per-formance compared to the inherent compatibility between task representations, confirming our hypothesis that certain tasks face intrinsic barriers to successful merging regardless of the techniques employed. 
+
+Answer to RQ2: Statistical analysis reveals that merging collapse is primarily task-dependent rather than method-dependent. The highly significant task-level effects con-trasted with non-significant merging technique-level ef-fects across both datasets demonstrate that inherent task incompatibilities, not methodological limitations, are the key to merging collapse. 4An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse                                                                                                                                                                                                                                                                                    
+
+> Table 2. Effectiveness of different merging methods on NLP Tasks with Qwen2.5 Models.
+> Model Merging NLP Tasks COLA MNLI MRPC QNLI QQP RTE SST-2 WNLI FT M(∆) FT M(∆) FT M(∆) FT M(∆) FT M(∆) FT M(∆) FT M(∆) FT M(∆)
+> 3B LA 82.7 81.0 (-2.1) 88.4 86.2 (-2.4) 89.5 75.5 (-15.6) 92.6 85.0 (-8.2) 84.2 62.6 (-25.7) 90.3 85.2 (-5.6) 95.4 93.7 (-1.8) 73.2 38.0 (-48.1) TA 82.7 81.2 (-1.9) 88.4 86.2 (-2.5) 89.5 75.5 (-15.6) 92.6 85.1 (-8.1) 84.2 62.6 (-25.7) 90.3 85.6 (-5.2) 95.4 93.6 (-1.9) 73.2 38.0 (-48.1) TIES 82.7 79.2 (-4.3) 88.4 87.8 (-0.7) 89.5 83.6 (-6.6) 92.6 67.8 (-26.9) 84.2 63.2 (-24.9) 90.3 87.7 (-2.8) 95.4 91.9 (-3.7) 73.2 46.5 (-36.5) DARE 82.7 70.4 (-14.9) 88.4 35.4 (-60.0) 89.5 82.6 (-7.7) 92.6 50.6 (-45.4) 84.2 63.2 (-24.9) 90.3 80.9 (-10.4) 95.4 73.7 (-22.7) 73.2 50.7 (-30.8) SLERP 82.7 81.7 (-1.3) 88.4 86.2 (-2.4) 89.5 76.0 (-15.1) 92.6 85.4 (-7.8) 84.2 62.6 (-25.6) 90.3 85.9 (-4.8) 95.4 93.7 (-1.8) 73.2 39.4 (-46.2) 7B LA 86.1 82.5 (-4.2) 90.8 86.1 (-5.1) 88.0 74.0 (-15.9) 95.3 88.3 (-7.4) 88.0 63.2 (-28.2) 89.9 88.1 (-2.0) 96.0 94.5 (-1.6) 78.9 19.7 (-75.0) TA 86.1 82.9 (-3.7) 90.8 86.1 (-5.1) 88.0 74.0 (-15.9) 95.3 88.1 (-7.6) 88.0 63.2 (-28.2) 89.9 87.4 (-2.8) 96.0 94.4 (-1.7) 78.9 22.5 (-71.4) TIES 86.1 62.2 (-27.7) 90.8 88.2 (-2.8) 88.0 55.4 (-37.0) 95.3 64.4 (-32.5) 88.0 63.2 (-28.2) 89.9 89.5 (-0.4) 96.0 94.4 (-1.7) 78.9 16.9 (-78.6) DARE 86.1 0.0 (-100.0) 90.8 27.0 (-70.2) 88.0 31.6 (-64.1) 95.3 50.5 (-47.0) 88.0 63.2 (-28.2) 89.9 47.7 (-47.0) 96.0 0.0 (-100.0) 78.9 43.7 (-44.6) SLERP 86.1 82.6 (-4.0) 90.8 86.2 (-5.0) 88.0 73.3 (-16.7) 95.3 88.4 (-7.3) 88.0 63.2 (-28.2) 89.9 85.9 (-4.4) 96.0 94.4 (-1.7) 78.9 21.1 (-73.2) 14B LA 88.1 81.5 (-7.5) 91.9 90.1 (-1.9) 90.4 78.2 (-13.6) 95.9 89.0 (-7.2) 88.7 62.4 (-29.7) 93.9 88.8 (-5.4) 97.1 95.1 (-2.1) 84.5 12.7 (-85.0) TA 88.1 81.4 (-7.6) 91.9 90.2 (-1.9) 90.4 78.7 (-13.0) 95.9 89.0 (-7.3) 88.7 62.4 (-29.7) 93.9 89.2 (-5.0) 97.1 95.2 (-2.0) 84.5 11.3 (-86.7) TIES 88.1 81.6 (-7.4) 91.9 88.2 (-4.1) 90.4 81.6 (-9.8) 95.9 81.5 (-15.1) 88.7 70.8 (-20.2) 93.9 88.1 (-6.2) 97.1 96.1 (-1.1) 84.5 12.7 (-85.0) DARE 88.1 28.4 (-67.8) 91.9 57.8 (-37.1) 90.4 85.5 (-5.4) 95.9 50.5 (-47.3) 88.7 76.0 (-14.3) 93.9 92.1 (-1.9) 97.1 92.4 (-4.8) 84.5 19.7 (-76.7) SLERP 88.1 81.4 (-7.6) 91.9 90.2 (-1.9) 90.4 78.9 (-12.7) 95.9 89.2 (-7.0) 88.7 62.4 (-29.6) 93.9 88.4 (-5.8) 97.1 95.2 (-2.0) 84.5 12.7 (-85.0)
+> *FT: Fine-tuned model performance; M(∆) : Performance after merging and the negative number of merging loss following Equation 1.
+
+Table 3. P-values of One-way ANOVA F-tests (Maxwell et al., 2017) for Task-level and Merging-technique-level Effects. p < 
+
+0.05 indicates statistical significance. 
+
+Task Setting Merging Tech. Task 
+
+Glue 0.575 2.357 × 10 −36 
+
+Lots-of-LoRAs 0.987 1.699 × 10 −7
+
+3.4. RQ3: Correlative Factors for Merging Collapse 
+
+3.4.1. T HEORETICAL EXPLANATION 
+
+Our empirical results establish a clear pattern, where merg-ing collapse is not determined methodological choices but inherent task incompatibility. To shed light on these empirical results with theoretical analysis, we develop a theoretical framework that formalizes the relationship between representational incompatibility and merging collapse. By modeling the merging process through the lens of rate-distortion theory (Berger, 2003), we can establish lower bounds on the minimum distortion achievable when com-bining representations from different tasks. Under the as-sumption of LMC (Frankle et al., 2020), which is widely observed in pre-training and fine-tuning paradigm (Zhou et al., 2024), we prove the following theorem. 
+
+Theorem 1 (Hidden–State Diameter Controls Mergeability) .
+
+Let { θi}Ni=1 ⊂ Rp be N fine-tuned minima of the same base network F (·; θ), and let h(x; θ) ∈ Rd be a fixed hid-den layer. Assume linear mode connectivity (LMC): every convex combination P
+
+i αiθi (αi ≥ 0, P αi = 1 ) attains the same training loss ≤ ε. Denote 
+
+d2(i, j ) = EX h(X; θi)−h(X; θj ) 22, ∆ = max 
+
+i,j d(i, j )
+
+and for any candidate merged model ˆθ define the worst-case hidden-state distortion δmax (ˆθ) = max i EX∥h(X; ˆθ) −
+
+h(X; θi)∥22.
+
+(i) (Achievability) There exists a convex merge ¯θ = P
+
+i αiθi
+
+such that δmax (¯θ) ≤ d
+
+2( d+1) ∆2.(ii) (Converse) Every merge satisfies δmax (ˆθ) ≥ 14 ∆2;hence 14 ∆2 is the minimum attainable distortion D⋆.(iii) Viewing I ∼ Unif {1, . . . , N } and Y = h(X; θI ) as the source, the Shannon rate–distortion curve obeys R(D) = 0 
+
+iff D ≥ D⋆, and R(D) ≥ log 2 N for D < D ⋆.Consequently, under LMC the single scalar ∆ com-pletely characterises (a) whether the experts are mergeable within a budget Dbudget and (b) the zero-rate point of the rate–distortion function. Sketch. Since LMC implies linearity of hidden states in parameter space , the hidden representation of any convex merge lies in the convex hull of {h(·; θi)}. The minimum enclosing ball of a finite set in Rd has radius less than d
+
+2( d+1) 
+
+of its diameter (Jung’s Theorem (Jung, 1901)). Details are in our Appendix 6. 3.4.2. H IDDEN -STATE DISTANCE SIMILARITY .Theorem 1 implies that the representations’ distances be-tween different models fine-tuned on different tasks can be an effective metric to capture the task-level merging collapse. Inspired by theorem 1, we propose Hidden-state Distance Similarity which is calculated based on the average L2-distance between the hidden states of different models processing a same set of input, referred as di,j . Assuming we calculate hidden-state distance similarity over a group of models {1, 2, ..., n } and their hidden states’ L2-distances 
+
+D = d1,2, d 1,3, ...d n−1,n , hidden-state distance similarity is calculated through: 
+
+HiddenSim (i, j ) = 
+
+(1 i = j
+
+max (D)−di,j 
+
+max (D)−min (D) i̸ = j (2) 5An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse 
+
+, where HiddenSim stands for the Hidden-state distance similarity. In our experiments measuring hidden state dis-tances, we draw k = 5 datapoints from every task’s dataset and compose them into a validation dataset. By running models on the validation dataset, we compare their hidden states of the last layer by calculating the normalized L2 distance averaged across each datapoint. 3.4.3. E MPIRICAL RESULTS ON CORRELATION WHEN MERGING PAIRS OF MODELS 
+
+To validate our theoretical analysis with empirical results, we first investigate the correlation between conflict metrics and merging collapse. 
+
+Experiment Setting. As the conflict metrics are defined between two models, we perform additional experiment merging all the pairs ( C28 = 28 pairs) of Qwen2.5-3B check-points on GLUE dataset across five merging techniques. Though merging two models is much easier than merging eight, merging collapse persists in certain task combina-tions. 
+
+Results. Contrary to intuitive expectations, the widely adopted parameter update conflicts we introduced in Sec-tion 2 exhibit remarkably weak correlations with merging collapse across all four parameter update conflict metrics. This absence of correlation of existing parameter update con-flict metrics is particularly evident in Table 4, where we cal-culate the p-values of Pearson correlation coefficient (Ben-esty et al., 2009) to analyze how existing parameter conflict metrics are correlated to merging loss. With all p-values 
+
+> 0.05 , though we can’t sufficiently conclude that existing parameter conflict metrics has completely no correlation with merging loss, it is inarguable that they perform poorly to capture the underlying mechanisms driving merging col-lapse, further indicating that the phenomenon likely emerges from more complex, task-related incompatibilities rather than straightforward parameter update disagreements. Our hidden state distance similarity metric, on the other hand, shows a strong correlation with merging collapse. Ex-cept for DARE, which is found to have unstable merging performance like discussed in RQ1, all p-values of Pear-son correlation coefficient are much less than the threshold of p = 0 .05 . Even for DARE, our metric keeps a drastic advantage over existing metrics in correlation. Our met-ric corresponds significantly better to the actual merging performance than existing parameter update conflicts. 3.4.4. E MPIRICAL RESULTS ON HIDDENSIM FOR SCALED MERGING .We further extend our theory explanation to the situation where more models are merged together. 
+
+Experiment Setting. We perform our empirical investi-gation on four 8-task groups: one task group consisting of 8 Qwen2.5-3B checkpoints fine-tuned on GLUE tasks, and three task groups (a), (b), (c), each containing of 8 Lots-of-LoRAs tasks. 
+
+Visualization. Figure 1 demonstrates a strong correlation between hidden state similarity and merging performance in merging eight Qwen2.5-3B checkpoints in GLUE tasks, where most tasks show high similarity scores with other tasks, while certain tasks like QQP and WNLI exhibit signif-icantly lower scores with other tasks, explaining their poor merging outcomes in a certain way. This pattern extends to LoRA task groups, where we adopt similar experiments on three Lots-of-LoRAs task groups (a), (b), (c) and find out similar correlation between lower similarity score and awful merging performance or even merging collapse. 
+
+Quantitative Analysis. To better understand how hidden state similarity score is correlated to merging performance and conduct quantitative analysis, we define the Merging Difficulty Score (MDS) for each task i as the reciprocal of average representational similarity scores with other tasks (j̸ = i) : 
+
+M DS i = 1
+
+Average j̸ =i(HiddenSim (i, j )) (3) This metric, inspired by the resistance in physics, provides a non-linear measure of similarity scores amplifying the im-pact of low similarities where higher MDS indicates worse mergeability (higher merging loss), i.e., greater resistance to merging. In Table 7 ~ 10, we present the calculated MDS value and bold the columns with the most severe merging collapse across all merging techniques. Without exception, all tasks with merging collapse have a significantly larger MDS. A statistical analysis is also shown in Table 5, which shows the p-values of Pearson correlation coefficients between every task’s MDS and best merging loss across different merging techniques. Among all four eight-task groups, all p-values are lower than the threshold p = 0 .05 . Results in these tables support our expectation of MDS that higher MDS indicates worse mergeability, providing further empirical evidence of our theory. 6An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse 
+
+Table 4. P-values of Pearson correlation coefficient (Benesty et al., 2009) on how conflict metrics are correlated to merging loss with different merging techniques when merging two model checkpoints. p < 0.05 indicates statistical significance. 
+
+Conflict Metrics Merging Techniques TIES LA DARE SLERP TA 
+
+Parameter Magnitude Change Ratio 0.192 0.098 0.834 0.085 0.186 Parameter Sign Change Ratio 0.379 0.460 0.882 0.408 0.659 Conflicting Parameter Magnitude Change Ratio 0.170 0.170 0.979 0.156 0.235 Average Cosine Similarity 0.262 0.459 0.635 0.444 0.296 
+
+Hidden State Distance Similarity 0.006 0.001 0.145 0.001 0.006 cola mnli mrpc qnli qqp rte sst2 wnli                                                         
+
+> cola mnli mrpc qnli qqp rte sst2 wnli
+> 1.000 0.820 0.663 0.741 0.483 0.670 0.867 0.245
+> 0.820 1.000 0.742 0.824 0.514 0.763 0.779 0.317
+> 0.663 0.742 1.000 0.543 0.349 1.000 0.635 0.000
+> 0.741 0.824 0.543 1.000 0.420 0.554 0.628 0.446
+> 0.483 0.514 0.349 0.420 1.000 0.370 0.447 0.206
+> 0.670 0.763 1.000 0.554 0.370 1.000 0.654 0.037
+> 0.867 0.779 0.635 0.628 0.447 0.654 1.000 0.181
+> 0.245 0.317 0.000 0.446 0.206 0.037 0.181 1.000
+
+Hidden State Similarity 
+
+Figure 1. Heatmap of similarity score of hidden states in GLUE tasks. 
+
+Table 5. P-values of Pearson correlation coefficients. on how MDS is correlated to the best merging loss in merging Qwen2.5-3B checkpoints on GLUE and Lots-of-LoRAs task groups (a), (b) and (c) in experiments. p < 0.05 indicates statistical significance. 
+
+Merging tasks p-value 
+
+GLUE 0.0032 ≪ 0.05 
+
+group (a) 0.0013 ≪ 0.05 
+
+group (b) 0.0288 < 0.05 
+
+group (c) 0.0059 ≪ 0.05 
+
+These findings from both intuitive figures and quantitative analysis confirm that representational compatibility at the hidden state level, rather than parameter update conflicts, is more correlated with merging success or collapse, validating our theoretical analysis that merging collapse stems from differences in model representations. 
+
+Merging Tasks Selection Guiding. Merging models with higher similarity scores could lead to better merging perfor-
+
+Table 6. Comparison among three task groups. 
+
+(a) (a1) (a2) 
+
+Worst Loss -70.8 -17.8 -19.1 Worst MDS 5.05 2.52 2.89 
+
+mance. In group (a), the 6-th task incurs significant merging collapse. Using our MDS metric as a guide, we strategically replace this task with more compatible alternatives from Lots-of-LoRA tasks and construct task gropus (a1) and (a2). Comparing their merging performance with TIES as shown in Table 6, we find that merging tasks with lower MDS do achieve lesser merging collapse, further supporting our the-ory explanation and demonstrating the potential usefulness of our findings. 
+
+Table 7. Detail data when merging 8 checkpoints from GLUE dataset. 
+
+LA -2.1 -2.4 -15.6 -8.2 -25.7 -5.6 -1.8 -48.1 
+
+TA -1.9 -2.5 -15.6 -8.1 -25.7 -5.2 -1.9 -48.1 
+
+TIES -4.3 -0.7 -6.6 -26.9 -24.9 -10.4 -22.7 -30.8 
+
+MDS 1.56 1.47 1.78 1.68 2.51 1.73 1.72 4.89 
+
+Table 8. Detail data when merging group (a) tasks from Lots-of-LoRAs. 
+
+LA -9.7 -6.8 -0.6 17.0 -4.9 -78.0 -4.6 -16.5 TA -17.9 -18.7 -3.7 12.8 -6.3 -78.6 -6.4 -11.4 TIES -10.8 -6.0 -3.7 -0.9 -5.6 -70.8 -3.1 -15.5 MDS 2.85 1.99 2.90 1.64 1.68 5.05 1.98 2.65 
+
+Table 9. Detail data when merging group (B) tasks from Lots-of-LoRAs. 
+
+LA 2.5 -9.1 -30.0 -11.7 -10.7 -75.8 -40.2 0.7 TA -16.0 -16.3 -57.5 -14.7 -17.6 -78.9 -44.7 -9.9 TIES -4.1 -6.8 -39.1 -9.8 -14.5 -68.2 -54.8 -0.9 MDS 2.22 2.78 1.62 2.19 1.45 8.15 1.94 1.43 7An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse                                  
+
+> Table 10. Detail data when merging group (C) tasks from Lots-of-LoRAs.
+> LA 2.9 -15.2 -62.8 -18.6 -13.1 -5.8 -8.3 -1.0 TA -7.3 -40.7 -67.6 -22.3 -10.4 26.3 -35.5 -15.7 TIES -0.1 -32.6 -57.1 -5.9 -14.7 6.6 -4.5 -1.0 MDS 1.45 1.30 3.75 1.23 1.70 1.23 1.24 1.28
+
+Answer to RQ3: While parameter-level conflicts show lit-tle correlation with merging collapse across multiple con-flict calculation methods, hidden state similarity strongly correlates with merging success, with higher representa-tional compatibility corresponding to better merged per-formance. This confirms that merging collapse stems from fundamental differences in task representations rather than parameter disagreements, explaining why catastrophic degradation exists across different merging techniques. 
+
+## 4. Related Work 
+
+4.1. Development of LLMs 
+
+LLMs are increasingly being deployed across a wide range of application scenarios (Bommasani et al., 2021). These application scenarios span a spectrum of specialized do-mains, ranging from intelligent customer service systems requiring precise query resolution (Xiaoliang et al., 2024; Pandya & Holia, 2023) to clinical decision-support tools in healthcare diagnostics (Abbasian et al., 2023; Zhang et al., 2024), from real-time risk assessment frameworks in fi-nancial operations (Zhao et al., 2024; Hasan et al., 2020) to adaptive learning platforms for personalized educational rec-ommendations (Urdaneta-Ponte et al., 2021). This substan-tial diversity in task requirements and operational contexts poses unique challenges when adapting general-purpose LLMs to domain-specific downstream tasks. To enhance targeted capabilities of LLMs in specialized applications, fine-tuning has emerged as a predominant methodological paradigm (Yang et al., 2019; Brown, 2020; Raffel et al., 2023), enabling the alignment of pre-trained knowledge with task-specific objectives on curated domain datasets. The pre-training and fine-tuning paradigm makes linear mode connectivity (Nagarajan & Kolter, 2019; Frankle et al., 2020)—where solutions in parameter space can be linearly interpolated while maintaining performance—as an emer-gent property of fine-tuned models (Qin et al., 2022; Zhou et al., 2024). 
+
+4.2. Model Merging 
+
+There is a growing body of work on post-training model merging (Wortsman et al., 2022; Zhang et al., 2019; Ilharco et al., 2023; Chitale et al., 2023; Ortiz-Jimenez et al., 2024; Yadav et al., 2024a; Yu et al., 2024), which focuses on combining pre-trained models that have been fine-tuned on different tasks. Linear averaging approaches (Wortsman et al., 2022; Zhang et al., 2019) average parameters of mul-tiple fine-tuned models element-wise. Task arithmetic (Il-harco et al., 2023; Chitale et al., 2023; Ortiz-Jimenez et al., 2024) leverages task-specific weight vectors, to represent weights for specific tasks to facilitate direct manipulation of multi-task learning by adding or subtracting on task vectors. These approaches are vulnerable to parameter update con-flicts (Chen & Kwok, 2024; Kong et al., 2024). TIES (Yadav et al., 2024a) tries to reduce parameter update conflicts with heuristics such as trimming minor updates to avoid redun-dant updates (Zbontar et al., 2021). DARE (Yu et al., 2024) improves upon TIES by re-scaling the remaining parame-ters to keep the distributional stability. Twin-merging (Lu et al., 2024) and AdaMerging (Yang et al., 2023) relaxes the storage constraints to improve the model performance after merging. Despite these advances, a fundamental un-derstanding of merge conflicts remains underdeveloped. 
+
+## 5. Conclusion 
+
+In this paper, we have investigated the fundamental lim-itations of model merging and identified the key factors that determine merging success or failure. Our research reveals that task-level representational incompatibility is the primary driver of merging collapse, with certain task combinations consistently failing across all merging meth-ods. This finding challenges the conventional wisdom that parameter conflicts are the main obstacle to successful merg-ing. We further develop a theoretical framework based on rate-distortion theory that establishes relationship between model representation distances and merging collapse, veri-fied by empirical evidence. 8An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse 
+
+## References 
+
+Abbasian, M., Azimi, I., Rahmani, A. M., and Jain, R. Con-versational health agents: A personalized llm-powered agent framework. arXiv preprint arXiv:2310.02374 ,2023. Achiam, J., Adler, S., Agarwal, S., Ahmad, L., Akkaya, I., Aleman, F. L., Almeida, D., Altenschmidt, J., Altman, S., Anadkat, S., et al. Gpt-4 technical report. arXiv preprint arXiv:2303.08774 , 2023. Benesty, J., Chen, J., Huang, Y., and Cohen, I. Pearson correlation coefficient. In Noise reduction in speech pro-cessing , pp. 37–40. Springer, 2009. Berger, T. Rate-distortion theory. Wiley Encyclopedia of Telecommunications , 2003. Bommasani, R., Hudson, D. A., Adeli, E., Altman, R., Arora, S., von Arx, S., Bernstein, M. S., Bohg, J., Bosse-lut, A., Brunskill, E., et al. On the opportunities and risks of foundation models. arXiv preprint arXiv:2108.07258 ,2021. Brown, T. B. Language models are few-shot learners. arXiv preprint arXiv:2005.14165 , 2020. Brüel-Gabrielsson, R., Zhu, J., Bhardwaj, O., Choshen, L., Greenewald, K., Yurochkin, M., and Solomon, J. Com-press then serve: Serving thousands of lora adapters with little overhead. arXiv preprint arXiv:2407.00066 , 2024. Chen, M., Tworek, J., Jun, H., Yuan, Q., Pinto, H. P. D. O., Kaplan, J., Edwards, H., Burda, Y., Joseph, N., Brockman, G., et al. Evaluating large language models trained on code. arXiv preprint arXiv:2107.03374 , 2021. Chen, W. and Kwok, J. You only merge once: Learning the pareto set of preference-aware model merging. arXiv preprint arXiv:2408.12105 , 2024. Chitale, R., Vaidya, A., Kane, A., and Ghotkar, A. Task arithmetic with lora for continual learning, 2023. URL 
+
+https://arxiv.org/abs/2311.02428 .Deng, W., Zhao, Y., Vakilian, V., Chen, M., Li, X., and Thrampoulidis, C. Dare the extreme: Revisiting delta-parameter pruning for fine-tuned models, 2025. URL 
+
+https://arxiv.org/abs/2410.09344 .Frankle, J., Dziugaite, G. K., Roy, D., and Carbin, M. Linear mode connectivity and the lottery ticket hypothesis. In 
+
+International Conference on Machine Learning , pp. 3259– 3269. PMLR, 2020. Freeden, W. and Törnig, W. On spherical spline interpola-tion and approximation. Mathematical Methods in the Applied Sciences , 3(1):551–575, 1981. Goddard, C., Siriwardhana, S., Ehghaghi, M., Meyers, L., Karpukhin, V., Benedict, B., McQuade, M., and So-lawetz, J. Arcee’s MergeKit: A toolkit for merging large language models. In Dernoncourt, F., Preo¸ tiuc-Pietro, D., and Shimorina, A. (eds.), Proceedings of the 2024 Conference on Empirical Methods in Nat-ural Language Processing: Industry Track , pp. 477– 485, Miami, Florida, US, November 2024. Association for Computational Linguistics. doi: 10.18653/v1/2024. emnlp-industry.36. URL https://aclanthology. org/2024.emnlp-industry.36 .Grattafiori, A., Dubey, A., Jauhri, A., Pandey, A., Kadian, A., Al-Dahle, A., Letman, A., Mathur, A., et al. The llama 3 herd of models, 2024. URL https://arxiv. org/abs/2407.21783 .Guo, D., Yang, D., Zhang, H., Song, J., Zhang, R., Xu, R., Zhu, Q., Ma, S., Wang, P., Bi, X., et al. Deepseek-r1: In-centivizing reasoning capability in llms via reinforcement learning. arXiv preprint arXiv:2501.12948 , 2025. Hasan, M. M., Popp, J., and Oláh, J. Current landscape and influence of big data on finance. Journal of Big Data , 7 (1):21, 2020. Hendel, R., Geva, M., and Globerson, A. In-context learning creates task vectors. arXiv preprint arXiv:2310.15916 ,2023. Hendrycks, D., Burns, C., Basart, S., Zou, A., Mazeika, M., Song, D., and Steinhardt, J. Measuring mas-sive multitask language understanding. arXiv preprint arXiv:2009.03300 , 2020. Hojel, A., Bai, Y., Darrell, T., Globerson, A., and Bar, A. Finding visual task vectors. In European Conference on Computer Vision , pp. 257–273. Springer, 2024. Houlsby, N., Giurgiu, A., Jastrzebski, S., Morrone, B., De Laroussilhe, Q., Gesmundo, A., Attariyan, M., and Gelly, S. Parameter-efficient transfer learning for nlp. In 
+
+ICML , pp. 2790–2799. PMLR, 2019. Howard, J. and Ruder, S. Universal language model fine-tuning for text classification. arXiv preprint arXiv:1801.06146 , 2018. Hu, E. J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L., Chen, W., et al. Lora: Low-rank adaptation of large language models. ICLR , 1(2):3, 2022. Huang, C., Ye, P., Chen, T., He, T., Yue, X., and Ouyang, W. Emr-merging: Tuning-free high-performance model merging. arXiv preprint arXiv:2405.17461 , 2024. Ilharco, G., Ribeiro, M. T., Wortsman, M., Gururangan, S., Schmidt, L., Hajishirzi, H., and Farhadi, A. Editing 9An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse 
+
+models with task arithmetic, 2023. URL https:// arxiv.org/abs/2212.04089 .Jain, N., Han, K., Gu, A., Li, W.-D., Yan, F., Zhang, T., Wang, S., Solar-Lezama, A., Sen, K., and Stoica, I. Livecodebench: Holistic and contamination free eval-uation of large language models for code. arXiv preprint arXiv:2403.07974 , 2024. Jiang, A. Q., Sablayrolles, A., Mensch, A., Bamford, C., Chaplot, D. S., de las Casas, D., Bressand, F., Lengyel, G., Lample, G., Saulnier, L., Lavaud, L. R., Lachaux, M.-A., Stock, P., Scao, T. L., Lavril, T., Wang, T., Lacroix, T., and Sayed, W. E. Mistral 7b, 2023. URL https: //arxiv.org/abs/2310.06825 .Jung, H. Ueber die kleinste kugel, die eine räumliche figur einschliesst. Journal für die reine und angewandte Math-ematik (Crelles Journal) , 1901(123):241–257, 1901. Kong, F., Zhang, R., and Wang, Z. Activated parameter locating via causal intervention for model merging. arXiv preprint arXiv:2408.09485 , 2024. Li, L., Geng, S., Li, Z., He, Y., Yu, H., Hua, Z., Ning, G., Wang, S., Xie, T., and Yang, H. Infibench: Evaluating the question-answering capabilities of code large language models. Advances in Neural Information Processing Systems , 37:128668–128698, 2024. Lin, C.-Y. Rouge: A package for automatic evaluation of summaries. In Text summarization branches out , pp. 74–81, 2004. Liu, H., Tam, D., Muqeeth, M., Mohta, J., Huang, T., Bansal, M., and Raffel, C. A. Few-shot parameter-efficient fine-tuning is better and cheaper than in-context learning. Ad-vances in Neural Information Processing Systems , 35: 1950–1965, 2022. Lu, S., Guo, D., Ren, S., Huang, J., Svyatkovskiy, A., Blanco, A., Clement, C., Drain, D., Jiang, D., Tang, D., et al. Codexglue: A machine learning benchmark dataset for code understanding and generation. arXiv preprint arXiv:2102.04664 , 2021. Lu, Z., Fan, C., Wei, W., Qu, X., Chen, D., and Cheng, Y. Twin-merging: Dynamic integration of modular expertise in model merging. arXiv preprint arXiv:2406.15479 ,2024. Maxwell, S. E., Delaney, H. D., and Kelley, K. Designing experiments and analyzing data: A model comparison perspective . Routledge, 2017. Megiddo, N. Linear-time algorithms for linear programming in rˆ3 and related problems. SIAM journal on computing ,12(4):759–776, 1983. Nagarajan, V. and Kolter, J. Z. Uniform convergence may be unable to explain generalization in deep learning. Ad-vances in Neural Information Processing Systems , 32, 2019. Ortiz-Jimenez, G., Favero, A., and Frossard, P. Task arith-metic in the tangent space: Improved editing of pre-trained models. Advances in Neural Information Pro-cessing Systems , 36, 2024. Pandya, K. and Holia, M. Automating customer service using langchain: Building custom open-source gpt chat-bot for organizations. arXiv preprint arXiv:2310.05421 ,2023. Qin, Y., Qian, C., Yi, J., Chen, W., Lin, Y., Han, X., Liu, Z., Sun, M., and Zhou, J. Exploring mode connectivity for pre-trained language models. In Proceedings of the 2022 Conference on Empirical Methods in Natural Language Processing , pp. 6726–6746, 2022. Raffel, C., Shazeer, N., Roberts, A., Lee, K., Narang, S., Matena, M., Zhou, Y., Li, W., and Liu, P. J. Explor-ing the limits of transfer learning with a unified text-to-text transformer, 2023. URL https://arxiv.org/ abs/1910.10683 .Shumailov, I., Shumaylov, Z., Zhao, Y., Papernot, N., Ander-son, R., and Gal, Y. Ai models collapse when trained on recursively generated data. Nature , 631(8022):755–759, 2024. Touvron, H., Lavril, T., Izacard, G., Martinet, X., Lachaux, M.-A., Lacroix, T., Rozière, B., Goyal, N., Hambro, E., Azhar, F., et al. Llama: Open and efficient foundation lan-guage models. arXiv preprint arXiv:2302.13971 , 2023. Urdaneta-Ponte, M. C., Mendez-Zorrilla, A., and Oleagordia-Ruiz, I. Recommendation systems for ed-ucation: Systematic review. Electronics , 10(14):1611, 2021. Wang, A., Singh, A., Michael, J., Hill, F., Levy, O., and Bowman, S. R. Glue: A multi-task benchmark and anal-ysis platform for natural language understanding. arXiv preprint arXiv:1804.07461 , 2018. Wolf, T., Debut, L., Sanh, V., Chaumond, J., Delangue, C., Moi, A., Cistac, P., Rault, T., Louf, R., Funtowicz, M., et al. Transformers: State-of-the-art natural language processing. In Proceedings of the 2020 conference on em-pirical methods in natural language processing: system demonstrations , pp. 38–45, 2020. Wortsman, M., Ilharco, G., Gadre, S. Y., Roelofs, R., Gontijo-Lopes, R., Morcos, A. S., Namkoong, H., Farhadi, A., Carmon, Y., Kornblith, S., et al. Model soups: averaging weights of multiple fine-tuned models 10 An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse 
+
+improves accuracy without increasing inference time. In 
+
+International conference on machine learning , pp. 23965– 23998. PMLR, 2022. Xiaoliang, M., RuQiang, Z., Ying, L., Congjian, D., and Dequan, D. Design of a large language model for improv-ing customer service in telecom operators. Electronics Letters , 60(10):e13218, 2024. Yadav, P., Tam, D., Choshen, L., Raffel, C. A., and Bansal, M. Ties-merging: Resolving interference when merging models. Advances in Neural Information Processing Systems , 36, 2024a. Yadav, P., Vu, T., Lai, J., Chronopoulou, A., Faruqui, M., Bansal, M., and Munkhdalai, T. What matters for model merging at scale? arXiv preprint arXiv:2410.03617 ,2024b. Yang, A., Yang, B., Zhang, B., Hui, B., Zheng, B., Yu, B., Li, C., Liu, D., Huang, F., Wei, H., et al. Qwen2. 5 technical report. arXiv preprint arXiv:2412.15115 , 2024a. Yang, E., Wang, Z., Shen, L., Liu, S., Guo, G., Wang, X., and Tao, D. Adamerging: Adaptive model merging for multi-task learning. arXiv preprint arXiv:2310.02575 ,2023. Yang, E., Shen, L., Guo, G., Wang, X., Cao, X., Zhang, J., and Tao, D. Model merging in llms, mllms, and beyond: Methods, theories, applications and opportunities. arXiv preprint arXiv:2408.07666 , 2024b. Yang, Z., Dai, Z., Yang, Y., Carbonell, J., Salakhutdinov, R. R., and Le, Q. V. Xlnet: Generalized autoregressive pretraining for language understanding. Advances in neural information processing systems , 32, 2019. Yu, L., Yu, B., Yu, H., Huang, F., and Li, Y. Language models are super mario: Absorbing abilities from homol-ogous models as a free lunch. In Forty-first International Conference on Machine Learning , 2024. Zbontar, J., Jing, L., Misra, I., LeCun, Y., and Deny, S. Barlow twins: Self-supervised learning via redundancy reduction. In International conference on machine learn-ing , pp. 12310–12320. PMLR, 2021. Zhang, K., Kang, Y., Zhao, F., and Liu, X. Llm-based medical assistant personalization with short-and long-term memory coordination. In NAACL , pp. 2386–2398, 2024. Zhang, X., Ma, Y., and Carroll, R. J. Malmem: model aver-aging in linear measurement error models. Journal of the Royal Statistical Society Series B: Statistical Methodol-ogy , 81(4):763–779, 2019. Zhao, H., Liu, Z., Wu, Z., Li, Y., Yang, T., Shu, P., Xu, S., Dai, H., Zhao, L., Mai, G., et al. Revolutionizing finance with llms: An overview of applications and in-sights. arXiv preprint arXiv:2401.11641 , 2024. Zhou, Z., Chen, Z., Chen, Y., Zhang, B., and Yan, J. On the emergence of cross-task linearity in pretraining-finetuning paradigm. In International Conference on Machine Learning , pp. 61854–61884. PMLR, 2024. 11 An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse 
+
+## Acknowledgments 
+
+Tao Xie is with the Key Laboratory of High Confidence Software Technologies (Peking University), Ministry of Ed-ucation; School of Computer Science, Peking University, Beijing, China; Beijing Tongming Lake Information Tech-nology Application Innovation Center; Fudan University Institute of Systems for Advanced Computing, Shanghai, China; Shanghai Institute of Systems for Open Computing, Shanghai, China. This work was partially supported by the National Natural Science Foundation of China under Grant No. 92464301, U25A6023. Dezhi Ran is partially supported by a Hunyuan Scholar Award. 
+
+## 6. Proof of Theorem 1 
+
+Lemma 1 (Jung’s Theorem (Jung, 1901)) . For any finite set 
+
+S ⊂ Rd with diameter diam( S) = max u,v ∈S ∥u − v∥2 =∆, there exists a point c ∈ conv( S) such that 
+
+max  
+
+> s∈S
+
+∥c − s∥2 ≤
+
+s
+
+d
+
+2( d + 1) ∆.
+
+Proof. The centre of the minimum enclosing ball of S
+
+has the stated properties and lies in the convex hull (by classic results on the smallest enclosing ball in Euclidean space (Megiddo, 1983)). 
+
+Proof of Theorem 1. Throughout we abbreviate Hi(x) = 
+
+h(x; θi) for the unique input x.
+
+Step 1: Achievability ( D⋆ ≤ d 
+
+> 2( d+1)
+
+∆2). Fix any co-efficients α = {αi}Ni=1 with αi ≥ 0, P 
+
+> i
+
+αi = 1 . LMC ensures that the hidden state of their convex merge satisfies 
+
+h(x; ¯θ) = h
+
+
+
+x; X
+
+> i
+
+αiθi
+
+
+
+= X
+
+> i
+
+αi h(x; θi) = X
+
+> i
+
+αiHi(x) ∈ conv {Hi(x)}i.
+
+(4) Apply Lemma 1 to the finite set {Hi(x)}i: choosing the same convex coefficients α ensures that h(x; ¯θ) coincides with the centre c(x) of the minimum enclosing ball, hence 
+
+h(x; ¯θ) − Hi(x) 2 ≤
+
+q d 
+
+> 2( d+1)
+
+∆x for every i, where 
+
+∆x = max j,k ∥Hj (x) − Hk(x)∥2 ≤ ∆. Taking expecta-tions and the maximum over i yields δmax (¯θ) ≤ d 
+
+> 2( d+1)
+
+∆2.
+
+Step 2: Converse ( D⋆ ≥ 14 ∆2). Let ˆθ be any merged model and choose indices (i, j ) that realise the diameter 
+
+d(i, j ) = ∆ . The triangle inequality gives 
+
+d(i, j ) = 
+
+q
+
+EX ∥Hi(X) − Hj (X)∥22 ≤
+
+q
+
+δi(ˆθ)+ 
+
+q
+
+δj (ˆθ) ≤ 2
+
+q
+
+δmax (ˆθ).
+
+Squaring both sides implies δmax (ˆθ) ≥ 14 ∆2, proving the lower bound. 
+
+Step 3: Rate–distortion statement. Let the random pair 
+
+(X, I ) be distributed according to PX × Unif {1, . . . , N },and define Y = h(X; θI ). A zero-rate encoder cannot send any information about I, so the decoder must output a reconstruction ˆY that is independent of I and is therefore produced by a single parameter vector ˆθ. The minimum achievable mean-squared error is precisely D⋆. Shannon’s converse then asserts that R(D) = 0 iff D ≥ D⋆, while for 
+
+D < D ⋆ at least log 2 N bits are necessary to transmit the expert identity, establishing the claimed R(D) behaviour. 
+
+Step 4: Putting the pieces together. Steps 1 and 2 show  
+
+> 14
+
+∆2 ≤ D⋆ ≤ d 
+
+> 2( d+1)
+
+∆2 and identify any convex merge (including the uniform average) as optimal. Step 3 con-nects this constant to the fundamental rate–distortion limit, completing the proof. 
+
+Corollary 1 (Practical mergeability test) . Given a distortion budget Dbudget , a set of models is mergeable under LMC iff their hidden–state diameter ∆ satisfies d 
+
+> 2( d+1)
+
+∆2 ≤
+
+Dbudget . Since the hidden dimension d is typically large in language models, d 
+
+> 2( d+1)
+
+can be approximated by 12 .
+
+12

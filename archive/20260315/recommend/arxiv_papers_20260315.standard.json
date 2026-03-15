@@ -1,0 +1,462 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-03-15T19:17:30.023465+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 0,
+    "deep_cap": 6,
+    "deep_selected": 0,
+    "quick_candidates": 15,
+    "quick_skim_target": 11,
+    "quick_selected": 11
+  },
+  "deep_dive": [],
+  "quick_skim": [
+    {
+      "id": "2603.08391v2",
+      "title": "Adaptive Loops and Memory in Transformers: Think Harder or Know More?",
+      "abstract": "Chain-of-thought (CoT) prompting enables reasoning in language models but requires explicit verbalization of intermediate steps. Looped transformers offer an alternative by iteratively refining representations within hidden states. This parameter efficiency comes at a cost, as looped models lack the storage capacity of deeper models which use unique weights per layer. In this work, we investigate transformer models that feature both adaptive per-layer looping, where each transformer block learns to iterate its hidden state via a learned halting mechanism, and gated memory banks, that provide additional learned storage. We find that looping primarily benefits mathematical reasoning, while memory banks help recover performance on commonsense tasks compared to parameter and FLOP matched models. Combining both mechanisms yields a model that outperforms an iso-FLOP baseline, with three times the number of layers, across math benchmarks. Analysis of model internals reveals layer specialization: early layers learn to loop minimally and access memory sparingly, while later layers do both more heavily.",
+      "authors": [
+        "Markus Frey",
+        "Behzad Shomali",
+        "Ali Hamza Bashir",
+        "David Berghaus",
+        "Mehdi Ali"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-03-09T13:49:03+00:00",
+      "link": "https://arxiv.org/pdf/2603.08391v2",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "parameter efficiency via looped transformers and adaptive mechanisms",
+      "llm_evidence_cn": "通过循环Transformer和自适应机制实现参数高效",
+      "llm_evidence": "通过循环Transformer和自适应机制实现参数高效",
+      "canonical_evidence": "通过循环Transformer和自适应机制实现参数高效",
+      "llm_tldr_en": "Investigates parameter-efficient looped transformers with adaptive halting and gated memory banks.",
+      "llm_tldr_cn": "研究具有自适应停止机制和门控记忆库的参数高效循环Transformer。",
+      "llm_tldr": "研究具有自适应停止机制和门控记忆库的参数高效循环Transformer。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "New architectures for low resource model fine tuning",
+      "matched_requirement_id": "req-11",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.07506v1",
+      "title": "A Unified Framework for Knowledge Transfer in Bidirectional Model Scaling",
+      "abstract": "Transferring pre-trained knowledge from a source model to a target model of a different architectural size is a key challenge for flexible and efficient model scaling. However, current parameter-space methods treat Small-to-Large (S2L) and Large-to-Small (L2S) scaling as separate, incompatible problems, focusing on parameter synthesis and selection, respectively. This fragmented perspective has resulted in specialized tools, hindering a unified, bidirectional framework. In this paper, we propose BoT (Bidirectional knowledge Transfer), the first size-agnostic framework to unify S2L and L2S scaling. Our core insight is to treat model weights as continuous signals, where models of different sizes represent distinct discretizations of the transferable knowledge. This multi-resolution perspective directly casts S2L and L2S scaling as the signal processing operations of upsampling and downsampling, naturally leading to the adoption of the Discrete Wavelet Transform (DWT) and its Inverse (IDWT). BoT leverages the recursive nature of wavelets, using the decomposition level as a dynamic scaling factor to bridge disparate model sizes in a parameter-free and computationally efficient manner. Extensive experiments on DeiT, BERT, and GPT demonstrate significant pre-training FLOPs savings (up to 67.1% for S2L, 52.8% for L2S) and state-of-the-art performance on benchmarks like GLUE and SQuAD.",
+      "authors": [
+        "Jianlu Shen",
+        "Fu Feng",
+        "Jiaze Xu",
+        "Yucheng Xie",
+        "Jiaqi Lv",
+        "Xin Geng"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-03-08T07:23:16+00:00",
+      "link": "https://arxiv.org/pdf/2603.07506v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "size-agnostic framework to unify knowledge transfer in model scaling",
+      "llm_evidence_cn": "统一模型缩放中知识迁移的尺寸无关框架",
+      "llm_evidence": "统一模型缩放中知识迁移的尺寸无关框架",
+      "canonical_evidence": "统一模型缩放中知识迁移的尺寸无关框架",
+      "llm_tldr_en": "Proposes a framework for efficient knowledge transfer between models of different sizes during scaling.",
+      "llm_tldr_cn": "提出一个在模型缩放过程中实现不同尺寸模型间高效知识迁移的框架。",
+      "llm_tldr": "提出一个在模型缩放过程中实现不同尺寸模型间高效知识迁移的框架。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "New architectures for low resource model fine tuning",
+      "matched_requirement_id": "req-11",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.08391v3",
+      "title": "Adaptive Loops and Memory in Transformers: Think Harder or Know More?",
+      "abstract": "Chain-of-thought (CoT) prompting enables reasoning in language models but requires explicit verbalization of intermediate steps. Looped transformers offer an alternative by iteratively refining representations within hidden states. This parameter efficiency comes at a cost, as looped models lack the storage capacity of deeper models which use unique weights per layer. In this work, we investigate transformer models that feature both adaptive per-layer looping, where each transformer block learns to iterate its hidden state via a learned halting mechanism, and gated memory banks, that provide additional learned storage. We find that looping primarily benefits mathematical reasoning, while memory banks help recover performance on commonsense tasks compared to parameter and FLOP matched models. Combining both mechanisms yields a model that outperforms an iso-FLOP baseline, with three times the number of layers, across math benchmarks. Analysis of model internals reveals layer specialization: early layers learn to loop minimally and access memory sparingly, while later layers do both more heavily.",
+      "authors": [
+        "Markus Frey",
+        "Behzad Shomali",
+        "Ali Hamza Bashir",
+        "David Berghaus",
+        "Joachim Koehler",
+        "Mehdi Ali"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-03-09T13:49:03+00:00",
+      "link": "https://arxiv.org/pdf/2603.08391v3",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "parameter efficiency via looped transformers and adaptive hidden state iteration",
+      "llm_evidence_cn": "通过循环Transformer和自适应隐藏状态迭代实现参数效率",
+      "llm_evidence": "通过循环Transformer和自适应隐藏状态迭代实现参数效率",
+      "canonical_evidence": "通过循环Transformer和自适应隐藏状态迭代实现参数效率",
+      "llm_tldr_en": "Investigates parameter-efficient looped transformers with adaptive hidden states and memory banks.",
+      "llm_tldr_cn": "研究了具有自适应隐藏状态和记忆库的参数高效循环Transformer模型。",
+      "llm_tldr": "研究了具有自适应隐藏状态和记忆库的参数高效循环Transformer模型。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "New architectures for low resource model fine tuning",
+      "matched_requirement_id": "req-11",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.07554v1",
+      "title": "Nwāchā Munā: A Devanagari Speech Corpus and Proximal Transfer Benchmark for Nepal Bhasha ASR",
+      "abstract": "Nepal Bhasha (Newari), an endangered language of the Kathmandu Valley, remains digitally marginalized due to the severe scarcity of annotated speech resources. In this work, we introduce Nwāchā Munā, a newly curated 5.39-hour manually transcribed Devanagari speech corpus for Nepal Bhasha, and establish the first benchmark using script-preserving acoustic modeling. We investigate whether proximal cross-lingual transfer from a geographically and linguistically adjacent language (Nepali) can rival large-scale multilingual pretraining in an ultra-low-resource Automatic Speech Recognition (ASR) setting. Fine-tuning a Nepali Conformer model reduces the Character Error Rate (CER) from a 52.54% zero-shot baseline to 17.59% with data augmentation, effectively matching the performance of the multilingual Whisper-Small model despite utilizing significantly fewer parameters. Our findings demonstrate that proximal transfer within South Asian language clusters serves as a computationally efficient alternative to massive multilingual models. We openly release the dataset and benchmarks to digitally enable the Newari community and foster further research in Nepal Bhasha.",
+      "authors": [
+        "Rishikesh Kumar Sharma",
+        "Safal Narshing Shrestha",
+        "Jenny Poudel",
+        "Rupak Tiwari",
+        "Arju Shrestha",
+        "Rupak Raj Ghimire",
+        "Bal Krishna Bal"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.AI",
+        "cs.SD"
+      ],
+      "published": "2026-03-08T09:35:05+00:00",
+      "link": "https://arxiv.org/pdf/2603.07554v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Fine-tuning for low-resource ASR",
+      "llm_evidence_cn": "针对低资源语音识别的微调",
+      "llm_evidence": "针对低资源语音识别的微调",
+      "canonical_evidence": "针对低资源语音识别的微调",
+      "llm_tldr_en": "Benchmarks proximal transfer and fine-tuning for ultra-low-resource Nepal Bhasha speech recognition.",
+      "llm_tldr_cn": "针对极低资源的尼泊尔语语音识别，建立了近端迁移和微调的基准。",
+      "llm_tldr": "针对极低资源的尼泊尔语语音识别，建立了近端迁移和微调的基准。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "New architectures for low resource model fine tuning",
+      "matched_requirement_id": "req-11",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.10444v1",
+      "title": "The Curse and Blessing of Mean Bias in FP4-Quantized LLM Training",
+      "abstract": "Large language models trained on natural language exhibit pronounced anisotropy: a small number of directions concentrate disproportionate energy, while the remaining dimensions form a broad semantic tail. In low-bit training regimes, this geometry becomes numerically unstable. Because blockwise quantization scales are determined by extreme elementwise magnitudes, dominant directions stretch the dynamic range, compressing long-tail semantic variation into narrow numerical bins. We show that this instability is primarily driven by a coherent rank-one mean bias, which constitutes the dominant component of spectral anisotropy in LLM representations. This mean component emerges systematically across layers and training stages and accounts for the majority of extreme activation magnitudes, making it the principal driver of dynamic-range inflation under low precision. Crucially, because the dominant instability is rank-one, it can be eliminated through a simple source-level mean-subtraction operation. This bias-centric conditioning recovers most of the stability benefits of SVD-based spectral methods while requiring only reduction operations and standard quantization kernels. Empirical results on FP4 (W4A4G4) training show that mean removal substantially narrows the loss gap to BF16 and restores downstream performance, providing a hardware-efficient path to stable low-bit LLM training.",
+      "authors": [
+        "Hengjie Cao",
+        "Zhendong Huang",
+        "Mengyi Chen",
+        "Yifeng Yang",
+        "Fanqi Yu",
+        "Ruijun Huang",
+        "Fang Dong",
+        "Xin Zhang",
+        "Jixian Zhou",
+        "Anrui Chen",
+        "Mingzhi Dong",
+        "Yujiang Wang",
+        "Jinlong Hou",
+        "Qin Lv",
+        "Yuan Cheng",
+        "Tun Lu",
+        "Fan Yang",
+        "Li Shang"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-03-11T05:59:12+00:00",
+      "link": "https://arxiv.org/pdf/2603.10444v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Low-bit FP4-quantized LLM training stability",
+      "llm_evidence_cn": "低比特FP4量化LLM训练稳定性",
+      "llm_evidence": "低比特FP4量化LLM训练稳定性",
+      "canonical_evidence": "低比特FP4量化LLM训练稳定性",
+      "llm_tldr_en": "Analyzes mean bias in FP4-quantized LLM training to improve stability in low-bit regimes.",
+      "llm_tldr_cn": "分析了FP4量化LLM训练中的均值偏差，以提高低比特训练的稳定性。",
+      "llm_tldr": "分析了FP4量化LLM训练中的均值偏差，以提高低比特训练的稳定性。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Quantized Low-Rank Adaptation for LLMs",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.08065v1",
+      "title": "Deterministic Differentiable Structured Pruning for Large Language Models",
+      "abstract": "Structured pruning reduces LLM inference cost by removing low-importance architectural components. This can be viewed as learning a multiplicative gate for each component under an l0 sparsity constraint. Due to the discreteness of the l0 norm, prior work typically adopts stochastic hard-concrete relaxations to enable differentiable optimization; however, this stochasticity can introduce a train--test mismatch when sampled masks are discretized for deployment and restricts masks to a bounded, near-binary range. To address this, we propose Deterministic Differentiable Pruning (DDP), a mask-only optimization method that eliminates stochasticity by directly optimizing a deterministic soft surrogate of the discrete l0 objective. Compared with prior approaches, DDP offers greater expressiveness, reduced train--test mismatch, and faster convergence. We apply our method to several dense and MoE models, including Qwen3-32B and Qwen3-30B-A3B, achieving a performance loss as small as 1% on downstream tasks while outperforming previous methods at 20% sparsity. We further demonstrate end-to-end inference speedups in realistic deployment settings with vLLM.",
+      "authors": [
+        "Weiyu Huang",
+        "Pengle Zhang",
+        "Xiaolu Zhang",
+        "Jun Zhou",
+        "Jun Zhu",
+        "Jianfei Chen"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.CL"
+      ],
+      "published": "2026-03-09T07:59:17+00:00",
+      "link": "https://arxiv.org/pdf/2603.08065v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "structured pruning to reduce LLM inference cost and architectural components",
+      "llm_evidence_cn": "通过结构化剪枝减少LLM推理成本和架构组件",
+      "llm_evidence": "通过结构化剪枝减少LLM推理成本和架构组件",
+      "canonical_evidence": "通过结构化剪枝减少LLM推理成本和架构组件",
+      "llm_tldr_en": "Proposes Deterministic Differentiable Pruning to efficiently reduce LLM size and inference costs.",
+      "llm_tldr_cn": "提出了确定性可微剪枝，以有效减小LLM规模并降低推理成本。",
+      "llm_tldr": "提出了确定性可微剪枝，以有效减小LLM规模并降低推理成本。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Memory-efficient fine-tuning strategies for large models",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.10887v1",
+      "title": "Dynamics-Predictive Sampling for Active RL Finetuning of Large Reasoning Models",
+      "abstract": "Reinforcement learning (RL) finetuning has become a key technique for enhancing the reasoning abilities of large language models (LLMs). However, its effectiveness critically depends on the selection of training data. Recent advances underscore the importance of online prompt selection methods, which typically concentrate training on partially solved or moderately challenging examples under the current policy, thereby yielding more effective model updates. While significantly accelerating RL finetuning in terms of training steps, they also incur substantial computational overhead by requiring extensive LLM rollouts over large candidate batches to identify informative samples, an expense that can outweigh the finetuning process itself. To address this challenge, this work proposes Dynamics-Predictive Sampling (DPS), which online predicts and selects informative prompts by inferring their learning dynamics prior to costly rollouts. Specifically, we introduce a new perspective by modeling each prompt's solving progress during RL finetuning as a dynamical system, where the extent of solving is represented as the state and the transition is characterized by a hidden Markov model. Using historical rollout reward signals, we perform online Bayesian inference to estimate evolving state distributions, and the inference outcome provides a predictive prior for efficient prompt selection without rollout-intensive filtering. Empirical results across diverse reasoning tasks, including mathematics, planning, and visual geometry, demonstrate that DPS substantially reduces redundant rollouts, accelerates the training process, and achieves superior reasoning performance.",
+      "authors": [
+        "Yixiu Mao",
+        "Yun Qu",
+        "Qi Wang",
+        "Heming Zou",
+        "Xiangyang Ji"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-03-11T15:31:14+00:00",
+      "link": "https://arxiv.org/pdf/2603.10887v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "efficient RL finetuning for LLMs",
+      "llm_evidence_cn": "大模型的高效强化学习微调",
+      "llm_evidence": "大模型的高效强化学习微调",
+      "canonical_evidence": "大模型的高效强化学习微调",
+      "llm_tldr_en": "Accelerates RL finetuning of reasoning models through dynamics-predictive sampling to reduce rollout overhead.",
+      "llm_tldr_cn": "通过动力学预测采样减少Rollout开销，加速推理大模型的强化学习微调。",
+      "llm_tldr": "通过动力学预测采样减少Rollout开销，加速推理大模型的强化学习微调。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.08083v1",
+      "title": "High-Fidelity Pruning for Large Language Models",
+      "abstract": "Large Language Models (LLMs) have demonstrated exceptional performance across a wide range of tasks, yet their significant computational and memory requirements present major challenges for deployment. A common approach uses Taylor expansion on the loss function to estimate neuron importance. However, its reliance on one-hot cross entropy loss, a key limitation is that it narrowly assesses importance based only on the probability assigned to the single predicted next token, thereby ignoring the other potential predictions of the original model. An intuitive solution to address this is to employ self distillation criterion for importance evaluation. However, this approach introduces significant computational overhead by requiring a separate teacher model for supervision. To this end, we propose a simple but effective criterion, information entropy of the model's output distribution, to efficiently evaluate importance scores of neurons with Taylor pruning without requirement of additional teacher. Compared to plain cross entropy criterion, it provides a more holistic criterion for Taylor pruning to prune neurons with the least impact on the prediction of model in a global manner, thereby preserving the fidelity of the model's predictive capabilities. Experimental results on extensive zero-shot benchmarks demonstrate that our method consistently outperforms existing pruning methods across the LLaMA and Qwen series models. The source code and trained weights are availabel at https://github.com/visresearch/HFPrune.",
+      "authors": [
+        "Yijun Zhu",
+        "Jianxin Wang",
+        "Chengchao Shen"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-03-09T08:24:48+00:00",
+      "link": "https://arxiv.org/pdf/2603.08083v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "High-fidelity pruning for memory-efficient deployment",
+      "llm_evidence_cn": "用于内存高效部署的高保真剪枝",
+      "llm_evidence": "用于内存高效部署的高保真剪枝",
+      "canonical_evidence": "用于内存高效部署的高保真剪枝",
+      "llm_tldr_en": "Proposes a self-distillation criterion for LLM pruning to reduce computational and memory requirements.",
+      "llm_tldr_cn": "提出一种自蒸馏准则用于LLM剪枝，以降低计算和内存需求。",
+      "llm_tldr": "提出一种自蒸馏准则用于LLM剪枝，以降低计算和内存需求。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Memory-efficient fine-tuning strategies for large models",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.12248v1",
+      "title": "Matching Features, Not Tokens: Energy-Based Fine-Tuning of Language Models",
+      "abstract": "Cross-entropy (CE) training provides dense and scalable supervision for language models, but it optimizes next-token prediction under teacher forcing rather than sequence-level behavior under model rollouts. We introduce a feature-matching objective for language-model fine-tuning that targets sequence-level statistics of the completion distribution, providing dense semantic feedback without requiring a task-specific verifier or preference model. To optimize this objective efficiently, we propose energy-based fine-tuning (EBFT), which uses strided block-parallel sampling to generate multiple rollouts from nested prefixes concurrently, batches feature extraction over these rollouts, and uses the resulting embeddings to perform an on-policy policy-gradient update. We present a theoretical perspective connecting EBFT to KL-regularized feature-matching and energy-based modeling. Empirically, across Q&A coding, unstructured coding, and translation, EBFT matches RLVR and outperforms SFT on downstream accuracy while achieving a lower validation cross-entropy than both methods.",
+      "authors": [
+        "Samy Jelassi",
+        "Mujin Kwun",
+        "Rosie Zhao",
+        "Yuanzhi Li",
+        "Nicolo Fusi",
+        "Yilun Du",
+        "Sham M. Kakade",
+        "Carles Domingo-Enrich"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-03-12T17:57:50+00:00",
+      "link": "https://arxiv.org/pdf/2603.12248v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "feature-matching objective for language-model fine-tuning",
+      "llm_evidence_cn": "语言模型微调的特征匹配目标",
+      "llm_evidence": "语言模型微调的特征匹配目标",
+      "canonical_evidence": "语言模型微调的特征匹配目标",
+      "llm_tldr_en": "Introduces energy-based fine-tuning (EBFT) for sequence-level semantic feedback.",
+      "llm_tldr_cn": "引入基于能量的微调（EBFT），通过特征匹配提供序列级语义反馈。",
+      "llm_tldr": "引入基于能量的微调（EBFT），通过特征匹配提供序列级语义反馈。",
+      "llm_tags": [
+        "query:peft"
+      ],
+      "matched_query_tag": "query:peft",
+      "matched_query_text": "Parameter-efficient fine-tuning methods for large language models",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2603.09065v1",
+      "title": "Learning Adaptive LLM Decoding",
+      "abstract": "Decoding from large language models (LLMs) typically relies on fixed sampling hyperparameters (e.g., temperature, top-p), despite substantial variation in task difficulty and uncertainty across prompts and individual decoding steps. We propose to learn adaptive decoding policies that dynamically select sampling strategies at inference time, conditioned on available compute resources. Rather than fine-tuning the language model itself, we introduce lightweight decoding adapters trained with reinforcement learning and verifiable terminal rewards (e.g. correctness on math and coding tasks). At the sequence level, we frame decoding as a contextual bandit problem: a policy selects a decoding strategy (e.g. greedy, top-k, min-p) for each prompt, conditioned on the prompt embedding and a parallel sampling budget. At the token level, we model decoding as a partially observable Markov decision process (POMDP), where a policy selects sampling actions at each token step based on internal model features and the remaining token budget. Experiments on the MATH and CodeContests benchmarks show that the learned adapters improve the accuracy-budget tradeoff: on MATH, the token-level adapter improves Pass@1 accuracy by up to 10.2% over the best static baseline under a fixed token budget, while the sequence-level adapter yields 2-3% gains under fixed parallel sampling. Ablation analyses support the contribution of both sequence- and token-level adaptation.",
+      "authors": [
+        "Chloe H. Su",
+        "Zhe Ye",
+        "Samuel Tenka",
+        "Aidan Yang",
+        "Soonho Kong",
+        "Udaya Ghai"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-03-10T01:15:26+00:00",
+      "link": "https://arxiv.org/pdf/2603.09065v1",
+      "tags": [
+        "keyword:PEFT",
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Lightweight decoding adapters for adaptive LLM inference",
+      "llm_evidence_cn": "用于自适应大模型推理的轻量级解码适配器",
+      "llm_evidence": "用于自适应大模型推理的轻量级解码适配器",
+      "canonical_evidence": "用于自适应大模型推理的轻量级解码适配器",
+      "llm_tldr_en": "Introduces lightweight adapters to dynamically select decoding strategies without fine-tuning the base model.",
+      "llm_tldr_cn": "引入轻量级适配器，在不微调基础模型的情况下动态选择推理阶段的解码策略。",
+      "llm_tldr": "引入轻量级适配器，在不微调基础模型的情况下动态选择推理阶段的解码策略。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2603.09463v1",
+      "title": "An Empirical Study and Theoretical Explanation on Task-Level Model-Merging Collapse",
+      "abstract": "Model merging unifies independently fine-tuned LLMs from the same base, enabling reuse and integration of parallel development efforts without retraining. However, in practice we observe that merging does not always succeed: certain combinations of task-specialist models suffer from catastrophic performance degradation after merging. We refer to this failure mode as merging collapse. Intuitively, collapse arises when the learned representations or parameter adjustments for different tasks are fundamentally incompatible, so that merging forces destructive interference rather than synergy. In this paper, we identify and characterize the phenomenon of task-level merging collapse, where certain task combinations consistently trigger huge performance degradation across all merging methods. Through extensive experiments and statistical analysis, we demonstrate that representational incompatibility between tasks is strongly correlated with merging collapse, while parameter-space conflict metrics show minimal correlation, challenging conventional wisdom in model merging literature. We provide a theoretical explanation on this phenomenon through rate-distortion theory with a dimension-dependent bound, establishing fundamental limits on task mergeability regardless of methodology.",
+      "authors": [
+        "Yuan Cao",
+        "Dezhi Ran",
+        "Yuzhe Guo",
+        "Mengzhou Wu",
+        "Simin Chen",
+        "Linyi Li",
+        "Wei Yang",
+        "Tao Xie"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-03-10T10:18:32+00:00",
+      "link": "https://arxiv.org/pdf/2603.09463v1",
+      "tags": [
+        "query:PEFT"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Analysis of merging independently fine-tuned LLMs",
+      "llm_evidence_cn": "分析独立微调后的LLM模型合并问题",
+      "llm_evidence": "分析独立微调后的LLM模型合并问题",
+      "canonical_evidence": "分析独立微调后的LLM模型合并问题",
+      "llm_tldr_en": "Investigates why merging fine-tuned models sometimes fails and characterizes task-level merging collapse.",
+      "llm_tldr_cn": "研究了微调模型合并失败的原因，并定义了任务级合并崩溃现象。",
+      "llm_tldr": "研究了微调模型合并失败的原因，并定义了任务级合并崩溃现象。",
+      "llm_tags": [
+        "query:peft:composite"
+      ],
+      "matched_query_tag": "query:peft:composite",
+      "matched_query_text": "Papers central to 帮我找最近的大模型高效微调的论文, especially work that connects or combines: Parameter-efficient fine-tuning methods for large language models; Low-Rank Adaptation of large language models; Soft prompt tuning and prefix tuning techniques; Quantized Low-Rank Adaptation for LLMs; Memory-efficient fine-tuning strategies for large models; Delta tuning methods for pre-trained language models; State of the art parameter efficient fine tuning techniques; Recent advances in efficient adaptation of large language models; Comparative study of PEFT methods for LLMs; Survey of efficient fine tuning for foundation models.",
+      "matched_requirement_id": "req-composite-peft",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}
